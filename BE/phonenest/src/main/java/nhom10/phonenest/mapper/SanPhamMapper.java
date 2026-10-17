@@ -1,8 +1,8 @@
-package nhom11.phonenest.mapper;
+package nhom10.phonenest.mapper;
 
-import nhom11.phonenest.dto.SanPhamDto;
-import nhom11.phonenest.entity.HinhAnhSanPham;
-import nhom11.phonenest.entity.SanPham;
+import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.entity.HinhAnhSanPham;
+import nhom10.phonenest.entity.SanPham;
 
 import java.util.List;
 

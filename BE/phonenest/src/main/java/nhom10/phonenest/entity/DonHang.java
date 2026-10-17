@@ -1,4 +1,4 @@
-package nhom11.phonenest.entity;
+package nhom10.phonenest.entity;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
@@ -11,8 +11,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import nhom11.phonenest.enums.PhuongThucTt;
-import nhom11.phonenest.enums.TrangThaiDonHang;
+import nhom10.phonenest.enums.PhuongThucTt;
+import nhom10.phonenest.enums.TrangThaiDonHang;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

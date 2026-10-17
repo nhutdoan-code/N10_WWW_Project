@@ -1,9 +1,9 @@
-package nhom11.phonenest.repository;
+package nhom10.phonenest.repository;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 
-import nhom11.phonenest.entity.DanhGia;
+import nhom10.phonenest.entity.DanhGia;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DanhGiaRepository extends JpaRepository<DanhGia, String> {

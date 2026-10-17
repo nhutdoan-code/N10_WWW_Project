@@ -49,13 +49,13 @@ export default function ProductDetailPage() {
       </div>
       <div>
         <h1>{sp.tenMay}</h1>
-        <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · ★ {sp.diemDanhGiaTb}</p>
+        <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · <span className="rating">{sp.diemDanhGiaTb}</span></p>
         <div className="price big">{formatPrice(sp.giaBan)}</div>
         <p><StatusBadge status={sp.trangThai} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
         <p>{sp.moTa}</p>
         <div className="row">
           <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" />
-          <button className="btn btn-primary" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng')}>
+          <button className="btn btn-primary btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng')}>
             Thêm vào giỏ
           </button>
           {isCustomer && (

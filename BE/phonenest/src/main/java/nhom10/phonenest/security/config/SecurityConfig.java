@@ -1,4 +1,4 @@
-package nhom11.phonenest.security.config;
+package nhom10.phonenest.security.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.svg';
+import AccountMenu from '../components/AccountMenu';
+import Icon from '../components/Icon';
 import SearchBox from '../components/SearchBox';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
@@ -29,37 +31,76 @@ export default function MainLayout() {
       <header className="header no-print">
         <div className="container header-inner">
           <Link to="/" className="logo">
-            <img src={logo} alt="" /> PhoneNest
+            <img src={logo} alt="" />
+            <span>PhoneNest</span>
           </Link>
           <SearchBox />
-          <nav>
-            {ids.length > 0 && <Link to="/compare">So sánh ({ids.length})</Link>}
+          <nav className="actions">
+            {ids.length > 0 && (
+              <Link to="/compare" className="pill">
+                <Icon name="compare" size={16} /> So sánh <b>{ids.length}</b>
+              </Link>
+            )}
+            {isCustomer && (
+              <Link to="/wishlist" className="icon-btn" aria-label="Yêu thích" title="Yêu thích">
+                <Icon name="heart" />
+              </Link>
+            )}
+            {isCustomer && (
+              <Link to="/notifications" className="icon-btn" aria-label="Thông báo" title="Thông báo">
+                <Icon name="bell" />
+                {unread > 0 && <span className="badge-dot">{unread}</span>}
+              </Link>
+            )}
+            {!isAdmin && (
+              <Link to="/cart" className="icon-btn" aria-label="Giỏ hàng" title="Giỏ hàng">
+                <Icon name="cart" />
+                {count > 0 && <span className="badge-dot">{count}</span>}
+              </Link>
+            )}
+            {isCustomer && <AccountMenu user={user} onLogout={handleLogout} />}
+            {isAdmin && (
+              <>
+                <Link to="/admin" className="btn btn-primary">Trang quản trị</Link>
+                <button className="btn btn-ghost" onClick={handleLogout}>Đăng xuất</button>
+              </>
+            )}
             {!user && (
               <>
-                <Link to="/cart">Giỏ hàng ({count})</Link>
-                <Link to="/login">Đăng nhập</Link>
+                <Link to="/login" className="btn btn-ghost">Đăng nhập</Link>
                 <Link to="/register" className="btn btn-primary">Đăng ký</Link>
               </>
             )}
-            {isCustomer && (
-              <>
-                <Link to="/wishlist">Yêu thích</Link>
-                <Link to="/orders">Đơn hàng</Link>
-                <Link to="/returns">Đổi trả</Link>
-                <Link to="/notifications">🔔{unread > 0 && <b className="dot">{unread}</b>}</Link>
-                <Link to="/cart">Giỏ hàng ({count})</Link>
-                <Link to="/account">{user.hoTen}</Link>
-              </>
-            )}
-            {isAdmin && <Link to="/admin">Trang quản trị</Link>}
-            {user && <button className="btn" onClick={handleLogout}>Đăng xuất</button>}
           </nav>
         </div>
       </header>
       <main className="container main">
         <Outlet />
       </main>
-      <footer className="footer no-print">© 2026 PhoneNest - Nhóm 10 - Lập trình WWW (Java)</footer>
+      <footer className="footer no-print">
+        <div className="container footer-grid">
+          <div>
+            <div className="logo">
+              <img src={logo} alt="" />
+              <span>PhoneNest</span>
+            </div>
+            <p>Điện thoại chính hãng, giá niêm yết rõ ràng. Theo dõi đơn hàng và yêu cầu đổi trả ngay trên website.</p>
+          </div>
+          <div>
+            <h4>Mua sắm</h4>
+            <Link to="/">Tất cả sản phẩm</Link>
+            <Link to="/compare">So sánh sản phẩm</Link>
+            <Link to="/cart">Giỏ hàng</Link>
+          </div>
+          <div>
+            <h4>Tài khoản</h4>
+            <Link to="/orders">Đơn hàng của tôi</Link>
+            <Link to="/returns">Đổi trả / hoàn tiền</Link>
+            <Link to="/account/addresses">Địa chỉ giao hàng</Link>
+          </div>
+        </div>
+        <div className="container footer-bottom">© 2026 PhoneNest · Đồ án Lập trình WWW (Java) · Nhóm 10</div>
+      </footer>
     </>
   );
 }

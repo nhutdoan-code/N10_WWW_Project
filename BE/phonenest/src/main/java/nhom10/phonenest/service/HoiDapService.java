@@ -1,14 +1,14 @@
-package nhom11.phonenest.service;
+package nhom10.phonenest.service;
 
-import nhom11.phonenest.dto.HoiDapDto;
-import nhom11.phonenest.entity.HoiDap;
-import nhom11.phonenest.entity.KhachHang;
-import nhom11.phonenest.entity.SanPham;
-import nhom11.phonenest.exception.AppException;
-import nhom11.phonenest.repository.HoiDapRepository;
-import nhom11.phonenest.repository.KhachHangRepository;
-import nhom11.phonenest.repository.SanPhamRepository;
-import nhom11.phonenest.util.IdGenerator;
+import nhom10.phonenest.dto.HoiDapDto;
+import nhom10.phonenest.entity.HoiDap;
+import nhom10.phonenest.entity.KhachHang;
+import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.exception.AppException;
+import nhom10.phonenest.repository.HoiDapRepository;
+import nhom10.phonenest.repository.KhachHangRepository;
+import nhom10.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.util.IdGenerator;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

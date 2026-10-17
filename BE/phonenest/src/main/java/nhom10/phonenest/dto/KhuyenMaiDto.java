@@ -1,4 +1,4 @@
-package nhom11.phonenest.dto;
+package nhom10.phonenest.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;

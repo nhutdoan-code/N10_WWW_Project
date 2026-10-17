@@ -1,9 +1,9 @@
-package nhom11.phonenest.dto;
+package nhom10.phonenest.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import nhom11.phonenest.enums.PhuongThucTt;
-import nhom11.phonenest.enums.TrangThaiDonHang;
+import nhom10.phonenest.enums.PhuongThucTt;
+import nhom10.phonenest.enums.TrangThaiDonHang;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

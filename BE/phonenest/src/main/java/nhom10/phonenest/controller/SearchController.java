@@ -1,8 +1,8 @@
-package nhom11.phonenest.controller;
+package nhom10.phonenest.controller;
 
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.dto.SanPhamDto;
-import nhom11.phonenest.service.SearchService;
+import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.service.SearchService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;

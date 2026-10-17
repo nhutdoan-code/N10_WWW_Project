@@ -1,10 +1,10 @@
-package nhom11.phonenest.service;
+package nhom10.phonenest.service;
 
-import nhom11.phonenest.dto.ThongBaoDto;
-import nhom11.phonenest.entity.ThongBao;
-import nhom11.phonenest.repository.QuanTriVienRepository;
-import nhom11.phonenest.repository.ThongBaoRepository;
-import nhom11.phonenest.util.IdGenerator;
+import nhom10.phonenest.dto.ThongBaoDto;
+import nhom10.phonenest.entity.ThongBao;
+import nhom10.phonenest.repository.QuanTriVienRepository;
+import nhom10.phonenest.repository.ThongBaoRepository;
+import nhom10.phonenest.util.IdGenerator;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

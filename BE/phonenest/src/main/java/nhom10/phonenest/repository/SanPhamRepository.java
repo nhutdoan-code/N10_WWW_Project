@@ -1,6 +1,6 @@
-package nhom11.phonenest.repository;
+package nhom10.phonenest.repository;
 
-import nhom11.phonenest.entity.SanPham;
+import nhom10.phonenest.entity.SanPham;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

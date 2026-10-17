@@ -1,10 +1,10 @@
-package nhom11.phonenest.service;
+package nhom10.phonenest.service;
 
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.dto.SanPhamDto;
-import nhom11.phonenest.enums.TrangThaiSanPham;
-import nhom11.phonenest.mapper.SanPhamMapper;
-import nhom11.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.enums.TrangThaiSanPham;
+import nhom10.phonenest.mapper.SanPhamMapper;
+import nhom10.phonenest.repository.SanPhamRepository;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;

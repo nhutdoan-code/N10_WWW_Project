@@ -1,7 +1,7 @@
-package nhom11.phonenest.repository;
+package nhom10.phonenest.repository;
 
 import java.util.List;
-import nhom11.phonenest.entity.HoiDap;
+import nhom10.phonenest.entity.HoiDap;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface HoiDapRepository extends JpaRepository<HoiDap, String> {

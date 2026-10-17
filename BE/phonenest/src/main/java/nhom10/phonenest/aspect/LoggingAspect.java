@@ -1,4 +1,4 @@
-package nhom11.phonenest.aspect;
+package nhom10.phonenest.aspect;
 
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LoggingAspect {
 
-    @Around("execution(* nhom11.phonenest.service..*(..))")
+    @Around("execution(* nhom10.phonenest.service..*(..))")
     public Object logTime(ProceedingJoinPoint jp) throws Throwable {
         long start = System.currentTimeMillis();
         try {

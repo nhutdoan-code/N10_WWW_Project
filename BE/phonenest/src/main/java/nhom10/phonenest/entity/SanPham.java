@@ -1,4 +1,4 @@
-package nhom11.phonenest.entity;
+package nhom10.phonenest.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,7 +10,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import nhom11.phonenest.enums.TrangThaiSanPham;
+import nhom10.phonenest.enums.TrangThaiSanPham;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;

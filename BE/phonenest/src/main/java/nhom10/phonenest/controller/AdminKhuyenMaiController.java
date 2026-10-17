@@ -1,11 +1,10 @@
-package nhom11.phonenest.controller;
+package nhom10.phonenest.controller;
 
-import nhom11.phonenest.dto.KhuyenMaiDto;
-import nhom11.phonenest.service.KhuyenMaiService;
+import nhom10.phonenest.dto.KhuyenMaiDto;
+import nhom10.phonenest.service.KhuyenMaiService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package nhom11.phonenest.entity;
+package nhom10.phonenest.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -6,10 +6,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.Setter;
-import nhom11.phonenest.enums.TrangThaiDoiTra;
+import nhom10.phonenest.enums.TrangThaiDoiTra;
 
 @Entity
 @Table(name = "YeuCauDoiTra")

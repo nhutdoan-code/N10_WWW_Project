@@ -31,49 +31,48 @@ export default function CartPage() {
 
   return (
     <>
-      <div className="row between">
-        <h2>Giỏ hàng ({count} sản phẩm)</h2>
-        <button className="btn btn-danger" onClick={() => window.confirm('Xóa toàn bộ giỏ hàng?') && run(clear, 'Đã xóa toàn bộ giỏ hàng')}>
-          Xóa tất cả
-        </button>
-      </div>
-      <table className="table">
-        <thead>
-          <tr><th>Sản phẩm</th><th>Đơn giá</th><th>Số lượng</th><th>Thành tiền</th><th></th></tr>
-        </thead>
-        <tbody>
+      <h2>Giỏ hàng <span className="muted">({count} sản phẩm)</span></h2>
+      <div className="cart-layout">
+        <div className="section">
           {items.map(({ sanPham: sp, soLuong }) => (
-            <tr key={sp.maSanPham}>
-              <td>
-                <Link to={`/products/${sp.maSanPham}`} className="row"><img className="thumb" src={sp.anhChinh} alt="" />{sp.tenMay}</Link>
-                {soLuong >= sp.soLuongTon && <small className="error">Đã đạt tối đa tồn kho ({sp.soLuongTon})</small>}
-              </td>
-              <td>{formatPrice(sp.giaBan)}</td>
-              <td>
-                <button className="btn" onClick={() => run(() => setQuantity(sp, soLuong - 1))}>−</button>
-                <input
-                  className="qty"
-                  type="number"
-                  min="1"
-                  max={sp.soLuongTon}
-                  value={soLuong}
-                  onChange={(e) => run(() => setQuantity(sp, Number(e.target.value)))}
-                />
-                <button className="btn" disabled={soLuong >= sp.soLuongTon} onClick={() => run(() => setQuantity(sp, soLuong + 1))}>+</button>
-              </td>
-              <td>{formatPrice(sp.giaBan * soLuong)}</td>
-              <td className="row">
-                {isCustomer && <button className="btn" onClick={() => toWishlist(sp)}>♡ Để sau</button>}
-                <button className="btn btn-danger" onClick={() => run(() => remove(sp))}>Xóa</button>
-              </td>
-            </tr>
+            <div key={sp.maSanPham} className="cart-item">
+              <Link to={`/products/${sp.maSanPham}`}><img src={sp.anhChinh} alt="" /></Link>
+              <div>
+                <h4><Link to={`/products/${sp.maSanPham}`}>{sp.tenMay}</Link></h4>
+                <span className="price">{formatPrice(sp.giaBan)}</span>
+                {soLuong >= sp.soLuongTon && <small className="error"> · Đã đạt tối đa tồn kho ({sp.soLuongTon})</small>}
+                <div className="tools">
+                  <div className="qty-box">
+                    <button aria-label="Giảm" onClick={() => run(() => setQuantity(sp, soLuong - 1))}>−</button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={sp.soLuongTon}
+                      value={soLuong}
+                      onChange={(e) => run(() => setQuantity(sp, Number(e.target.value)))}
+                    />
+                    <button aria-label="Tăng" disabled={soLuong >= sp.soLuongTon} onClick={() => run(() => setQuantity(sp, soLuong + 1))}>+</button>
+                  </div>
+                  {isCustomer && <button className="link-btn" onClick={() => toWishlist(sp)}>Để sau</button>}
+                  <button className="link-btn" onClick={() => run(() => remove(sp))}>Xóa</button>
+                </div>
+              </div>
+              <b>{formatPrice(sp.giaBan * soLuong)}</b>
+            </div>
           ))}
-        </tbody>
-      </table>
-      {!isCustomer && <p className="muted">Giỏ hàng được lưu tạm trên trình duyệt. Đăng nhập để đặt hàng, giỏ hàng sẽ được giữ lại.</p>}
-      <div className="row end">
-        <h3>Tổng: {formatPrice(total)}</h3>
-        <Link to="/checkout" className="btn btn-primary">{isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}</Link>
+        </div>
+        <aside className="side">
+          <div className="summary">
+            <div className="row between"><span>Tạm tính ({count} sản phẩm)</span><span>{formatPrice(total)}</span></div>
+            <div className="row between total"><b>Tổng cộng</b><b className="price">{formatPrice(total)}</b></div>
+            <p className="muted">Nhập mã khuyến mãi và chọn địa chỉ ở bước thanh toán.</p>
+            <Link to="/checkout" className="btn btn-primary btn-lg">{isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}</Link>
+          </div>
+          {!isCustomer && <p className="muted">Giỏ hàng được lưu tạm trên trình duyệt và sẽ được giữ lại sau khi bạn đăng nhập.</p>}
+          <button className="btn btn-danger" onClick={() => window.confirm('Xóa toàn bộ giỏ hàng?') && run(clear, 'Đã xóa toàn bộ giỏ hàng')}>
+            Xóa tất cả
+          </button>
+        </aside>
       </div>
     </>
   );

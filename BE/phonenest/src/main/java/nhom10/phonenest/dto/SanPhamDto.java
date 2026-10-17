@@ -1,10 +1,10 @@
-package nhom11.phonenest.dto;
+package nhom10.phonenest.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import nhom11.phonenest.enums.TrangThaiSanPham;
+import nhom10.phonenest.enums.TrangThaiSanPham;
 
 import java.math.BigDecimal;
 import java.util.List;

@@ -1,4 +1,4 @@
-package nhom11.phonenest.config;
+package nhom10.phonenest.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

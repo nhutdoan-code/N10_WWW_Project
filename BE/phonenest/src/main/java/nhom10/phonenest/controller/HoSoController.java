@@ -1,12 +1,11 @@
-package nhom11.phonenest.controller;
+package nhom10.phonenest.controller;
 
-import nhom11.phonenest.dto.HoSoDto;
-import nhom11.phonenest.service.KhachHangService;
+import nhom10.phonenest.dto.HoSoDto;
+import nhom10.phonenest.service.KhachHangService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.util.SecurityUtil;
+import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/customer/profile")

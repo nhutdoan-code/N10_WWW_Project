@@ -3,6 +3,7 @@ import useCart from '../hooks/useCart';
 import useCompare from '../hooks/useCompare';
 import useToast from '../hooks/useToast';
 import { errorMessage, formatPrice } from '../utils/format';
+import Icon from './Icon';
 import StatusBadge from './StatusBadge';
 
 export default function ProductCard({ sp }) {
@@ -23,19 +24,28 @@ export default function ProductCard({ sp }) {
   return (
     <div className="card product-card">
       <Link to={`/products/${sp.maSanPham}`}>
-        <img src={sp.anhChinh} alt={sp.tenMay} />
+        <span className="thumb-wrap">
+          <img src={sp.anhChinh} alt={sp.tenMay} loading="lazy" />
+          {hetHang && <span className="sold-out"><StatusBadge status={sp.trangThai} /></span>}
+        </span>
         <h3>{sp.tenMay}</h3>
       </Link>
-      <div className="price">{formatPrice(sp.giaBan)}</div>
       <div className="row between">
-        <StatusBadge status={sp.trangThai} />
-        <span className="muted">★ {sp.diemDanhGiaTb}</span>
+        <span className="price">{formatPrice(sp.giaBan)}</span>
+        <span className="rating">{sp.diemDanhGiaTb}</span>
       </div>
-      <div className="row">
-        <button className="btn btn-primary grow" disabled={hetHang} onClick={() => run(() => add(sp), 'Đã thêm vào giỏ hàng')}>
+      <div className="actions-row">
+        <button className="btn btn-primary" disabled={hetHang} onClick={() => run(() => add(sp), 'Đã thêm vào giỏ hàng')}>
           {hetHang ? 'Hết hàng' : 'Thêm vào giỏ'}
         </button>
-        <button className={ids.includes(sp.maSanPham) ? 'btn active' : 'btn'} title="So sánh" onClick={() => run(() => toggle(sp.maSanPham))}>⇄</button>
+        <button
+          className={ids.includes(sp.maSanPham) ? 'btn icon-sq active' : 'btn icon-sq'}
+          title="So sánh"
+          aria-label="So sánh"
+          onClick={() => run(() => toggle(sp.maSanPham))}
+        >
+          <Icon name="compare" size={18} />
+        </button>
       </div>
     </div>
   );

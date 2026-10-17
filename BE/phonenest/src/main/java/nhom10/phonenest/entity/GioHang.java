@@ -1,4 +1,4 @@
-package nhom11.phonenest.entity;
+package nhom10.phonenest.entity;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;

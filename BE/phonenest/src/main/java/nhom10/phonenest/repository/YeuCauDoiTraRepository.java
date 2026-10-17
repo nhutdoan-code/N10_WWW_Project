@@ -1,8 +1,8 @@
-package nhom11.phonenest.repository;
+package nhom10.phonenest.repository;
 
 import java.util.List;
 import java.util.Optional;
-import nhom11.phonenest.entity.YeuCauDoiTra;
+import nhom10.phonenest.entity.YeuCauDoiTra;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, String> {

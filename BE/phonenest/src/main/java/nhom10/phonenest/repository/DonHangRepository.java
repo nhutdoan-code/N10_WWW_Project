@@ -1,6 +1,6 @@
-package nhom11.phonenest.repository;
+package nhom10.phonenest.repository;
 
-import nhom11.phonenest.entity.DonHang;
+import nhom10.phonenest.entity.DonHang;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

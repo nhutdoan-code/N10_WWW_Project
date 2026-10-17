@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useDebounce from '../hooks/useDebounce';
+import Icon from './Icon';
 import { productService } from '../service/productService';
 import { formatPrice } from '../utils/format';
 
@@ -45,6 +46,7 @@ export default function SearchBox() {
   return (
     <div className="search" ref={box}>
       <form onSubmit={submit}>
+        <Icon name="search" size={18} />
         <input
           value={text}
           placeholder={ai ? 'Mô tả nhu cầu: "điện thoại pin trâu dưới 10 triệu"' : 'Tìm tên máy, mã máy, hãng...'}
@@ -54,8 +56,9 @@ export default function SearchBox() {
           }}
           onFocus={() => setOpen(true)}
         />
-        <label className="ai-toggle">
-          <input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} /> AI
+        <label className={ai ? 'ai-toggle on' : 'ai-toggle'} title="Tìm bằng AI: mô tả nhu cầu bằng câu tự nhiên">
+          <input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} />
+          <Icon name="sparkle" size={14} /> AI
         </label>
       </form>
       {open && debounced && (

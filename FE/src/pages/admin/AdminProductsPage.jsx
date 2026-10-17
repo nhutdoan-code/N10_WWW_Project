@@ -49,7 +49,7 @@ export default function AdminProductsPage() {
               <td>{formatPrice(p.giaBan)}</td>
               <td>{p.soLuongTon}</td>
               <td><StatusBadge status={p.trangThai} /></td>
-              <td className="row">
+              <td><div className="row">
                 <button className="btn" onClick={() => setEditing(p)}>Sửa</button>
                 <button
                   className="btn btn-danger"
@@ -57,7 +57,7 @@ export default function AdminProductsPage() {
                 >
                   Xóa
                 </button>
-              </td>
+              </div></td>
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.svg';
 import useAuth from '../hooks/useAuth';
 
 const MENU = [
@@ -20,14 +21,17 @@ export default function AdminLayout() {
   return (
     <div className="admin">
       <aside className="sidebar">
-        <h2>PhoneNest Admin</h2>
-        <p className="muted">{user.hoTen}</p>
+        <div className="brand">
+          <img src={logo} alt="" />
+          <span>PhoneNest</span>
+        </div>
+        <p className="who">Quản trị · {user.hoTen}</p>
         {MENU.map((m) => (
           <NavLink key={m.to} to={m.to}>{m.label}</NavLink>
         ))}
-        <Link to="/">← Về trang bán hàng</Link>
+        <div className="spacer" />
+        <Link to="/">Về trang bán hàng</Link>
         <button
-          className="btn"
           onClick={() => {
             logout();
             navigate('/login');

@@ -1,9 +1,9 @@
-package nhom11.phonenest.controller;
+package nhom10.phonenest.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.dto.AuthDto;
-import nhom11.phonenest.service.AuthService;
+import nhom10.phonenest.dto.AuthDto;
+import nhom10.phonenest.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

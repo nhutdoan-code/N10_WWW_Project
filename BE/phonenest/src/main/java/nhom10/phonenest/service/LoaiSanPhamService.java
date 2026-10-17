@@ -1,11 +1,11 @@
-package nhom11.phonenest.service;
+package nhom10.phonenest.service;
 
-import nhom11.phonenest.dto.LoaiSanPhamDto;
-import nhom11.phonenest.entity.LoaiSanPham;
-import nhom11.phonenest.exception.AppException;
-import nhom11.phonenest.repository.LoaiSanPhamRepository;
-import nhom11.phonenest.repository.SanPhamRepository;
-import nhom11.phonenest.util.IdGenerator;
+import nhom10.phonenest.dto.LoaiSanPhamDto;
+import nhom10.phonenest.entity.LoaiSanPham;
+import nhom10.phonenest.exception.AppException;
+import nhom10.phonenest.repository.LoaiSanPhamRepository;
+import nhom10.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.util.IdGenerator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

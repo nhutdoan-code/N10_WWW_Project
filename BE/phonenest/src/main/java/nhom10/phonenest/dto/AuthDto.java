@@ -1,10 +1,10 @@
-package nhom11.phonenest.dto;
+package nhom10.phonenest.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import nhom11.phonenest.enums.Role;
+import nhom10.phonenest.enums.Role;
 
 import java.time.LocalDate;
 

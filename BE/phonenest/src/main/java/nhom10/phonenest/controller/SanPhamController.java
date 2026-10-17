@@ -1,14 +1,14 @@
-package nhom11.phonenest.controller;
+package nhom10.phonenest.controller;
 
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.dto.DanhGiaDto;
-import nhom11.phonenest.dto.HoiDapDto;
-import nhom11.phonenest.dto.LoaiSanPhamDto;
-import nhom11.phonenest.dto.SanPhamDto;
-import nhom11.phonenest.service.DanhGiaService;
-import nhom11.phonenest.service.HoiDapService;
-import nhom11.phonenest.service.LoaiSanPhamService;
-import nhom11.phonenest.service.SanPhamService;
+import nhom10.phonenest.dto.DanhGiaDto;
+import nhom10.phonenest.dto.HoiDapDto;
+import nhom10.phonenest.dto.LoaiSanPhamDto;
+import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.service.DanhGiaService;
+import nhom10.phonenest.service.HoiDapService;
+import nhom10.phonenest.service.LoaiSanPhamService;
+import nhom10.phonenest.service.SanPhamService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;

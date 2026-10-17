@@ -1,4 +1,4 @@
-package nhom11.phonenest.exception;
+package nhom10.phonenest.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;

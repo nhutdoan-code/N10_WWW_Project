@@ -1,13 +1,13 @@
-package nhom11.phonenest.mapper;
+package nhom10.phonenest.mapper;
 
 import lombok.RequiredArgsConstructor;
-import nhom11.phonenest.dto.DonHangDto;
-import nhom11.phonenest.entity.DonHang;
-import nhom11.phonenest.entity.KhuyenMai;
-import nhom11.phonenest.entity.KhachHang;
-import nhom11.phonenest.repository.KhachHangRepository;
-import nhom11.phonenest.repository.SanPhamRepository;
-import nhom11.phonenest.repository.YeuCauDoiTraRepository;
+import nhom10.phonenest.dto.DonHangDto;
+import nhom10.phonenest.entity.DonHang;
+import nhom10.phonenest.entity.KhuyenMai;
+import nhom10.phonenest.entity.KhachHang;
+import nhom10.phonenest.repository.KhachHangRepository;
+import nhom10.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.repository.YeuCauDoiTraRepository;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
