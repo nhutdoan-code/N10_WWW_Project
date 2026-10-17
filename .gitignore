@@ -1,0 +1,15 @@
+# Backend
+BE/phonenest/target/
+.mvn/wrapper/maven-wrapper.jar
+
+# Frontend
+FE/node_modules/
+FE/dist/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.log
+.env

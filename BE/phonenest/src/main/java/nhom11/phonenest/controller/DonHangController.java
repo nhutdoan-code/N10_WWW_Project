@@ -1,0 +1,55 @@
+package nhom11.phonenest.controller;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import nhom11.phonenest.dto.DonHangDto;
+import nhom11.phonenest.dto.GioHangDto;
+import nhom11.phonenest.service.DonHangService;
+import nhom11.phonenest.util.SecurityUtil;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/customer")
+@RequiredArgsConstructor
+public class DonHangController {
+
+    private final DonHangService donHangService;
+
+    @PostMapping("/orders")
+    public DonHangDto datHang(@Valid @RequestBody DonHangDto.Checkout request) {
+        return donHangService.datHang(SecurityUtil.currentUserId(), request);
+    }
+
+    @GetMapping("/orders")
+    public List<DonHangDto> lichSu() {
+        return donHangService.lichSu(SecurityUtil.currentUserId());
+    }
+
+    @GetMapping("/orders/{ma}")
+    public DonHangDto chiTiet(@PathVariable String ma) {
+        return donHangService.chiTiet(SecurityUtil.currentUserId(), ma);
+    }
+
+    @PutMapping("/orders/{ma}/cancel")
+    public DonHangDto huy(@PathVariable String ma) {
+        return donHangService.huy(SecurityUtil.currentUserId(), ma);
+    }
+
+    @PostMapping("/orders/{ma}/reorder")
+    public GioHangDto muaLai(@PathVariable String ma) {
+        return donHangService.muaLai(SecurityUtil.currentUserId(), ma);
+    }
+
+    @GetMapping("/promotions/{ma}")
+    public DonHangDto.KhuyenMaiInfo khuyenMai(@PathVariable String ma) {
+        return donHangService.xemKhuyenMai(ma);
+    }
+}

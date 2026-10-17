@@ -1,0 +1,88 @@
+package nhom11.phonenest.service;
+
+import lombok.RequiredArgsConstructor;
+import nhom11.phonenest.dto.TaiKhoanDto;
+import nhom11.phonenest.entity.KhachHang;
+import nhom11.phonenest.entity.QuanTriVien;
+import nhom11.phonenest.entity.TaiKhoan;
+import nhom11.phonenest.enums.Role;
+import nhom11.phonenest.exception.AppException;
+import nhom11.phonenest.repository.DonHangRepository;
+import nhom11.phonenest.repository.KhachHangRepository;
+import nhom11.phonenest.repository.QuanTriVienRepository;
+import nhom11.phonenest.repository.TaiKhoanRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TaiKhoanService {
+
+    private final TaiKhoanRepository taiKhoanRepository;
+    private final KhachHangRepository khachHangRepository;
+    private final QuanTriVienRepository quanTriVienRepository;
+    private final DonHangRepository donHangRepository;
+
+    @Transactional(readOnly = true)
+    public List<TaiKhoanDto> list() {
+        return taiKhoanRepository.findAll().stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TaiKhoanDto get(String ma) {
+        return toDto(tim(ma));
+    }
+
+    public TaiKhoanDto capNhat(String ma, TaiKhoanDto.Update u) {
+        TaiKhoan tk = tim(ma);
+        KhachHang kh = khachHangRepository.findById(ma)
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Chỉ được chỉnh sửa tài khoản khách hàng"));
+        String sdt = u.soDienThoai();
+        if (sdt != null && !sdt.isBlank() && !sdt.equals(tk.getSoDienThoai())) {
+            if (taiKhoanRepository.existsBySoDienThoai(sdt)) {
+                throw new AppException(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng");
+            }
+            tk.setSoDienThoai(sdt);
+        }
+        kh.setHoTen(u.hoTen().trim());
+        return toDto(tk);
+    }
+
+    public void xoa(String ma) {
+        TaiKhoan tk = tim(ma);
+        if (quanTriVienRepository.existsById(ma)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể xóa tài khoản quản trị");
+        }
+        if (donHangRepository.existsByMaKh(ma)) {
+            throw new AppException(HttpStatus.CONFLICT, "Tài khoản đã từng đặt hàng, hãy khóa tài khoản thay vì xóa");
+        }
+        taiKhoanRepository.delete(tk);
+    }
+
+    private TaiKhoan tim(String ma) {
+        return taiKhoanRepository.findById(ma)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy tài khoản"));
+    }
+
+    public TaiKhoanDto doiTrangThai(String ma) {
+        TaiKhoan tk = taiKhoanRepository.findById(ma)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy tài khoản"));
+        if (quanTriVienRepository.existsById(ma)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể khóa tài khoản quản trị");
+        }
+        tk.setTrangThaiHoatDong(!tk.isTrangThaiHoatDong());
+        return toDto(tk);
+    }
+
+    private TaiKhoanDto toDto(TaiKhoan tk) {
+        var admin = quanTriVienRepository.findById(tk.getMaTk());
+        String hoTen = admin.map(QuanTriVien::getHoTen)
+                .orElseGet(() -> khachHangRepository.findById(tk.getMaTk()).map(KhachHang::getHoTen).orElse(""));
+        return new TaiKhoanDto(tk.getMaTk(), hoTen, tk.getEmail(), tk.getSoDienThoai(),
+                admin.isPresent() ? Role.ADMIN : Role.CUSTOMER, tk.getNgayTao(), tk.isTrangThaiHoatDong());
+    }
+}

@@ -1,0 +1,51 @@
+package nhom11.phonenest.mapper;
+
+import lombok.RequiredArgsConstructor;
+import nhom11.phonenest.dto.DonHangDto;
+import nhom11.phonenest.entity.DonHang;
+import nhom11.phonenest.entity.KhuyenMai;
+import nhom11.phonenest.entity.KhachHang;
+import nhom11.phonenest.repository.KhachHangRepository;
+import nhom11.phonenest.repository.SanPhamRepository;
+import nhom11.phonenest.repository.YeuCauDoiTraRepository;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor
+public class DonHangMapper {
+
+    private final SanPhamRepository sanPhamRepository;
+    private final KhachHangRepository khachHangRepository;
+    private final YeuCauDoiTraRepository yeuCauDoiTraRepository;
+
+    public DonHangDto toDto(DonHang d) {
+        List<DonHangDto.Dong> dong = d.getChiTiet().stream().map(c -> {
+            var sp = sanPhamRepository.findById(c.getMaSanPham()).map(SanPhamMapper::toDto).orElse(null);
+            return new DonHangDto.Dong(c.getMaSanPham(), sp == null ? "" : sp.tenMay(),
+                    sp == null ? null : sp.anhChinh(), c.getSoLuong(), c.getDonGia());
+        }).toList();
+        BigDecimal tamTinh = dong.stream().map(x -> x.donGia().multiply(BigDecimal.valueOf(x.soLuong())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal giam = giamGia(tamTinh, d.getKhuyenMai());
+        return new DonHangDto(d.getMaDonHang(), d.getMaKh(),
+                d.getKhuyenMai() == null ? null : d.getKhuyenMai().getMaKm(),
+                d.getNgayMua(), d.getPhuongThucTt(), d.getTrangThai(),
+                tamTinh, giam, tamTinh.subtract(giam), d.getDiaChiGiaoHang(), d.getNgayCapNhat(),
+                khachHangRepository.findById(d.getMaKh()).map(KhachHang::getHoTen).orElse(""),
+                yeuCauDoiTraRepository.findByMaDonHang(d.getMaDonHang()).map(y -> y.getTrangThai().name()).orElse(null),
+                dong);
+    }
+
+    private BigDecimal giamGia(BigDecimal tamTinh, KhuyenMai km) {
+        if (km == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal giam = tamTinh.multiply(km.getPhanTramGiam()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+        BigDecimal max = km.getSoTienGiamToiDa();
+        return max != null && giam.compareTo(max) > 0 ? max : giam;
+    }
+}

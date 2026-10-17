@@ -1,0 +1,92 @@
+import { useState } from 'react';
+import FormField from '../../components/FormField';
+import Modal from '../../components/Modal';
+import useFetch from '../../hooks/useFetch';
+import useToast from '../../hooks/useToast';
+import { adminService } from '../../service/adminService';
+import { errorMessage, formatPrice } from '../../utils/format';
+
+const EMPTY = { maKm: '', tenKm: '', phanTramGiam: '', soTienGiamToiDa: '', ngayBatDau: '', ngayKetThuc: '', dieuKienApDung: '' };
+
+export default function AdminPromotionsPage() {
+  const { data: list, reload } = useFetch(adminService.promotions);
+  const [editing, setEditing] = useState(null);
+  const toast = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const run = async (action, message) => {
+    try {
+      await action();
+      toast(message);
+      setEditing(null);
+      reload();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
+
+  const set = (key) => (e) => setEditing({ ...editing, [key]: e.target.value });
+  const submit = (e) => {
+    e.preventDefault();
+    const { isNew, ...data } = editing;
+    run(
+      () => adminService.savePromotion(isNew ? null : data.maKm, {
+        ...data,
+        phanTramGiam: Number(data.phanTramGiam),
+        soTienGiamToiDa: data.soTienGiamToiDa === '' || data.soTienGiamToiDa == null ? null : Number(data.soTienGiamToiDa),
+      }),
+      'Đã lưu khuyến mãi'
+    );
+  };
+
+  return (
+    <>
+      <div className="row between">
+        <h2>Quản lý khuyến mãi</h2>
+        <button className="btn btn-primary" onClick={() => setEditing({ ...EMPTY, isNew: true })}>+ Tạo mã</button>
+      </div>
+      <table className="table">
+        <thead>
+          <tr><th>Mã</th><th>Tên chương trình</th><th>Giảm</th><th>Tối đa</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr>
+        </thead>
+        <tbody>
+          {list?.map((k) => {
+            const hieuLuc = k.ngayBatDau <= today && today <= k.ngayKetThuc;
+            return (
+              <tr key={k.maKm}>
+                <td><b>{k.maKm}</b></td>
+                <td>{k.tenKm}</td>
+                <td>{k.phanTramGiam}%</td>
+                <td>{k.soTienGiamToiDa ? formatPrice(k.soTienGiamToiDa) : '—'}</td>
+                <td>{k.ngayBatDau} → {k.ngayKetThuc}</td>
+                <td>{hieuLuc ? 'Đang chạy' : today < k.ngayBatDau ? 'Sắp diễn ra' : 'Hết hạn'}</td>
+                <td className="row">
+                  <button className="btn" onClick={() => setEditing(k)}>Sửa</button>
+                  <button className="btn btn-danger" onClick={() => window.confirm(`Xóa mã ${k.maKm}?`) && run(() => adminService.deletePromotion(k.maKm), 'Đã xóa khuyến mãi')}>Xóa</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {editing && (
+        <Modal title={editing.isNew ? 'Tạo khuyến mãi' : 'Sửa khuyến mãi'} onClose={() => setEditing(null)}>
+          <form className="form" onSubmit={submit}>
+            <FormField label="Mã khuyến mãi" value={editing.maKm} onChange={set('maKm')} disabled={!editing.isNew} required />
+            <FormField label="Tên chương trình" value={editing.tenKm} onChange={set('tenKm')} required />
+            <div className="grid-2">
+              <FormField label="Phần trăm giảm (%)" type="number" min="1" max="100" value={editing.phanTramGiam} onChange={set('phanTramGiam')} required />
+              <FormField label="Giảm tối đa (₫)" type="number" min="0" value={editing.soTienGiamToiDa ?? ''} onChange={set('soTienGiamToiDa')} />
+            </div>
+            <div className="grid-2">
+              <FormField label="Từ ngày" type="date" value={editing.ngayBatDau} onChange={set('ngayBatDau')} required />
+              <FormField label="Đến ngày" type="date" value={editing.ngayKetThuc} onChange={set('ngayKetThuc')} required />
+            </div>
+            <FormField label="Điều kiện áp dụng" value={editing.dieuKienApDung || ''} onChange={set('dieuKienApDung')} />
+            <button className="btn btn-primary">Lưu</button>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
