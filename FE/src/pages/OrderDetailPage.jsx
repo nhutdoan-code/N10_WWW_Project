@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FormField from '../components/FormField';
 import Modal from '../components/Modal';
+import OrderSteps from '../components/OrderSteps';
 import StatusBadge from '../components/StatusBadge';
-import { CANCEL_REASONS, ORDER_STATUS, ORDER_STEPS, PAYMENT_METHODS } from '../config/constants';
+import { CANCEL_REASONS, ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
 import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
@@ -42,7 +43,6 @@ export default function OrderDetailPage() {
   if (error) return <p className="error">{error}</p>;
 
   const huy = o.trangThai === 'DA_HUY';
-  const buoc = ORDER_STEPS.indexOf(o.trangThai);
 
   return (
     <>
@@ -62,11 +62,7 @@ export default function OrderDetailPage() {
               <p className="error">Đơn hàng đã bị hủy (cập nhật {formatDate(o.ngayCapNhat)}){o.lyDoHuy && ` · Lý do: ${o.lyDoHuy}`}</p>
             ) : (
               <>
-                <ol className="steps">
-                  {ORDER_STEPS.map((s, i) => (
-                    <li key={s} className={i < buoc ? 'done' : i === buoc ? 'done current' : ''}>{ORDER_STATUS[s]}</li>
-                  ))}
-                </ol>
+                <OrderSteps trangThai={o.trangThai} />
                 <p className="muted">Cập nhật lần cuối: {formatDate(o.ngayCapNhat || o.ngayMua)}</p>
               </>
             )}

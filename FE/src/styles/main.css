@@ -310,3 +310,15 @@ section > h3 { font-size: 1.2rem; margin: 28px 0 14px; }
 @media print { .no-print { display: none !important; } body { background: #fff; } .invoice { border: none; padding: 0; } }
 .side .row.between > span:first-child { min-width: 0; }
 .side .row.between > span:last-child, .side .row.between > b:last-child { white-space: nowrap; }
+
+.status-tabs { display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.status-tabs .tab { flex: none; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.status-tabs .tab:hover { color: var(--ink); }
+.status-tabs .tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+.status-tabs .count { display: inline-block; min-width: 22px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: #e9ecf2; font-size: 0.75rem; line-height: 20px; text-align: center; }
+.status-tabs .tab.active .count { background: rgba(30, 79, 216, 0.12); }
+.order-tools { display: flex; gap: 10px; margin-bottom: 14px; }
+.order-tools input { flex: 1; min-width: 0; }
+.card.order { margin-bottom: 14px; display: grid; gap: 10px; }
+.card.order p { margin: 0; }
+@media (max-width: 800px) { .order-tools { flex-direction: column; } }
