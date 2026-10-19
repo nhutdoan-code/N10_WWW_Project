@@ -10,7 +10,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>nhom11</groupId>
+    <groupId>nhom10</groupId>
     <artifactId>phonenest</artifactId>
     <version>1.0.0</version>
     <name>phonenest</name>

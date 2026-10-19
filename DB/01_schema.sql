@@ -331,3 +331,16 @@ CREATE TABLE WishlistSanPham (
         ON UPDATE CASCADE
         ON DELETE CASCADE
 );
+
+CREATE TABLE HuyDonHang (
+    maDonHang VARCHAR(50) PRIMARY KEY,
+    lyDo VARCHAR(100) NOT NULL,
+    ghiChu VARCHAR(255) NULL,
+    ngayHuy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT FK_HuyDonHang_DonHang
+        FOREIGN KEY (maDonHang)
+        REFERENCES DonHang(maDonHang)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);

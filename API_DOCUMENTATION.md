@@ -1,4 +1,4 @@
-# PhoneNest – Website bán điện thoại (Nhóm 11)
+# PhoneNest – Website bán điện thoại (Nhóm 10)
 
 ## Cách chạy (MariaDB)
 
@@ -48,7 +48,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 | Customer | Hồ sơ, đổi mật khẩu, điểm tích lũy & hạng thành viên | `/api/customer/profile` |
 | Customer | Sổ địa chỉ (thêm/sửa/xóa/mặc định) | `/api/customer/addresses` |
 | Customer | Giỏ hàng: thêm, tăng/giảm, xóa, xóa hết, kiểm tra tồn kho & trạng thái kinh doanh | `/api/customer/cart` |
-| Customer | Đặt hàng: chọn địa chỉ, mã khuyến mãi, COD/chuyển khoản/ví; email xác nhận | `POST /api/customer/orders` |
+| Customer | Đặt hàng: chọn địa chỉ, mã khuyến mãi, COD/chuyển khoản/ví; email xác nhận | `POST /api/customer/orders` | (trừ kho ngay khi đặt)
 | Customer | Lịch sử, chi tiết, theo dõi trạng thái, hủy (khi chờ xác nhận), mua lại, hóa đơn in/PDF | `/api/customer/orders`, trang `/orders/:ma/invoice` |
 | Customer | Đổi trả/hoàn tiền, đánh giá (chỉ khi đã nhận hàng), hỏi đáp, wishlist, so sánh, thông báo | `/api/customer/returns`, `/reviews`, `/questions`, `/wishlist`, `/api/notifications` |
 | Admin | Tìm kiếm tổng hợp, thống kê & báo cáo (xuất CSV) | `/api/admin/search`, `/api/admin/stats` |
@@ -63,3 +63,12 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 **Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `promotions/{ma}` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/eligible/{ma}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 
 **Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET, `POST /{ma}/import`, `PUT /{ma}`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
+
+## Hủy đơn hàng (UC013)
+`PUT /api/customer/orders/{ma}/cancel` body `{ "lyDo": "...", "ghiChu": "..." }` (`lyDo` chọn từ danh sách 7 lý do phổ biến; `ghiChu` bắt buộc khi chọn "Lý do khác"). Chỉ hủy được khi đơn **Chờ xác nhận** hoặc **Đang xử lý**; đơn Đang giao / Đã giao bị từ chối với thông báo "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy." Hệ thống kiểm tra lại trạng thái trong CSDL, đổi sang Đã hủy, lưu vào bảng `HuyDonHang` (lý do, ghi chú, ngày hủy), cộng lại tồn kho và gửi thông báo. Kho được trừ lúc đặt hàng nên hủy (khách hoặc admin) đều hoàn kho.
+Nếu đã tạo CSDL cũ, chạy:
+```sql
+ALTER TABLE DonHang DROP COLUMN IF EXISTS lyDoHuy;
+CREATE TABLE HuyDonHang (maDonHang VARCHAR(50) PRIMARY KEY, lyDo VARCHAR(100) NOT NULL, ghiChu VARCHAR(255) NULL, ngayHuy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT FK_HuyDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE);
+```

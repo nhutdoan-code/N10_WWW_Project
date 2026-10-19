@@ -23,6 +23,7 @@ public record DonHangDto(
         LocalDateTime ngayCapNhat,
         String tenKhach,
         String trangThaiDoiTra,
+        String lyDoHuy,
         List<Dong> chiTiet) {
 
     public record Dong(String maSanPham, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
@@ -31,6 +32,9 @@ public record DonHangDto(
     public record Checkout(@NotNull(message = "Vui lòng chọn phương thức thanh toán") PhuongThucTt phuongThucTt,
                            @NotBlank(message = "Vui lòng chọn địa chỉ giao hàng") String maDiaChi,
                            String maKm) {
+    }
+
+    public record HuyRequest(@NotBlank(message = "Vui lòng chọn lý do hủy đơn") String lyDo, String ghiChu) {
     }
 
     public record KhuyenMaiInfo(String maKm, String tenKm, BigDecimal phanTramGiam, BigDecimal soTienGiamToiDa) {

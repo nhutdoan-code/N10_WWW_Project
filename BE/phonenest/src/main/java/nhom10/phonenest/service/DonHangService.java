@@ -6,6 +6,7 @@ import nhom10.phonenest.entity.ChiTietDonHang;
 import nhom10.phonenest.entity.DiaChi;
 import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.entity.GioHang;
+import nhom10.phonenest.entity.HuyDonHang;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.TrangThaiDonHang;
@@ -16,6 +17,7 @@ import nhom10.phonenest.repository.DiaChiRepository;
 import nhom10.phonenest.repository.DonHangRepository;
 import nhom10.phonenest.repository.GioHangRepository;
 import nhom10.phonenest.repository.KhachHangRepository;
+import nhom10.phonenest.repository.HuyDonHangRepository;
 import nhom10.phonenest.repository.KhuyenMaiRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.repository.TaiKhoanRepository;
@@ -35,10 +37,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class DonHangService {
 
     private static final int DIEM_MOI_VND = 10000;
+    private static final String LY_DO_KHAC = "Lý do khác";
+    private static final List<String> LY_DO_HUY = List.of(
+            "Muốn thay đổi địa chỉ giao hàng",
+            "Muốn nhập / thay đổi mã khuyến mãi",
+            "Muốn thay đổi sản phẩm trong đơn (màu sắc, dung lượng, số lượng...)",
+            "Thủ tục thanh toán quá rắc rối",
+            "Tìm thấy giá tốt hơn ở nơi khác",
+            "Đổi ý, không muốn mua nữa",
+            LY_DO_KHAC);
 
     private final DonHangRepository donHangRepository;
     private final GioHangRepository gioHangRepository;
     private final KhuyenMaiRepository khuyenMaiRepository;
+    private final HuyDonHangRepository huyDonHangRepository;
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
     private final TaiKhoanRepository taiKhoanRepository;
@@ -78,6 +90,7 @@ public class DonHangService {
         });
         gio.getItems().clear();
         DonHang luu = donHangRepository.save(d);
+        doiTonKho(luu, -1);
         DonHangDto dto = donHangMapper.toDto(luu);
 
         thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + luu.getMaDonHang() + " đang chờ xác nhận");
@@ -105,14 +118,33 @@ public class DonHangService {
         return donHangMapper.toDto(donCuaToi(maKh, ma));
     }
 
-    public DonHangDto huy(String maKh, String ma) {
+    public DonHangDto huy(String maKh, String ma, DonHangDto.HuyRequest req) {
         DonHang d = donCuaToi(maKh, ma);
-        if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ được hủy đơn khi đang chờ xác nhận");
+        TrangThaiDonHang tt = d.getTrangThai();
+        if (tt == TrangThaiDonHang.DA_HUY) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã được hủy trước đó");
         }
+        if (tt != TrangThaiDonHang.CHO_XAC_NHAN && tt != TrangThaiDonHang.DANG_XU_LY) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy.");
+        }
+        boolean khac = LY_DO_KHAC.equals(req.lyDo());
+        if (!LY_DO_HUY.contains(req.lyDo())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Lý do hủy đơn không hợp lệ");
+        }
+        if (khac && (req.ghiChu() == null || req.ghiChu().isBlank())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác");
+        }
+        doiTonKho(d, 1);
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
+        HuyDonHang h = new HuyDonHang();
+        h.setMaDonHang(ma);
+        h.setLyDo(req.lyDo());
+        h.setGhiChu(khac ? req.ghiChu().trim() : null);
+        h.setNgayHuy(LocalDateTime.now());
+        huyDonHangRepository.save(h);
         d.setNgayCapNhat(LocalDateTime.now());
-        thongBaoService.guiQuanTri("Khách hàng đã hủy đơn " + ma);
+        thongBaoService.gui(maKh, "Bạn đã hủy đơn hàng " + ma + " thành công");
+        thongBaoService.guiQuanTri("Khách hàng đã hủy đơn " + ma + ". Lý do: " + req.lyDo());
         return donHangMapper.toDto(d);
     }
 
@@ -139,10 +171,7 @@ public class DonHangService {
         if (cu == TrangThaiDonHang.DA_GIAO || cu == TrangThaiDonHang.DA_HUY) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã kết thúc, không thể đổi trạng thái");
         }
-        boolean chuaTruKho = cu.ordinal() < TrangThaiDonHang.DANG_GIAO.ordinal();
-        if (chuaTruKho && (moi == TrangThaiDonHang.DANG_GIAO || moi == TrangThaiDonHang.DA_GIAO)) {
-            doiTonKho(d, -1);
-        } else if (cu == TrangThaiDonHang.DANG_GIAO && moi == TrangThaiDonHang.DA_HUY) {
+        if (moi == TrangThaiDonHang.DA_HUY) {
             doiTonKho(d, 1);
         }
         d.setTrangThai(moi);
@@ -167,12 +196,15 @@ public class DonHangService {
             if (d.getChiTiet().size() == 1) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng phải còn ít nhất một sản phẩm, hãy hủy đơn");
             }
+            capNhatTon(maSanPham, dong.getSoLuong());
             d.getChiTiet().remove(dong);
         } else {
             SanPham s = sanPhamRepository.findById(maSanPham).orElseThrow();
-            if (soLuong > s.getSoLuongTon()) {
+            int them = soLuong - dong.getSoLuong();
+            if (them > s.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ còn " + s.getSoLuongTon() + " sản phẩm trong kho");
             }
+            capNhatTon(maSanPham, -them);
             dong.setSoLuong(soLuong);
         }
         d.setNgayCapNhat(LocalDateTime.now());
@@ -188,12 +220,14 @@ public class DonHangService {
     }
 
     private void doiTonKho(DonHang d, int dau) {
-        for (ChiTietDonHang c : d.getChiTiet()) {
-            SanPham s = sanPhamRepository.findById(c.getMaSanPham()).orElseThrow();
-            s.setSoLuongTon(Math.max(0, s.getSoLuongTon() + dau * c.getSoLuong()));
-            if (s.getTrangThai() != TrangThaiSanPham.NGUNG_KINH_DOANH) {
-                s.setTrangThai(s.getSoLuongTon() > 0 ? TrangThaiSanPham.CON_HANG : TrangThaiSanPham.HET_HANG);
-            }
+        d.getChiTiet().forEach(c -> capNhatTon(c.getMaSanPham(), dau * c.getSoLuong()));
+    }
+
+    private void capNhatTon(String maSanPham, int delta) {
+        SanPham s = sanPhamRepository.findById(maSanPham).orElseThrow();
+        s.setSoLuongTon(Math.max(0, s.getSoLuongTon() + delta));
+        if (s.getTrangThai() != TrangThaiSanPham.NGUNG_KINH_DOANH) {
+            s.setTrangThai(s.getSoLuongTon() > 0 ? TrangThaiSanPham.CON_HANG : TrangThaiSanPham.HET_HANG);
         }
     }
 

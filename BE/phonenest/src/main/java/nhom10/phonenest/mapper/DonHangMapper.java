@@ -5,6 +5,7 @@ import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.entity.KhachHang;
+import nhom10.phonenest.repository.HuyDonHangRepository;
 import nhom10.phonenest.repository.KhachHangRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.repository.YeuCauDoiTraRepository;
@@ -21,6 +22,7 @@ public class DonHangMapper {
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
     private final YeuCauDoiTraRepository yeuCauDoiTraRepository;
+    private final HuyDonHangRepository huyDonHangRepository;
 
     public DonHangDto toDto(DonHang d) {
         List<DonHangDto.Dong> dong = d.getChiTiet().stream().map(c -> {
@@ -37,6 +39,9 @@ public class DonHangMapper {
                 tamTinh, giam, tamTinh.subtract(giam), d.getDiaChiGiaoHang(), d.getNgayCapNhat(),
                 khachHangRepository.findById(d.getMaKh()).map(KhachHang::getHoTen).orElse(""),
                 yeuCauDoiTraRepository.findByMaDonHang(d.getMaDonHang()).map(y -> y.getTrangThai().name()).orElse(null),
+                huyDonHangRepository.findById(d.getMaDonHang())
+                        .map(h -> h.getGhiChu() == null || h.getGhiChu().isBlank() ? h.getLyDo() : h.getLyDo() + ": " + h.getGhiChu())
+                        .orElse(null),
                 dong);
     }
 

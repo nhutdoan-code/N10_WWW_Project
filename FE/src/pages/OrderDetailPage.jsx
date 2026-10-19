@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FormField from '../components/FormField';
+import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
-import { ORDER_STATUS, ORDER_STEPS, PAYMENT_METHODS } from '../config/constants';
+import { CANCEL_REASONS, ORDER_STATUS, ORDER_STEPS, PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
 import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
@@ -14,6 +15,7 @@ export default function OrderDetailPage() {
   const { ma } = useParams();
   const { data: o, loading, error, reload } = useFetch(() => orderService.get(ma), [ma]);
   const [returnForm, setReturnForm] = useState(null);
+  const [cancelForm, setCancelForm] = useState(null);
   const { replace } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
@@ -26,6 +28,14 @@ export default function OrderDetailPage() {
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
+  };
+
+  const submitCancel = async (e) => {
+    e.preventDefault();
+    const khac = cancelForm.lyDo === 'Lý do khác';
+    if (khac && !cancelForm.khac.trim()) return toast('Vui lòng nhập lý do hủy', 'error');
+    await run(() => orderService.cancel(o.maDonHang, cancelForm.lyDo, khac ? cancelForm.khac.trim() : null), 'Hủy đơn hàng thành công');
+    setCancelForm(null);
   };
 
   if (loading) return <p className="muted">Đang tải...</p>;
@@ -49,7 +59,7 @@ export default function OrderDetailPage() {
           <div className="section">
             <h3>Theo dõi vận chuyển</h3>
             {huy ? (
-              <p className="error">Đơn hàng đã bị hủy (cập nhật {formatDate(o.ngayCapNhat)})</p>
+              <p className="error">Đơn hàng đã bị hủy (cập nhật {formatDate(o.ngayCapNhat)}){o.lyDoHuy && ` · Lý do: ${o.lyDoHuy}`}</p>
             ) : (
               <>
                 <ol className="steps">
@@ -122,12 +132,30 @@ export default function OrderDetailPage() {
           {o.trangThai === 'DA_GIAO' && !o.trangThaiDoiTra && (
             <button className="btn" onClick={() => setReturnForm({ lyDo: '', hinhAnhMinhChung: '' })}>Yêu cầu đổi trả / hoàn tiền</button>
           )}
-          {o.trangThai === 'CHO_XAC_NHAN' && (
-            <button className="btn btn-danger" onClick={() => window.confirm('Hủy đơn hàng này?') && run(() => orderService.cancel(o.maDonHang), 'Đã hủy đơn hàng')}>
-              Hủy đơn
-            </button>
+          {['CHO_XAC_NHAN', 'DANG_XU_LY'].includes(o.trangThai) && (
+            <button className="btn btn-danger" onClick={() => setCancelForm({ lyDo: CANCEL_REASONS[0], khac: '' })}>Hủy đơn hàng</button>
           )}
         </aside>
+        {cancelForm && (
+          <Modal title="Hủy đơn hàng" onClose={() => setCancelForm(null)}>
+            <form className="stack" onSubmit={submitCancel}>
+              <p>Bạn chắc chắn muốn hủy đơn <b>{o.maDonHang}</b>? Số lượng sản phẩm sẽ được hoàn lại kho.</p>
+              <label className="field">
+                <span>Lý do hủy đơn</span>
+                <select value={cancelForm.lyDo} onChange={(e) => setCancelForm({ ...cancelForm, lyDo: e.target.value })}>
+                  {CANCEL_REASONS.map((r) => <option key={r}>{r}</option>)}
+                </select>
+              </label>
+              {cancelForm.lyDo === 'Lý do khác' && (
+                <textarea rows="3" placeholder="Nhập lý do của bạn" value={cancelForm.khac} onChange={(e) => setCancelForm({ ...cancelForm, khac: e.target.value })} />
+              )}
+              <div className="row end">
+                <button type="button" className="btn" onClick={() => setCancelForm(null)}>Đóng</button>
+                <button className="btn btn-danger">Xác nhận hủy</button>
+              </div>
+            </form>
+          </Modal>
+        )}
       </div>
     </>
   );

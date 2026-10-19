@@ -30,6 +30,16 @@ export const ORDER_STATUS = {
   DA_HUY: 'Đã hủy',
 };
 
+export const CANCEL_REASONS = [
+  'Muốn thay đổi địa chỉ giao hàng',
+  'Muốn nhập / thay đổi mã khuyến mãi',
+  'Muốn thay đổi sản phẩm trong đơn (màu sắc, dung lượng, số lượng...)',
+  'Thủ tục thanh toán quá rắc rối',
+  'Tìm thấy giá tốt hơn ở nơi khác',
+  'Đổi ý, không muốn mua nữa',
+  'Lý do khác',
+];
+
 export const PRODUCT_STATUS = {
   CON_HANG: 'Còn hàng',
   HET_HANG: 'Hết hàng',
