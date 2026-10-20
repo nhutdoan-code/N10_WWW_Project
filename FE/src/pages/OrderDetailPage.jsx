@@ -114,7 +114,9 @@ export default function OrderDetailPage() {
           </div>
           <div className="summary">
             <div className="row between"><span>Tạm tính</span><span>{formatPrice(o.tamTinh)}</span></div>
-            <div className="row between"><span>Giảm giá {o.maKm && `(${o.maKm})`}</span><span>- {formatPrice(o.giamGia)}</span></div>
+            <div className="row between"><span>Phí vận chuyển</span><span>{Number(o.phiVanChuyen) > 0 ? formatPrice(o.phiVanChuyen) : 'Miễn phí'}</span></div>
+            {Number(o.giamPhiVanChuyen) > 0 && <div className="row between"><span>Giảm phí vận chuyển ({o.maKmVanChuyen})</span><span>- {formatPrice(o.giamPhiVanChuyen)}</span></div>}
+            {Number(o.giamGia) > 0 && <div className="row between"><span>Giảm giá {o.maKm && `(${o.maKm})`}</span><span>- {formatPrice(o.giamGia)}</span></div>}
             <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(o.tongTien)}</b></div>
           </div>
           {o.trangThaiDoiTra && <p>Đổi trả: <StatusBadge status={o.trangThaiDoiTra} /> <Link to="/returns">Xem chi tiết</Link></p>}

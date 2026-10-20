@@ -15,6 +15,8 @@ public interface DonHangRepository extends JpaRepository<DonHang, String> {
 
     boolean existsByMaKh(String maKh);
 
+    boolean existsByMaKhAndTrangThaiNot(String maKh, nhom10.phonenest.enums.TrangThaiDonHang trangThai);
+
     @Query("select count(d) > 0 from DonHang d join d.chiTiet c where c.maSanPham = :ma")
     boolean daCoTrongDonHang(@Param("ma") String maSanPham);
 }

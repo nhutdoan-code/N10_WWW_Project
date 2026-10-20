@@ -67,10 +67,19 @@ INSERT INTO HinhAnhSanPham (maHinhAnh, maSanPham, duongDan, gocChup, anhChinh) V
 INSERT INTO ChiTietGioHang (maGioHang, maSanPham, soLuong) VALUES ('GH003','SP006',1);
 INSERT INTO WishlistSanPham (maDanhSach, maSanPham) VALUES ('WL002','SP004');
 
-INSERT INTO KhuyenMai (maKm, tenKm, phanTramGiam, soTienGiamToiDa, ngayBatDau, ngayKetThuc, dieuKienApDung) VALUES
-('NEST10','Giảm 10% toàn bộ đơn hàng',10,2000000,'2026-01-01','2026-12-31','Áp dụng cho mọi đơn hàng'),
-('WELCOME5','Chào bạn mới giảm 5%',5,500000,'2026-01-01','2026-12-31','Áp dụng cho khách hàng mới'),
-('HETHAN20','Khuyến mãi đã hết hạn (dùng để thử lỗi)',20,3000000,'2025-01-01','2025-12-31',NULL);
+INSERT INTO KhuyenMai (maKm, tenKm, loai, phanTramGiam, soTienGiamToiDa, donToiThieu, soLuong, chiKhachMoi, ngayBatDau, ngayKetThuc, dieuKienApDung) VALUES
+('NEST10','Giảm 10% đơn hàng','DON_HANG',10,2000000,0,NULL,FALSE,'2026-01-01','2026-12-31','Áp dụng cho mọi đơn hàng'),
+('WELCOME5','Chào bạn mới giảm 5%','DON_HANG',5,500000,0,NULL,TRUE,'2026-01-01','2026-12-31','Chỉ dành cho đơn hàng đầu tiên'),
+('SALE10TR','Giảm 8% cho đơn từ 10 triệu','DON_HANG',8,1500000,10000000,100,FALSE,'2026-01-01','2026-12-31','Đơn hàng từ 10.000.000đ, số lượng có hạn'),
+('FREESHIP','Miễn phí vận chuyển','VAN_CHUYEN',100,30000,500000,NULL,FALSE,'2026-01-01','2026-12-31','Đơn hàng từ 500.000đ, giảm tối đa 30.000đ phí giao hàng'),
+('SHIP50','Giảm 50% phí vận chuyển','VAN_CHUYEN',50,25000,0,NULL,FALSE,'2026-01-01','2026-12-31','Áp dụng cho mọi đơn hàng'),
+('HETHAN20','Khuyến mãi đã hết hạn (dùng để thử lỗi)','DON_HANG',20,3000000,0,NULL,FALSE,'2025-01-01','2025-12-31',NULL);
+
+INSERT INTO PhiVanChuyen (maPhi, khuVuc, phiCoBan, mienPhiTu, thoiGianGiao) VALUES
+('PVC01','TP. Hồ Chí Minh',25000,3000000,'1 - 2 ngày'),
+('PVC02','Hà Nội',40000,5000000,'2 - 3 ngày'),
+('PVC03','Đà Nẵng',40000,5000000,'2 - 3 ngày'),
+('PVC99','Khác',50000,10000000,'3 - 5 ngày');
 
 INSERT INTO DonHang (maDonHang, maKh, maKm, ngayMua, phuongThucTt, trangThai) VALUES
 ('DH001','TK002',NULL,'2026-09-20 10:30:00','COD','DA_GIAO'),
@@ -104,6 +113,10 @@ INSERT INTO DiaChi (maDiaChi, maKh, tenNguoiNhan, soDienThoaiNhan, diaChiNhanHan
 ('DC001','TK002','Nguyễn Văn An','0900000002','12 Nguyễn Văn Bảo, Phường 4, Quận Gò Vấp','TP. Hồ Chí Minh',TRUE),
 ('DC002','TK002','Nguyễn Văn An (công ty)','0900000002','45 Lê Lợi, Quận 1','TP. Hồ Chí Minh',FALSE),
 ('DC003','TK003','Trần Thị Bình','0900000003','88 Trần Hưng Đạo, Quận 5','TP. Hồ Chí Minh',TRUE);
+
+-- Phí vận chuyển và giảm giá của các đơn mẫu
+UPDATE DonHang SET phiVanChuyen=25000 WHERE maDonHang IN ('DH001','DH003');
+UPDATE DonHang SET phiVanChuyen=25000, giamGia=2000000 WHERE maDonHang='DH002';
 
 -- Địa chỉ và thời điểm cập nhật cho các đơn mẫu
 UPDATE DonHang SET diaChiGiaoHang='Nguyễn Văn An - 0900000002 - 12 Nguyễn Văn Bảo, Phường 4, Quận Gò Vấp, TP. Hồ Chí Minh', ngayCapNhat='2026-09-22 16:00:00' WHERE maDonHang='DH001';

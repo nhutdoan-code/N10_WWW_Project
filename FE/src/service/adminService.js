@@ -24,6 +24,9 @@ export const adminService = {
 
   promotions: () => api.get('/admin/promotions'),
   savePromotion: (ma, data) => (ma ? api.put(`/admin/promotions/${ma}`, data) : api.post('/admin/promotions', data)),
+  shippingFees: () => api.get('/admin/shipping-fees'),
+  saveShippingFee: (ma, data) => (ma ? api.put(`/admin/shipping-fees/${ma}`, data) : api.post('/admin/shipping-fees', data)),
+  deleteShippingFee: (ma) => api.delete(`/admin/shipping-fees/${ma}`),
   deletePromotion: (ma) => api.delete(`/admin/promotions/${ma}`),
 
   reviews: () => api.get('/admin/reviews'),

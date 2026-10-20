@@ -2,9 +2,15 @@ package nhom10.phonenest.service;
 
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.entity.KhuyenMai;
+import nhom10.phonenest.enums.LoaiKhuyenMai;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.KhuyenMaiRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,6 +54,10 @@ public class KhuyenMaiService {
         k.setSoTienGiamToiDa(d.soTienGiamToiDa());
         k.setNgayBatDau(d.ngayBatDau());
         k.setNgayKetThuc(d.ngayKetThuc());
+        k.setLoai(d.loai() == null ? LoaiKhuyenMai.DON_HANG : d.loai());
+        k.setDonToiThieu(d.donToiThieu() == null ? BigDecimal.ZERO : d.donToiThieu());
+        k.setSoLuong(d.soLuong());
+        k.setChiKhachMoi(d.chiKhachMoi());
         k.setDieuKienApDung(d.dieuKienApDung());
         return toDto(khuyenMaiRepository.save(k));
     }
@@ -58,7 +68,32 @@ public class KhuyenMaiService {
     }
 
     private KhuyenMaiDto toDto(KhuyenMai k) {
-        return new KhuyenMaiDto(k.getMaKm(), k.getTenKm(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(),
+        return new KhuyenMaiDto(k.getMaKm(), k.getTenKm(), k.getLoai(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(),
+                k.getDonToiThieu(), k.getSoLuong(), k.getDaDung(), k.isChiKhachMoi(),
                 k.getNgayBatDau(), k.getNgayKetThuc(), k.getDieuKienApDung());
+    }
+
+    public String lyDoKhongDung(KhuyenMai k, BigDecimal tamTinh, boolean khachMoi) {
+        LocalDate hom = LocalDate.now();
+        if (hom.isBefore(k.getNgayBatDau()) || hom.isAfter(k.getNgayKetThuc())) {
+            return "Mã khuyến mãi không còn hiệu lực";
+        }
+        if (k.getSoLuong() != null && k.getDaDung() >= k.getSoLuong()) {
+            return "Mã khuyến mãi đã hết lượt sử dụng";
+        }
+        if (k.isChiKhachMoi() && !khachMoi) {
+            return "Chỉ dành cho khách hàng mua lần đầu";
+        }
+        if (tamTinh.compareTo(k.getDonToiThieu()) < 0) {
+            String thieu = NumberFormat.getInstance(Locale.of("vi", "VN")).format(k.getDonToiThieu().subtract(tamTinh));
+            return "Mua thêm " + thieu + " ₫ để dùng mã này";
+        }
+        return null;
+    }
+
+    public BigDecimal tinhGiam(KhuyenMai k, BigDecimal coSo) {
+        BigDecimal giam = coSo.multiply(k.getPhanTramGiam()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+        BigDecimal max = k.getSoTienGiamToiDa();
+        return max != null && giam.compareTo(max) > 0 ? max : giam;
     }
 }

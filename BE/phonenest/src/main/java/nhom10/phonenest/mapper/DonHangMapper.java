@@ -3,7 +3,6 @@ package nhom10.phonenest.mapper;
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.entity.DonHang;
-import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.entity.KhachHang;
 import nhom10.phonenest.repository.HuyDonHangRepository;
 import nhom10.phonenest.repository.KhachHangRepository;
@@ -12,7 +11,6 @@ import nhom10.phonenest.repository.YeuCauDoiTraRepository;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 @Component
@@ -32,25 +30,17 @@ public class DonHangMapper {
         }).toList();
         BigDecimal tamTinh = dong.stream().map(x -> x.donGia().multiply(BigDecimal.valueOf(x.soLuong())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal giam = giamGia(tamTinh, d.getKhuyenMai());
+        BigDecimal tong = tamTinh.subtract(d.getGiamGia()).add(d.getPhiVanChuyen()).subtract(d.getGiamPhiVanChuyen());
         return new DonHangDto(d.getMaDonHang(), d.getMaKh(),
-                d.getKhuyenMai() == null ? null : d.getKhuyenMai().getMaKm(),
+                d.getKhuyenMai() == null ? null : d.getKhuyenMai().getMaKm(), d.getMaKmVanChuyen(),
                 d.getNgayMua(), d.getPhuongThucTt(), d.getTrangThai(),
-                tamTinh, giam, tamTinh.subtract(giam), d.getDiaChiGiaoHang(), d.getNgayCapNhat(),
+                tamTinh, d.getGiamGia(), d.getPhiVanChuyen(), d.getGiamPhiVanChuyen(), tong,
+                d.getDiaChiGiaoHang(), d.getNgayCapNhat(),
                 khachHangRepository.findById(d.getMaKh()).map(KhachHang::getHoTen).orElse(""),
                 yeuCauDoiTraRepository.findByMaDonHang(d.getMaDonHang()).map(y -> y.getTrangThai().name()).orElse(null),
                 huyDonHangRepository.findById(d.getMaDonHang())
                         .map(h -> h.getGhiChu() == null || h.getGhiChu().isBlank() ? h.getLyDo() : h.getLyDo() + ": " + h.getGhiChu())
                         .orElse(null),
                 dong);
-    }
-
-    private BigDecimal giamGia(BigDecimal tamTinh, KhuyenMai km) {
-        if (km == null) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal giam = tamTinh.multiply(km.getPhanTramGiam()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-        BigDecimal max = km.getSoTienGiamToiDa();
-        return max != null && giam.compareTo(max) > 0 ? max : giam;
     }
 }

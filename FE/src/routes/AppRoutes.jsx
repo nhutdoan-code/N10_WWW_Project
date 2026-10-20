@@ -26,6 +26,7 @@ import RegisterPage from '../pages/RegisterPage';
 import WishlistPage from '../pages/WishlistPage';
 import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminCategoriesPage from '../pages/admin/AdminCategoriesPage';
+import AdminShippingPage from '../pages/admin/AdminShippingPage';
 import AdminOrdersPage from '../pages/admin/AdminOrdersPage';
 import AdminProductsPage from '../pages/admin/AdminProductsPage';
 import ProtectedRoute from './ProtectedRoute';
@@ -62,6 +63,7 @@ export default function AppRoutes() {
           <Route path="products" element={<AdminProductsPage />} />
           <Route path="inventory" element={<AdminInventoryPage />} />
           <Route path="promotions" element={<AdminPromotionsPage />} />
+          <Route path="shipping" element={<AdminShippingPage />} />
           <Route path="returns" element={<AdminReturnsPage />} />
           <Route path="feedback" element={<AdminFeedbackPage />} />
           <Route path="categories" element={<AdminCategoriesPage />} />

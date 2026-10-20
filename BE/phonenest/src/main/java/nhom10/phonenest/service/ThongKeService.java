@@ -78,7 +78,7 @@ public class ThongKeService {
     }
 
     public String xuatCsv(LocalDate tu, LocalDate den) {
-        StringBuilder sb = new StringBuilder("﻿Mã đơn,Ngày mua,Khách hàng,Trạng thái,Thanh toán,Tạm tính,Giảm giá,Tổng tiền\n");
+        StringBuilder sb = new StringBuilder("﻿Mã đơn,Ngày mua,Khách hàng,Trạng thái,Thanh toán,Tạm tính,Giảm giá,Phí vận chuyển,Tổng tiền\n");
         trongKhoang(tu, den).stream().map(donHangMapper::toDto).forEach(d -> sb
                 .append(d.maDonHang()).append(',')
                 .append(d.ngayMua().toLocalDate()).append(',')
@@ -87,6 +87,7 @@ public class ThongKeService {
                 .append(d.phuongThucTt()).append(',')
                 .append(d.tamTinh().toBigInteger()).append(',')
                 .append(d.giamGia().toBigInteger()).append(',')
+                .append(d.phiVanChuyen().subtract(d.giamPhiVanChuyen()).toBigInteger()).append(',')
                 .append(d.tongTien().toBigInteger()).append('\n'));
         return sb.toString();
     }

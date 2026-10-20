@@ -9,6 +9,7 @@ import nhom10.phonenest.entity.GioHang;
 import nhom10.phonenest.entity.HuyDonHang;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.enums.LoaiKhuyenMai;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
@@ -25,6 +26,7 @@ import nhom10.phonenest.util.HangThanhVien;
 import nhom10.phonenest.util.IdGenerator;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -51,6 +53,8 @@ public class DonHangService {
     private final GioHangRepository gioHangRepository;
     private final KhuyenMaiRepository khuyenMaiRepository;
     private final HuyDonHangRepository huyDonHangRepository;
+    private final KhuyenMaiService khuyenMaiService;
+    private final PhiVanChuyenService phiVanChuyenService;
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
     private final TaiKhoanRepository taiKhoanRepository;
@@ -78,16 +82,31 @@ public class DonHangService {
         d.setPhuongThucTt(req.phuongThucTt());
         d.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
         d.setDiaChiGiaoHang(diaChiText(dc));
-        if (req.maKm() != null && !req.maKm().isBlank()) {
-            d.setKhuyenMai(khuyenMaiHopLe(req.maKm().trim()));
-        }
-        gio.getItems().forEach((ma, soLuong) -> {
-            SanPham s = sanPhamRepository.findById(ma).orElseThrow();
-            if (s.getTrangThai() != TrangThaiSanPham.CON_HANG || soLuong > s.getSoLuongTon()) {
+        BigDecimal tamTinh = BigDecimal.ZERO;
+        for (var e : gio.getItems().entrySet()) {
+            SanPham s = sanPhamRepository.findById(e.getKey()).orElseThrow();
+            if (s.getTrangThai() != TrangThaiSanPham.CON_HANG || e.getValue() > s.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, s.getTenMay() + " không đủ hàng, vui lòng cập nhật giỏ hàng");
             }
-            d.getChiTiet().add(new ChiTietDonHang(ma, soLuong, s.getGiaBan()));
-        });
+            d.getChiTiet().add(new ChiTietDonHang(e.getKey(), e.getValue(), s.getGiaBan()));
+            tamTinh = tamTinh.add(s.getGiaBan().multiply(BigDecimal.valueOf(e.getValue())));
+        }
+        BigDecimal phi = phiVanChuyenService.tinhPhi(phiVanChuyenService.theoDiaChi(dc.getTinhThanhPho()), tamTinh);
+        d.setPhiVanChuyen(phi);
+        boolean khachMoi = !donHangRepository.existsByMaKhAndTrangThaiNot(maKh, TrangThaiDonHang.DA_HUY);
+        if (coMa(req.maKm())) {
+            KhuyenMai k = dungVoucher(req.maKm(), LoaiKhuyenMai.DON_HANG, tamTinh, khachMoi);
+            d.setKhuyenMai(k);
+            d.setGiamGia(khuyenMaiService.tinhGiam(k, tamTinh));
+        }
+        if (coMa(req.maKmVanChuyen())) {
+            if (phi.signum() == 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Phí vận chuyển đã được miễn phí, không cần dùng mã vận chuyển");
+            }
+            KhuyenMai k = dungVoucher(req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tamTinh, khachMoi);
+            d.setMaKmVanChuyen(k.getMaKm());
+            d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
+        }
         gio.getItems().clear();
         DonHang luu = donHangRepository.save(d);
         doiTonKho(luu, -1);
@@ -100,12 +119,6 @@ public class DonHangService {
                 "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: " + dto.tongTien().toBigInteger() + " VND. Giao đến: "
                         + luu.getDiaChiGiaoHang()));
         return dto;
-    }
-
-    @Transactional(readOnly = true)
-    public DonHangDto.KhuyenMaiInfo xemKhuyenMai(String ma) {
-        KhuyenMai k = khuyenMaiHopLe(ma.trim());
-        return new DonHangDto.KhuyenMaiInfo(k.getMaKm(), k.getTenKm(), k.getPhanTramGiam(), k.getSoTienGiamToiDa());
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +148,7 @@ public class DonHangService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác");
         }
         doiTonKho(d, 1);
+        hoanVoucher(d);
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
         HuyDonHang h = new HuyDonHang();
         h.setMaDonHang(ma);
@@ -173,6 +187,7 @@ public class DonHangService {
         }
         if (moi == TrangThaiDonHang.DA_HUY) {
             doiTonKho(d, 1);
+            hoanVoucher(d);
         }
         d.setTrangThai(moi);
         d.setNgayCapNhat(LocalDateTime.now());
@@ -207,6 +222,11 @@ public class DonHangService {
             capNhatTon(maSanPham, -them);
             dong.setSoLuong(soLuong);
         }
+        if (d.getKhuyenMai() != null) {
+            BigDecimal moi = d.getChiTiet().stream().map(c -> c.getDonGia().multiply(BigDecimal.valueOf(c.getSoLuong())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            d.setGiamGia(khuyenMaiService.tinhGiam(d.getKhuyenMai(), moi));
+        }
         d.setNgayCapNhat(LocalDateTime.now());
         thongBaoService.gui(d.getMaKh(), "Cửa hàng đã điều chỉnh sản phẩm trong đơn " + ma);
         return donHangMapper.toDto(d);
@@ -214,7 +234,7 @@ public class DonHangService {
 
     private void congDiem(DonHang d, DonHangDto dto) {
         khachHangRepository.findById(d.getMaKh()).ifPresent(k -> {
-            k.setDiemTichLuy(k.getDiemTichLuy() + dto.tongTien().intValue() / DIEM_MOI_VND);
+            k.setDiemTichLuy(k.getDiemTichLuy() + dto.tamTinh().subtract(dto.giamGia()).intValue() / DIEM_MOI_VND);
             k.setHangThanhVien(HangThanhVien.of(k.getDiemTichLuy()));
         });
     }
@@ -257,10 +277,32 @@ public class DonHangService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"));
     }
 
-    private KhuyenMai khuyenMaiHopLe(String ma) {
-        LocalDate hom = LocalDate.now();
-        return khuyenMaiRepository.findById(ma)
-                .filter(k -> !hom.isBefore(k.getNgayBatDau()) && !hom.isAfter(k.getNgayKetThuc()))
-                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Mã khuyến mãi không hợp lệ hoặc đã hết hạn"));
+    private boolean coMa(String ma) {
+        return ma != null && !ma.isBlank();
+    }
+
+    private KhuyenMai dungVoucher(String ma, LoaiKhuyenMai loai, BigDecimal tamTinh, boolean khachMoi) {
+        KhuyenMai k = khuyenMaiRepository.findById(ma.trim())
+                .filter(x -> x.getLoai() == loai)
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Mã khuyến mãi không hợp lệ"));
+        String lyDo = khuyenMaiService.lyDoKhongDung(k, tamTinh, khachMoi);
+        if (lyDo != null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, k.getMaKm() + ": " + lyDo);
+        }
+        k.setDaDung(k.getDaDung() + 1);
+        return k;
+    }
+
+    private void hoanVoucher(DonHang d) {
+        if (d.getKhuyenMai() != null) {
+            giamDaDung(d.getKhuyenMai());
+        }
+        if (d.getMaKmVanChuyen() != null) {
+            khuyenMaiRepository.findById(d.getMaKmVanChuyen()).ifPresent(this::giamDaDung);
+        }
+    }
+
+    private void giamDaDung(KhuyenMai k) {
+        k.setDaDung(Math.max(0, k.getDaDung() - 1));
     }
 }

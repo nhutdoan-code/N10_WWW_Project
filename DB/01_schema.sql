@@ -1,4 +1,6 @@
-CREATE DATABASE IF NOT EXISTS BanDienThoai
+DROP DATABASE IF EXISTS BanDienThoai;
+
+CREATE DATABASE BanDienThoai
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
@@ -166,7 +168,20 @@ CREATE TABLE KhuyenMai (
     soTienGiamToiDa DECIMAL(15,2),
     ngayBatDau DATE NOT NULL,
     ngayKetThuc DATE NOT NULL,
-    dieuKienApDung TEXT
+    dieuKienApDung TEXT,
+    loai ENUM('DON_HANG', 'VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
+    donToiThieu DECIMAL(15,2) NOT NULL DEFAULT 0,
+    soLuong INT NULL,
+    daDung INT NOT NULL DEFAULT 0,
+    chiKhachMoi BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE PhiVanChuyen (
+    maPhi VARCHAR(50) PRIMARY KEY,
+    khuVuc VARCHAR(100) NOT NULL UNIQUE,
+    phiCoBan DECIMAL(15,2) NOT NULL,
+    mienPhiTu DECIMAL(15,2) NULL,
+    thoiGianGiao VARCHAR(50)
 );
 
 CREATE TABLE DonHang (
@@ -175,6 +190,10 @@ CREATE TABLE DonHang (
     maKm VARCHAR(50),
     diaChiGiaoHang VARCHAR(500),
     ngayCapNhat DATETIME NULL,
+    maKmVanChuyen VARCHAR(50) NULL,
+    giamGia DECIMAL(15,2) NOT NULL DEFAULT 0,
+    phiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
+    giamPhiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
 
     ngayMua DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -200,6 +219,12 @@ CREATE TABLE DonHang (
 
     CONSTRAINT FK_DonHang_KhuyenMai
         FOREIGN KEY (maKm)
+        REFERENCES KhuyenMai(maKm)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT FK_DonHang_KhuyenMaiVanChuyen
+        FOREIGN KEY (maKmVanChuyen)
         REFERENCES KhuyenMai(maKm)
         ON UPDATE CASCADE
         ON DELETE SET NULL

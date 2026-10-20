@@ -6,5 +6,5 @@ export const orderService = {
   get: (ma) => api.get(`/customer/orders/${ma}`),
   cancel: (ma, lyDo, ghiChu) => api.put(`/customer/orders/${ma}/cancel`, { lyDo, ghiChu }),
   reorder: (ma) => api.post(`/customer/orders/${ma}/reorder`),
-  promotion: (ma) => api.get(`/customer/promotions/${ma}`),
+  preview: (maDiaChi) => api.get('/customer/checkout/preview', { params: { maDiaChi } }),
 };

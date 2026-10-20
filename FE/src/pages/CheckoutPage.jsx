@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import VoucherCard from '../components/VoucherCard';
 import { PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
 import useFetch from '../hooks/useFetch';
@@ -13,36 +14,71 @@ export default function CheckoutPage() {
   const { data: addresses } = useFetch(customerService.addresses);
   const [maDiaChi, setMaDiaChi] = useState('');
   const [payment, setPayment] = useState('COD');
-  const [code, setCode] = useState('');
-  const [promo, setPromo] = useState(null);
+  const [chon, setChon] = useState({ dh: undefined, vc: undefined });
+  const [xemHet, setXemHet] = useState({ DON_HANG: false, VAN_CHUYEN: false });
   const toast = useToast();
   const navigate = useNavigate();
+  const { data: pv, loading: dangTinh, reload } = useFetch(
+    () => (maDiaChi ? orderService.preview(maDiaChi) : Promise.resolve(null)),
+    [maDiaChi]
+  );
 
   useEffect(() => {
     if (addresses?.length) setMaDiaChi((addresses.find((a) => a.macDinh) || addresses[0]).maDiaChi);
   }, [addresses]);
 
-  const discount = promo ? Math.min((total * promo.phanTramGiam) / 100, promo.soTienGiamToiDa ?? Infinity) : 0;
-
-  const applyPromo = async () => {
-    try {
-      setPromo(await orderService.promotion(code.trim()));
-      toast('Áp dụng mã khuyến mãi thành công');
-    } catch (e) {
-      setPromo(null);
-      toast(errorMessage(e), 'error');
-    }
+  const ds = (loai) => (pv?.vouchers || []).filter((v) => v.loai === loai);
+  const tot = (list) => list.filter((v) => v.apDungDuoc).reduce((b, v) => (!b || v.soTienGiam > b.soTienGiam ? v : b), null);
+  const hieuLuc = (list, daChon) => {
+    const ma = daChon === undefined ? tot(list)?.maKm : daChon;
+    return list.find((v) => v.maKm === ma && v.apDungDuoc) || null;
   };
+  const vDh = hieuLuc(ds('DON_HANG'), chon.dh);
+  const vVc = hieuLuc(ds('VAN_CHUYEN'), chon.vc);
+
+  const tamTinh = pv ? Number(pv.tamTinh) : total;
+  const phi = pv ? Number(pv.phiVanChuyen) : 0;
+  const giamDh = vDh ? Number(vDh.soTienGiam) : 0;
+  const giamVc = vVc ? Math.min(Number(vVc.soTienGiam), phi) : 0;
+  const tong = tamTinh - giamDh + phi - giamVc;
+  const thieuMienPhi = pv?.mienPhiTu && phi > 0 ? Number(pv.mienPhiTu) - tamTinh : 0;
 
   const placeOrder = async () => {
     try {
-      const order = await orderService.checkout({ phuongThucTt: payment, maDiaChi, maKm: promo?.maKm });
+      const order = await orderService.checkout({ phuongThucTt: payment, maDiaChi, maKm: vDh?.maKm, maKmVanChuyen: vVc?.maKm });
       reset();
       toast('Đặt hàng thành công!');
       navigate(`/orders/${order.maDonHang}`);
     } catch (e) {
       toast(errorMessage(e), 'error');
+      reload();
     }
+  };
+
+  const voucherSection = (loai, tieuDe, daChon, khoa) => {
+    const list = ds(loai);
+    if (list.length === 0) return null;
+    const hien = xemHet[loai] ? list : list.slice(0, 3);
+    return (
+      <div className="section">
+        <h3>{tieuDe}</h3>
+        <div className="voucher-list">
+          {hien.map((v) => (
+            <VoucherCard
+              key={v.maKm}
+              v={v}
+              selected={daChon?.maKm === v.maKm}
+              onSelect={() => setChon({ ...chon, [khoa]: daChon?.maKm === v.maKm ? null : v.maKm })}
+            />
+          ))}
+        </div>
+        {list.length > 3 && (
+          <button type="button" className="btn btn-ghost" onClick={() => setXemHet({ ...xemHet, [loai]: !xemHet[loai] })}>
+            {xemHet[loai] ? 'Thu gọn' : `Xem thêm ${list.length - 3} voucher`}
+          </button>
+        )}
+      </div>
+    );
   };
 
   if (items.length === 0) return <p className="muted">Giỏ hàng trống. <Link to="/">Tiếp tục mua sắm</Link></p>;
@@ -76,14 +112,8 @@ export default function CheckoutPage() {
             ))}
           </div>
 
-          <div className="section">
-            <h3>Mã khuyến mãi</h3>
-            <div className="row">
-              <input placeholder="Nhập mã (vd: NEST10)" value={code} onChange={(e) => setCode(e.target.value)} />
-              <button className="btn" onClick={applyPromo}>Áp dụng</button>
-            </div>
-            {promo && <p className="muted">Đã áp dụng: {promo.tenKm}</p>}
-          </div>
+          {voucherSection('DON_HANG', 'Voucher giảm giá', vDh, 'dh')}
+          {voucherSection('VAN_CHUYEN', 'Voucher vận chuyển', vVc, 'vc')}
         </div>
 
         <aside className="side">
@@ -96,9 +126,13 @@ export default function CheckoutPage() {
               </div>
             ))}
             <div className="row between total"><span>Tạm tính</span><span>{formatPrice(total)}</span></div>
-            <div className="row between"><span>Giảm giá</span><span>- {formatPrice(discount)}</span></div>
-            <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(total - discount)}</b></div>
-            <button className="btn btn-primary btn-lg" disabled={!maDiaChi} onClick={placeOrder}>Xác nhận đặt hàng</button>
+            <div className="row between"><span>Phí vận chuyển</span><span>{pv ? (phi > 0 ? formatPrice(phi) : 'Miễn phí') : '—'}</span></div>
+            {giamVc > 0 && <div className="row between"><span>Giảm phí vận chuyển</span><span>- {formatPrice(giamVc)}</span></div>}
+            {giamDh > 0 && <div className="row between"><span>Voucher giảm giá</span><span>- {formatPrice(giamDh)}</span></div>}
+            <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(tong)}</b></div>
+            {pv && <p className="muted">Giao đến {pv.khuVuc}, dự kiến {pv.thoiGianGiao}.</p>}
+            {thieuMienPhi > 0 && <p className="muted">Mua thêm {formatPrice(thieuMienPhi)} để được miễn phí vận chuyển.</p>}
+            <button className="btn btn-primary btn-lg" disabled={!maDiaChi || dangTinh} onClick={placeOrder}>Xác nhận đặt hàng</button>
             {!maDiaChi && <p className="muted">Hãy thêm địa chỉ giao hàng để tiếp tục.</p>}
           </div>
         </aside>

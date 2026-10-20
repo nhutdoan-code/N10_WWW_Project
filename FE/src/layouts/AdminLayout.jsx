@@ -10,6 +10,7 @@ const MENU = [
   { to: 'orders', label: 'Đơn hàng' },
   { to: 'returns', label: 'Đổi trả / hoàn tiền' },
   { to: 'promotions', label: 'Khuyến mãi' },
+  { to: 'shipping', label: 'Phí vận chuyển' },
   { to: 'feedback', label: 'Đánh giá & hỏi đáp' },
   { to: 'accounts', label: 'Tài khoản' },
 ];

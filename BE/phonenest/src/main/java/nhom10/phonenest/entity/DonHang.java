@@ -14,6 +14,7 @@ import lombok.Setter;
 import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,10 @@ public class DonHang {
     private LocalDateTime ngayMua;
     private LocalDateTime ngayCapNhat;
     private String diaChiGiaoHang;
+    private String maKmVanChuyen;
+    private BigDecimal giamGia = BigDecimal.ZERO;
+    private BigDecimal phiVanChuyen = BigDecimal.ZERO;
+    private BigDecimal giamPhiVanChuyen = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     private PhuongThucTt phuongThucTt;

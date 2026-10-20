@@ -13,11 +13,14 @@ public record DonHangDto(
         String maDonHang,
         String maKh,
         String maKm,
+        String maKmVanChuyen,
         LocalDateTime ngayMua,
         PhuongThucTt phuongThucTt,
         TrangThaiDonHang trangThai,
         BigDecimal tamTinh,
         BigDecimal giamGia,
+        BigDecimal phiVanChuyen,
+        BigDecimal giamPhiVanChuyen,
         BigDecimal tongTien,
         String diaChiGiaoHang,
         LocalDateTime ngayCapNhat,
@@ -31,12 +34,11 @@ public record DonHangDto(
 
     public record Checkout(@NotNull(message = "Vui lòng chọn phương thức thanh toán") PhuongThucTt phuongThucTt,
                            @NotBlank(message = "Vui lòng chọn địa chỉ giao hàng") String maDiaChi,
-                           String maKm) {
+                           String maKm,
+                           String maKmVanChuyen) {
     }
 
     public record HuyRequest(@NotBlank(message = "Vui lòng chọn lý do hủy đơn") String lyDo, String ghiChu) {
     }
 
-    public record KhuyenMaiInfo(String maKm, String tenKm, BigDecimal phanTramGiam, BigDecimal soTienGiamToiDa) {
-    }
 }

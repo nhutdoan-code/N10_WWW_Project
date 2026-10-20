@@ -38,6 +38,8 @@ export default function InvoicePage() {
       </table>
       <p>Tạm tính: {formatPrice(o.tamTinh)}</p>
       <p>Giảm giá: {formatPrice(o.giamGia)}</p>
+      <p>Phí vận chuyển: {formatPrice(o.phiVanChuyen)}</p>
+      <p>Giảm phí vận chuyển: {formatPrice(o.giamPhiVanChuyen)}</p>
       <h3>Tổng thanh toán: {formatPrice(o.tongTien)}</h3>
     </div>
   );

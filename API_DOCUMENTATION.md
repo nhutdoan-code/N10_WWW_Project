@@ -22,7 +22,7 @@
 | Customer | `khach1@phonenest.vn`, `khach2@phonenest.vn` | `Khach@123` |
 | Admin | `admin@phonenest.vn` | `Admin@123` |
 
-Mã khuyến mãi mẫu: `NEST10`, `WELCOME5`, `HETHAN20` (đã hết hạn, để thử báo lỗi).
+Voucher mẫu: `NEST10`, `WELCOME5` (khách mua lần đầu), `SALE10TR` (đơn từ 10 triệu) cho đơn hàng; `FREESHIP`, `SHIP50` cho phí vận chuyển; `HETHAN20` (đã hết hạn, không hiện ở bước thanh toán).
 
 ## Phân quyền (Spring Security + JWT)
 
@@ -66,9 +66,10 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Hủy đơn hàng (UC013)
 `PUT /api/customer/orders/{ma}/cancel` body `{ "lyDo": "...", "ghiChu": "..." }` (`lyDo` chọn từ danh sách 7 lý do phổ biến; `ghiChu` bắt buộc khi chọn "Lý do khác"). Chỉ hủy được khi đơn **Chờ xác nhận** hoặc **Đang xử lý**; đơn Đang giao / Đã giao bị từ chối với thông báo "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy." Hệ thống kiểm tra lại trạng thái trong CSDL, đổi sang Đã hủy, lưu vào bảng `HuyDonHang` (lý do, ghi chú, ngày hủy), cộng lại tồn kho và gửi thông báo. Kho được trừ lúc đặt hàng nên hủy (khách hoặc admin) đều hoàn kho.
-Nếu đã tạo CSDL cũ, chạy:
-```sql
-ALTER TABLE DonHang DROP COLUMN IF EXISTS lyDoHuy;
-CREATE TABLE HuyDonHang (maDonHang VARCHAR(50) PRIMARY KEY, lyDo VARCHAR(100) NOT NULL, ghiChu VARCHAR(255) NULL, ngayHuy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT FK_HuyDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE);
-```
+Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema.sql`.
+
+## Voucher và phí vận chuyển
+- **Phí vận chuyển** tính theo tỉnh/thành của địa chỉ giao hàng (bảng `PhiVanChuyen`, admin quản lý ở `/api/admin/shipping-fees`). Địa chỉ không khớp khu vực nào thì dùng dòng "Khác". Đơn đạt mức `mienPhiTu` của khu vực thì miễn phí giao hàng.
+- **Voucher** (`KhuyenMai`) có hai loại: `DON_HANG` (giảm trên tạm tính) và `VAN_CHUYEN` (giảm trên phí giao hàng). Mỗi đơn dùng tối đa 1 voucher mỗi loại. Có thêm đơn tối thiểu, số lượng giới hạn (`soLuong`/`daDung`), chỉ dành cho khách mua lần đầu (`chiKhachMoi`). Hủy đơn sẽ hoàn lại lượt dùng.
+- `GET /api/customer/checkout/preview?maDiaChi=...` trả về tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
+- `POST /api/customer/orders` nhận thêm `maKmVanChuyen`; BE kiểm tra lại toàn bộ điều kiện và lưu `giamGia`, `phiVanChuyen`, `giamPhiVanChuyen` vào đơn.
