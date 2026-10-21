@@ -8,7 +8,7 @@
 2. **Backend** (`BE/phonenest`, Java 21, port 8080): mặc định kết nối `jdbc:mariadb://localhost:3306/BanDienThoai`, user `root`, mật khẩu rỗng.
    Khác mặc định thì đặt biến môi trường `DB_USER`, `DB_PASS` (hoặc sửa `application.properties`), rồi `mvn spring-boot:run`.
 3. **Frontend** (`FE`, port 5173): `npm install` → `npm run dev`. Vite tự chuyển `/api` sang `localhost:8080`.
-4. **Tuỳ chọn**: `OPENAI_API_KEY` để bật tìm kiếm AI (không có thì dùng tìm từ khoá). Email quên mật khẩu/xác nhận đơn được ghi ra log nếu chưa cấu hình SMTP (xem comment trong `application.properties`).
+4. **Tuỳ chọn**: `OPENAI_API_KEY` để bật trợ lý chat AI (không có thì trợ lý trả lời theo từ khoá). Email quên mật khẩu/xác nhận đơn được ghi ra log nếu chưa cấu hình SMTP (xem comment trong `application.properties`).
 
 ### Thay đổi so với schema gốc
 - `LoaiSanPham.maLoaiCha` – danh mục cha/con (Tree Pattern).
@@ -34,9 +34,9 @@ Voucher mẫu: `NEST10`, `WELCOME5` (khách mua lần đầu), `SALE10TR` (đơn
 
 Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại → `CUSTOMER`. Gửi token qua `Authorization: Bearer <token>`. Chưa đăng nhập → `401`, sai vai trò → `403`. Lỗi trả về `{ "message": "..." }`.
 
-## Tìm kiếm (Spring AI)
+## Tìm kiếm và trợ lý chat (Spring AI)
 - `GET /api/search?q=` – tìm nhanh (dropdown, tối đa 5 kết quả).
-- `GET /api/search/ai?q=` – `ChatClient` nhận danh sách sản phẩm trong CSDL + câu hỏi tự nhiên, trả về mã sản phẩm phù hợp; lỗi/chưa có key → quay về tìm nhanh.
+- `POST /api/chat` – khung chat tròn ở góc phải màn hình (khách vãng lai cũng dùng được). Body `{message, history}`; BE đưa danh sách sản phẩm, voucher, phí vận chuyển trong CSDL vào prompt cho `ChatClient`, trả về `{reply, products}` (tối đa 3 máy gợi ý, hiển thị dạng thẻ). Chưa có key hoặc lỗi → trả lời theo từ khoá (ngân sách "x triệu", phí giao hàng, voucher). Ô tìm kiếm trên đầu trang chỉ còn tìm theo từ khoá.
 
 ## Chức năng theo file Word
 
@@ -58,7 +58,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Endpoint chi tiết
 
-**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search`, `/api/search/ai`
+**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
 
 **Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `promotions/{ma}` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/eligible/{ma}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 

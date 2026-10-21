@@ -22,11 +22,6 @@ public class SearchController {
         return searchService.nhanh(gioiHan(q));
     }
 
-    @GetMapping("/ai")
-    public List<SanPhamDto> ai(@RequestParam String q) {
-        return searchService.ai(gioiHan(q));
-    }
-
     private String gioiHan(String q) {
         return q.length() > 200 ? q.substring(0, 200) : q;
     }

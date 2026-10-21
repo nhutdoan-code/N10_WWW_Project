@@ -10,7 +10,6 @@ import { formatPrice } from '../utils/format';
 export default function HomePage() {
   const [params] = useSearchParams();
   const q = params.get('q') || '';
-  const ai = params.get('ai') === '1' && q !== '';
   const [maLoai, setMaLoai] = useState('');
   const [price, setPrice] = useState(0);
   const [sort, setSort] = useState('');
@@ -19,8 +18,8 @@ export default function HomePage() {
   const macDinh = !q && !maLoai && !price && !sort;
 
   const { data: products, loading, error } = useFetch(
-    () => (ai ? productService.aiSearch(q) : productService.list({ q, maLoai, min: range.min, max: range.max, sort })),
-    [q, ai, maLoai, price, sort]
+    () => productService.list({ q, maLoai, min: range.min, max: range.max, sort }),
+    [q, maLoai, price, sort]
   );
 
   const noiBat = macDinh && products
@@ -55,17 +54,17 @@ export default function HomePage() {
         </section>
       )}
       <div className="shop">
-        {!ai && categories && (
+        {categories && (
           <aside className="card">
             <h3>Danh mục</h3>
             <CategoryTree categories={categories} value={maLoai} onChange={setMaLoai} />
           </aside>
         )}
         <div>
-          {q && <h2>{ai ? 'Gợi ý AI' : 'Kết quả tìm kiếm'} cho "{q}"</h2>}
+          {q && <h2>Kết quả tìm kiếm cho "{q}"</h2>}
           <div className="toolbar">
             <span className="count">{products ? <><b>{products.length}</b> sản phẩm</> : 'Đang tải sản phẩm...'}</span>
-            {!ai && (
+            {(
               <div className="row">
                 <select aria-label="Mức giá" value={price} onChange={(e) => setPrice(Number(e.target.value))}>
                   {PRICE_RANGES.map((r, i) => (

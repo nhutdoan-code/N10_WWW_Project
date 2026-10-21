@@ -8,5 +8,4 @@ export const productService = {
   questions: (ma) => api.get(`/products/${ma}/questions`),
   categories: () => api.get('/categories'),
   search: (q) => api.get('/search', { params: { q } }),
-  aiSearch: (q) => api.get('/search/ai', { params: { q } }),
 };

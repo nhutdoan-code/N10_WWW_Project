@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.svg';
+import ChatWidget from '../components/ChatWidget';
 import AccountMenu from '../components/AccountMenu';
 import Icon from '../components/Icon';
 import SearchBox from '../components/SearchBox';
@@ -101,6 +102,7 @@ export default function MainLayout() {
         </div>
         <div className="container footer-bottom">© 2026 PhoneNest · Đồ án Lập trình WWW (Java) · Nhóm 10</div>
       </footer>
+      <ChatWidget />
     </>
   );
 }

@@ -7,11 +7,10 @@ import { formatPrice } from '../utils/format';
 
 export default function SearchBox() {
   const [text, setText] = useState('');
-  const [ai, setAi] = useState(false);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const debounced = useDebounce(text.trim(), ai ? 700 : 300);
+  const debounced = useDebounce(text.trim(), 300);
   const box = useRef(null);
   const navigate = useNavigate();
 
@@ -22,14 +21,14 @@ export default function SearchBox() {
     }
     let alive = true;
     setLoading(true);
-    (ai ? productService.aiSearch : productService.search)(debounced)
+    productService.search(debounced)
       .then((data) => alive && setResults(data))
       .catch(() => alive && setResults([]))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [debounced, ai]);
+  }, [debounced]);
 
   useEffect(() => {
     const close = (e) => !box.current?.contains(e.target) && setOpen(false);
@@ -40,7 +39,7 @@ export default function SearchBox() {
   const submit = (e) => {
     e.preventDefault();
     setOpen(false);
-    navigate(`/?q=${encodeURIComponent(text.trim())}${ai ? '&ai=1' : ''}`);
+    navigate(`/?q=${encodeURIComponent(text.trim())}`);
   };
 
   return (
@@ -49,17 +48,13 @@ export default function SearchBox() {
         <Icon name="search" size={18} />
         <input
           value={text}
-          placeholder={ai ? 'Mô tả nhu cầu: "điện thoại pin trâu dưới 10 triệu"' : 'Tìm tên máy, mã máy, hãng...'}
+          placeholder="Tìm tên máy, mã máy, hãng..."
           onChange={(e) => {
             setText(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
         />
-        <label className={ai ? 'ai-toggle on' : 'ai-toggle'} title="Tìm bằng AI: mô tả nhu cầu bằng câu tự nhiên">
-          <input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} />
-          <Icon name="sparkle" size={14} /> AI
-        </label>
       </form>
       {open && debounced && (
         <div className="search-dropdown">
