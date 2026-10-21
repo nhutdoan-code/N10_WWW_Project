@@ -36,6 +36,7 @@ public class DonHang {
     private LocalDateTime ngayMua;
     private LocalDateTime ngayCapNhat;
     private String diaChiGiaoHang;
+    private LocalDateTime ngayGiao;
     private String maKmVanChuyen;
     private BigDecimal giamGia = BigDecimal.ZERO;
     private BigDecimal phiVanChuyen = BigDecimal.ZERO;

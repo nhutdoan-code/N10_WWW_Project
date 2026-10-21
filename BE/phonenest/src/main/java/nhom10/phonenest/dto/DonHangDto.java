@@ -24,6 +24,7 @@ public record DonHangDto(
         BigDecimal tongTien,
         String diaChiGiaoHang,
         LocalDateTime ngayCapNhat,
+        LocalDateTime ngayGiao,
         String tenKhach,
         String trangThaiDoiTra,
         String lyDoHuy,

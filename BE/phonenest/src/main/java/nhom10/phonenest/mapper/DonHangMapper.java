@@ -35,7 +35,7 @@ public class DonHangMapper {
                 d.getKhuyenMai() == null ? null : d.getKhuyenMai().getMaKm(), d.getMaKmVanChuyen(),
                 d.getNgayMua(), d.getPhuongThucTt(), d.getTrangThai(),
                 tamTinh, d.getGiamGia(), d.getPhiVanChuyen(), d.getGiamPhiVanChuyen(), tong,
-                d.getDiaChiGiaoHang(), d.getNgayCapNhat(),
+                d.getDiaChiGiaoHang(), d.getNgayCapNhat(), d.getNgayGiao(),
                 khachHangRepository.findById(d.getMaKh()).map(KhachHang::getHoTen).orElse(""),
                 yeuCauDoiTraRepository.findByMaDonHang(d.getMaDonHang()).map(y -> y.getTrangThai().name()).orElse(null),
                 huyDonHangRepository.findById(d.getMaDonHang())

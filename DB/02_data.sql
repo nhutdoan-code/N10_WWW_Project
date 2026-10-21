@@ -3492,13 +3492,13 @@ UPDATE DonHang SET phiVanChuyen=25000 WHERE maDonHang IN ('DH001','DH003');
 UPDATE DonHang SET phiVanChuyen=25000, giamGia=2000000 WHERE maDonHang='DH002';
 
 -- Địa chỉ và thời điểm cập nhật cho các đơn mẫu
-UPDATE DonHang SET diaChiGiaoHang='Nguyễn Văn An - 0900000002 - 12 Nguyễn Văn Bảo, Phường Hạnh Thông, Thành phố Hồ Chí Minh', ngayCapNhat='2026-09-22 16:00:00' WHERE maDonHang='DH001';
+UPDATE DonHang SET diaChiGiaoHang='Nguyễn Văn An - 0900000002 - 12 Nguyễn Văn Bảo, Phường Hạnh Thông, Thành phố Hồ Chí Minh', ngayCapNhat='2026-09-22 16:00:00', ngayGiao='2026-09-22 16:00:00' WHERE maDonHang='DH001';
 UPDATE DonHang SET diaChiGiaoHang='Nguyễn Văn An - 0900000002 - 12 Nguyễn Văn Bảo, Phường Hạnh Thông, Thành phố Hồ Chí Minh', ngayCapNhat='2026-10-12 14:05:00' WHERE maDonHang='DH002';
 UPDATE DonHang SET diaChiGiaoHang='Trần Thị Bình - 0900000003 - 88 Trần Hưng Đạo, Phường Chợ Lớn, Thành phố Hồ Chí Minh', ngayCapNhat='2026-10-15 08:30:00' WHERE maDonHang='DH003';
 
 -- Đánh giá (khách đã nhận hàng DH001), hỏi đáp, thông báo, đổi trả
-INSERT INTO DanhGia (maDanhGia, maKh, maSanPham, diemSao, noiDungBinhLuan, hinhAnhThucTe, ngayDanhGia) VALUES
-('DG001','TK002','SP010',5,'Máy rẻ mà dùng ổn, pin trâu, giao hàng nhanh.',NULL,'2026-09-25');
+INSERT INTO DanhGia (maDanhGia, maKh, maDonHang, maSanPham, diemSao, noiDungBinhLuan, hinhAnhThucTe, ngayDanhGia) VALUES
+('DG001','TK002','DH001','SP010',5,'Máy rẻ mà dùng ổn, pin trâu, giao hàng nhanh.',NULL,'2026-09-25');
 UPDATE SanPham SET diemDanhGiaTb = 5.0 WHERE maSanPham = 'SP010';
 
 INSERT INTO HoiDap (maCauHoi, maKh, maSanPham, noiDungCauHoi, noiDungTraLoi, ngayHoi, ngayTraLoi) VALUES

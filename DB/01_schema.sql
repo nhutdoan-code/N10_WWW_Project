@@ -228,6 +228,7 @@ CREATE TABLE DonHang (
     maKm VARCHAR(50),
     diaChiGiaoHang VARCHAR(500),
     ngayCapNhat DATETIME NULL,
+    ngayGiao DATETIME NULL,
     maKmVanChuyen VARCHAR(50) NULL,
     giamGia DECIMAL(15,2) NOT NULL DEFAULT 0,
     phiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
@@ -319,6 +320,7 @@ CREATE TABLE YeuCauDoiTra (
 CREATE TABLE DanhGia (
     maDanhGia VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL,
+    maDonHang VARCHAR(50) NOT NULL,
     maSanPham VARCHAR(50) NOT NULL,
 
     diemSao INT NOT NULL,
@@ -337,6 +339,15 @@ CREATE TABLE DanhGia (
         REFERENCES SanPham(maSanPham)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
+
+    CONSTRAINT FK_DanhGia_ChiTietDonHang
+        FOREIGN KEY (maDonHang, maSanPham)
+        REFERENCES ChiTietDonHang(maDonHang, maSanPham)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT UQ_DanhGia_DonHang_SanPham
+        UNIQUE (maDonHang, maSanPham),
 
     CONSTRAINT CK_DanhGia_DiemSao
         CHECK (diemSao BETWEEN 1 AND 5)

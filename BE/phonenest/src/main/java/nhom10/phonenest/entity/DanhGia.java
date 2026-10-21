@@ -21,6 +21,7 @@ public class DanhGia {
     @Id
     private String maDanhGia;
     private String maKh;
+    private String maDonHang;
     private String maSanPham;
     private int diemSao;
     private String noiDungBinhLuan;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FormField from '../components/FormField';
 import Modal from '../components/Modal';
+import ReviewForm from '../components/ReviewForm';
 import OrderSteps from '../components/OrderSteps';
 import StatusBadge from '../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
@@ -17,6 +18,11 @@ export default function OrderDetailPage() {
   const { data: o, loading, error, reload } = useFetch(() => orderService.get(ma), [ma]);
   const [returnForm, setReturnForm] = useState(null);
   const [cancelForm, setCancelForm] = useState(null);
+  const [reviewing, setReviewing] = useState(null);
+  const { data: reviewStates, reload: reloadReviews } = useFetch(
+    () => (o?.trangThai === 'DA_GIAO' ? customerService.orderReviews(ma) : Promise.resolve([])),
+    [ma, o?.trangThai]
+  );
   const { replace } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
@@ -79,7 +85,13 @@ export default function OrderDetailPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <b>{formatPrice(d.donGia * d.soLuong)}</b>
-                  {o.trangThai === 'DA_GIAO' && <div><Link to={`/products/${d.maSanPham}#danh-gia`}>Đánh giá</Link></div>}
+                  {o.trangThai === 'DA_GIAO' && (() => {
+                    const r = reviewStates?.find((x) => x.maSanPham === d.maSanPham);
+                    if (!r) return null;
+                    if (r.danhGia) return <div className="muted"><span className="stars">{'★'.repeat(r.danhGia.diemSao)}</span> Đã đánh giá</div>;
+                    if (r.duocDanhGia) return <button className="btn" onClick={() => setReviewing(d)}>Đánh giá</button>;
+                    return <small className="muted">{r.lyDo}</small>;
+                  })()}
                 </div>
               </div>
             ))}
@@ -134,6 +146,12 @@ export default function OrderDetailPage() {
             <button className="btn btn-danger" onClick={() => setCancelForm({ lyDo: CANCEL_REASONS[0], khac: '' })}>Hủy đơn hàng</button>
           )}
         </aside>
+        {reviewing && (
+          <Modal title="Đánh giá sản phẩm" onClose={() => setReviewing(null)}>
+            <ReviewForm maDonHang={o.maDonHang} sanPham={reviewing} onCancel={() => setReviewing(null)}
+              onDone={() => { setReviewing(null); reloadReviews(); }} />
+          </Modal>
+        )}
         {cancelForm && (
           <Modal title="Hủy đơn hàng" onClose={() => setCancelForm(null)}>
             <form className="stack" onSubmit={submitCancel}>

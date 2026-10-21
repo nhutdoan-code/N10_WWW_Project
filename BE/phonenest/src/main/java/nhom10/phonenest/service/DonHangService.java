@@ -192,6 +192,9 @@ public class DonHangService {
         }
         d.setTrangThai(moi);
         d.setNgayCapNhat(LocalDateTime.now());
+        if (moi == TrangThaiDonHang.DA_GIAO) {
+            d.setNgayGiao(d.getNgayCapNhat());
+        }
         DonHangDto dto = donHangMapper.toDto(d);
         if (moi == TrangThaiDonHang.DA_GIAO) {
             congDiem(d, dto);

@@ -60,7 +60,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 **Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
 
-**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `promotions/{ma}` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/eligible/{ma}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
+**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 
 **Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET, `POST /{ma}/import`, `PUT /{ma}`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
 
@@ -79,3 +79,13 @@ Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema
 - `GET /api/locations/provinces` và `GET /api/locations/provinces/{maTinh}/wards` trả về danh sách `{ma, ten}` cho ô chọn.
 - Địa chỉ lưu `maTinh`, `maPhuong` và chỉ cho nhập tay phần "số nhà, tên đường" (`diaChiNhanHang`). BE kiểm tra phường thuộc đúng tỉnh.
 - Khách thêm / sửa địa chỉ ngay ở bước thanh toán; đổi địa chỉ sẽ tính lại phí vận chuyển theo tỉnh (bảng `PhiVanChuyen`, dòng `maTinh` rỗng là mức mặc định).
+
+## Đánh giá sản phẩm
+Mỗi đánh giá gắn với một dòng sản phẩm của một đơn hàng cụ thể (`DanhGia.maDonHang` + `maSanPham`, khóa ngoại tới `ChiTietDonHang`, duy nhất theo cặp này). BE kiểm tra lần lượt:
+1. Đơn hàng thuộc về khách đang đăng nhập.
+2. Đơn ở trạng thái **Đã giao** (thời điểm giao lưu ở `DonHang.ngayGiao`).
+3. Sản phẩm có trong đơn đó.
+4. Đơn không có yêu cầu đổi trả / hoàn tiền đang xử lý hoặc đã duyệt (bị từ chối thì vẫn được đánh giá).
+5. Còn trong 30 ngày kể từ khi nhận hàng.
+6. Chưa đánh giá sản phẩm này trong đơn (có ràng buộc UNIQUE ở CSDL chống gửi trùng).
+Dữ liệu: 1 - 5 sao, nhận xét tối đa 1000 ký tự (bắt buộc từ 10 ký tự nếu chấm 1 - 2 sao), link ảnh phải là http(s). Khách đánh giá ở trang chi tiết đơn hàng; `GET /api/customer/reviews/order/{ma}` trả về trạng thái từng sản phẩm (được đánh giá / lý do chưa được / đánh giá đã gửi).

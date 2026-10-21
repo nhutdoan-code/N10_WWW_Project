@@ -10,7 +10,7 @@ export const customerService = {
   setDefaultAddress: (ma) => api.put(`/customer/addresses/${ma}/default`),
   deleteAddress: (ma) => api.delete(`/customer/addresses/${ma}`),
 
-  canReview: (ma) => api.get(`/customer/reviews/eligible/${ma}`),
+  orderReviews: (maDonHang) => api.get(`/customer/reviews/order/${maDonHang}`),
   review: (data) => api.post('/customer/reviews', data),
   ask: (maSanPham, noiDung) => api.post('/customer/questions', { maSanPham, noiDung }),
 

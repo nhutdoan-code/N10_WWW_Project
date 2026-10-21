@@ -25,8 +25,8 @@ public class DanhGiaController {
         return danhGiaService.cuaToi(SecurityUtil.currentUserId());
     }
 
-    @GetMapping("/eligible/{ma}")
-    public DanhGiaDto.Eligible kiemTra(@PathVariable String ma) {
-        return danhGiaService.kiemTra(SecurityUtil.currentUserId(), ma);
+    @GetMapping("/order/{ma}")
+    public List<DanhGiaDto.TrangThai> theoDonHang(@PathVariable String ma) {
+        return danhGiaService.theoDonHang(SecurityUtil.currentUserId(), ma);
     }
 }

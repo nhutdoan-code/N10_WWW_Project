@@ -1,6 +1,7 @@
 package nhom10.phonenest.repository;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 
 import nhom10.phonenest.entity.DanhGia;
@@ -13,7 +14,7 @@ public interface DanhGiaRepository extends JpaRepository<DanhGia, String> {
 
     List<DanhGia> findAllByOrderByNgayDanhGiaDesc();
 
-    boolean existsByMaKhAndMaSanPham(String maKh, String maSanPham);
+    Optional<DanhGia> findByMaDonHangAndMaSanPham(String maDonHang, String maSanPham);
 
     @Query("select avg(d.diemSao) from DanhGia d where d.maSanPham = ?1")
     Double trungBinh(String maSanPham);

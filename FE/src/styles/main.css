@@ -380,3 +380,8 @@ section > h3 { font-size: 1.2rem; margin: 28px 0 14px; }
 .chat-panel header .icon-btn { width: 32px; height: 32px; border: 0; background: rgba(255, 255, 255, 0.14); }
 .chat-panel header .icon-btn:hover { background: rgba(255, 255, 255, 0.26); }
 .chat-product { color: var(--ink); }
+
+.star-input { display: flex; align-items: center; gap: 4px; }
+.star-input button { padding: 0 2px; border: 0; background: none; font-size: 1.9rem; line-height: 1; color: #d3d8e2; cursor: pointer; }
+.star-input button.on { color: var(--star); }
+.star-input span { margin-left: 8px; }
