@@ -54,6 +54,7 @@ public class DonHangService {
     private final KhuyenMaiRepository khuyenMaiRepository;
     private final HuyDonHangRepository huyDonHangRepository;
     private final KhuyenMaiService khuyenMaiService;
+    private final DiaChiService diaChiService;
     private final PhiVanChuyenService phiVanChuyenService;
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
@@ -81,7 +82,7 @@ public class DonHangService {
         d.setNgayCapNhat(d.getNgayMua());
         d.setPhuongThucTt(req.phuongThucTt());
         d.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
-        d.setDiaChiGiaoHang(diaChiText(dc));
+        d.setDiaChiGiaoHang(diaChiService.diaChiDayDu(dc));
         BigDecimal tamTinh = BigDecimal.ZERO;
         for (var e : gio.getItems().entrySet()) {
             SanPham s = sanPhamRepository.findById(e.getKey()).orElseThrow();
@@ -91,7 +92,7 @@ public class DonHangService {
             d.getChiTiet().add(new ChiTietDonHang(e.getKey(), e.getValue(), s.getGiaBan()));
             tamTinh = tamTinh.add(s.getGiaBan().multiply(BigDecimal.valueOf(e.getValue())));
         }
-        BigDecimal phi = phiVanChuyenService.tinhPhi(phiVanChuyenService.theoDiaChi(dc.getTinhThanhPho()), tamTinh);
+        BigDecimal phi = phiVanChuyenService.tinhPhi(phiVanChuyenService.theoDiaChi(dc.getMaTinh()), tamTinh);
         d.setPhiVanChuyen(phi);
         boolean khachMoi = !donHangRepository.existsByMaKhAndTrangThaiNot(maKh, TrangThaiDonHang.DA_HUY);
         if (coMa(req.maKm())) {
@@ -259,11 +260,6 @@ public class DonHangService {
             case DA_GIAO -> "Đã giao";
             case DA_HUY -> "Đã hủy";
         };
-    }
-
-    private String diaChiText(DiaChi dc) {
-        String tinh = dc.getTinhThanhPho() == null || dc.getTinhThanhPho().isBlank() ? "" : ", " + dc.getTinhThanhPho();
-        return dc.getTenNguoiNhan() + " - " + dc.getSoDienThoaiNhan() + " - " + dc.getDiaChiNhanHang() + tinh;
     }
 
     private DonHang tim(String ma) {

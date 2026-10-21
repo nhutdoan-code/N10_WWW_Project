@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import AddressForm from '../components/AddressForm';
+import Modal from '../components/Modal';
 import VoucherCard from '../components/VoucherCard';
 import { PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
@@ -11,7 +13,8 @@ import { errorMessage, formatPrice } from '../utils/format';
 
 export default function CheckoutPage() {
   const { items, total, reset } = useCart();
-  const { data: addresses } = useFetch(customerService.addresses);
+  const { data: addresses, reload: reloadAddresses } = useFetch(customerService.addresses);
+  const [editingAddress, setEditingAddress] = useState(null);
   const [maDiaChi, setMaDiaChi] = useState('');
   const [payment, setPayment] = useState('COD');
   const [chon, setChon] = useState({ dh: undefined, vc: undefined });
@@ -42,6 +45,14 @@ export default function CheckoutPage() {
   const giamVc = vVc ? Math.min(Number(vVc.soTienGiam), phi) : 0;
   const tong = tamTinh - giamDh + phi - giamVc;
   const thieuMienPhi = pv?.mienPhiTu && phi > 0 ? Number(pv.mienPhiTu) - tamTinh : 0;
+
+  const addressSaved = async (saved) => {
+    setEditingAddress(null);
+    toast('Đã lưu địa chỉ giao hàng');
+    setMaDiaChi(saved.maDiaChi);
+    reloadAddresses();
+    reload();
+  };
 
   const placeOrder = async () => {
     try {
@@ -90,17 +101,19 @@ export default function CheckoutPage() {
         <div>
           <div className="section">
             <h3>Địa chỉ giao hàng</h3>
-            {addresses?.length === 0 && <p className="error">Bạn chưa có địa chỉ giao hàng. <Link to="/account/addresses">Thêm địa chỉ</Link></p>}
+            {addresses?.length === 0 && <p className="muted">Bạn chưa có địa chỉ giao hàng, hãy thêm địa chỉ để tiếp tục.</p>}
             {addresses?.map((a) => (
               <label key={a.maDiaChi} className="option">
                 <input type="radio" checked={maDiaChi === a.maDiaChi} onChange={() => setMaDiaChi(a.maDiaChi)} />
-                <span>
+                <span className="grow">
                   <b>{a.tenNguoiNhan}</b> · {a.soDienThoaiNhan}
                   <br />
-                  <span className="muted">{a.diaChiNhanHang}{a.tinhThanhPho && `, ${a.tinhThanhPho}`}</span>
+                  <span className="muted">{a.diaChiNhanHang}, {a.tenPhuong}, {a.tenTinh}</span>
                 </span>
+                <button type="button" className="btn btn-ghost" onClick={(e) => { e.preventDefault(); setEditingAddress(a); }}>Sửa</button>
               </label>
             ))}
+            <button type="button" className="btn" onClick={() => setEditingAddress({})}>+ Thêm địa chỉ mới</button>
           </div>
 
           <div className="section">
@@ -137,6 +150,11 @@ export default function CheckoutPage() {
           </div>
         </aside>
       </div>
+      {editingAddress && (
+        <Modal title={editingAddress.maDiaChi ? 'Sửa địa chỉ giao hàng' : 'Thêm địa chỉ giao hàng'} onClose={() => setEditingAddress(null)}>
+          <AddressForm initial={editingAddress} onSaved={addressSaved} onCancel={() => setEditingAddress(null)} />
+        </Modal>
+      )}
     </>
   );
 }

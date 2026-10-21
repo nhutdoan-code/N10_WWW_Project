@@ -35,6 +35,7 @@ public class ThanhToanService {
     private final KhuyenMaiRepository khuyenMaiRepository;
     private final KhuyenMaiService khuyenMaiService;
     private final PhiVanChuyenService phiVanChuyenService;
+    private final DiaChiService diaChiService;
 
     public CheckoutDto xemTruoc(String maKh, String maDiaChi) {
         GioHang gio = gioHangRepository.findByMaKh(maKh)
@@ -46,7 +47,7 @@ public class ThanhToanService {
         BigDecimal tamTinh = gio.getItems().entrySet().stream()
                 .map(e -> sanPhamRepository.findById(e.getKey()).orElseThrow().getGiaBan().multiply(BigDecimal.valueOf(e.getValue())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        PhiVanChuyen pvc = phiVanChuyenService.theoDiaChi(dc.getTinhThanhPho());
+        PhiVanChuyen pvc = phiVanChuyenService.theoDiaChi(dc.getMaTinh());
         BigDecimal phi = phiVanChuyenService.tinhPhi(pvc, tamTinh);
         boolean khachMoi = !donHangRepository.existsByMaKhAndTrangThaiNot(maKh, TrangThaiDonHang.DA_HUY);
 
@@ -57,7 +58,7 @@ public class ThanhToanService {
                 .sorted(Comparator.comparing(CheckoutDto.Voucher::apDungDuoc).reversed()
                         .thenComparing(CheckoutDto.Voucher::soTienGiam, Comparator.reverseOrder()))
                 .toList();
-        return new CheckoutDto(tamTinh, phi, pvc.getMienPhiTu(), pvc.getKhuVuc(), pvc.getThoiGianGiao(), vouchers);
+        return new CheckoutDto(tamTinh, phi, pvc.getMienPhiTu(), diaChiService.tenTinh(dc.getMaTinh()), pvc.getThoiGianGiao(), vouchers);
     }
 
     private CheckoutDto.Voucher voucher(KhuyenMai k, BigDecimal tamTinh, BigDecimal phi, boolean khachMoi) {

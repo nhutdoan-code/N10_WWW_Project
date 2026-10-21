@@ -59,20 +59,52 @@ CREATE TABLE ThongBao (
         ON DELETE CASCADE
 );
 
+CREATE TABLE TinhThanh (
+    maTinh VARCHAR(10) PRIMARY KEY,
+    tenTinh VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE PhuongXa (
+    maPhuong VARCHAR(10) PRIMARY KEY,
+    tenPhuong VARCHAR(100) NOT NULL,
+    maTinh VARCHAR(10) NOT NULL,
+
+    CONSTRAINT FK_PhuongXa_TinhThanh
+        FOREIGN KEY (maTinh)
+        REFERENCES TinhThanh(maTinh)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    INDEX IDX_PhuongXa_maTinh (maTinh)
+);
+
 CREATE TABLE DiaChi (
     maDiaChi VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL,
     tenNguoiNhan VARCHAR(100) NOT NULL,
     soDienThoaiNhan VARCHAR(20) NOT NULL,
     diaChiNhanHang VARCHAR(255) NOT NULL,
-    tinhThanhPho VARCHAR(100),
+    maTinh VARCHAR(10) NOT NULL,
+    maPhuong VARCHAR(10) NOT NULL,
     macDinh BOOLEAN NOT NULL DEFAULT FALSE,
 
     CONSTRAINT FK_DiaChi_KhachHang
         FOREIGN KEY (maKh)
         REFERENCES KhachHang(maKh)
         ON UPDATE CASCADE
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT FK_DiaChi_TinhThanh
+        FOREIGN KEY (maTinh)
+        REFERENCES TinhThanh(maTinh)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT FK_DiaChi_PhuongXa
+        FOREIGN KEY (maPhuong)
+        REFERENCES PhuongXa(maPhuong)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 CREATE TABLE LoaiSanPham (
@@ -178,10 +210,16 @@ CREATE TABLE KhuyenMai (
 
 CREATE TABLE PhiVanChuyen (
     maPhi VARCHAR(50) PRIMARY KEY,
-    khuVuc VARCHAR(100) NOT NULL UNIQUE,
+    maTinh VARCHAR(10) NULL UNIQUE,
     phiCoBan DECIMAL(15,2) NOT NULL,
     mienPhiTu DECIMAL(15,2) NULL,
-    thoiGianGiao VARCHAR(50)
+    thoiGianGiao VARCHAR(50),
+
+    CONSTRAINT FK_PhiVanChuyen_TinhThanh
+        FOREIGN KEY (maTinh)
+        REFERENCES TinhThanh(maTinh)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
 CREATE TABLE DonHang (

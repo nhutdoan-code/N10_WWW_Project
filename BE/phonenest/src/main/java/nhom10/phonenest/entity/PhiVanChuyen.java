@@ -16,7 +16,7 @@ public class PhiVanChuyen {
 
     @Id
     private String maPhi;
-    private String khuVuc;
+    private String maTinh;
     private BigDecimal phiCoBan;
     private BigDecimal mienPhiTu;
     private String thoiGianGiao;

@@ -73,3 +73,9 @@ Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema
 - **Voucher** (`KhuyenMai`) có hai loại: `DON_HANG` (giảm trên tạm tính) và `VAN_CHUYEN` (giảm trên phí giao hàng). Mỗi đơn dùng tối đa 1 voucher mỗi loại. Có thêm đơn tối thiểu, số lượng giới hạn (`soLuong`/`daDung`), chỉ dành cho khách mua lần đầu (`chiKhachMoi`). Hủy đơn sẽ hoàn lại lượt dùng.
 - `GET /api/customer/checkout/preview?maDiaChi=...` trả về tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
 - `POST /api/customer/orders` nhận thêm `maKmVanChuyen`; BE kiểm tra lại toàn bộ điều kiện và lưu `giamGia`, `phiVanChuyen`, `giamPhiVanChuyen` vào đơn.
+
+## Địa chỉ giao hàng (tỉnh / phường sau sáp nhập)
+- Danh mục theo Nghị quyết 202/2025/QH15: 34 tỉnh/thành và 3.321 phường/xã/đặc khu, nằm trong `02_data.sql` (bảng `TinhThanh`, `PhuongXa`).
+- `GET /api/locations/provinces` và `GET /api/locations/provinces/{maTinh}/wards` trả về danh sách `{ma, ten}` cho ô chọn.
+- Địa chỉ lưu `maTinh`, `maPhuong` và chỉ cho nhập tay phần "số nhà, tên đường" (`diaChiNhanHang`). BE kiểm tra phường thuộc đúng tỉnh.
+- Khách thêm / sửa địa chỉ ngay ở bước thanh toán; đổi địa chỉ sẽ tính lại phí vận chuyển theo tỉnh (bảng `PhiVanChuyen`, dòng `maTinh` rỗng là mức mặc định).

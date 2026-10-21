@@ -22,6 +22,7 @@ public class DiaChi {
     private String tenNguoiNhan;
     private String soDienThoaiNhan;
     private String diaChiNhanHang;
-    private String tinhThanhPho;
+    private String maTinh;
+    private String maPhuong;
     private boolean macDinh;
 }

@@ -3,15 +3,16 @@ package nhom10.phonenest.service;
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.PhiVanChuyenDto;
 import nhom10.phonenest.entity.PhiVanChuyen;
+import nhom10.phonenest.entity.TinhThanh;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.PhiVanChuyenRepository;
+import nhom10.phonenest.repository.TinhThanhRepository;
 import nhom10.phonenest.util.IdGenerator;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.text.Normalizer;
 import java.util.List;
 
 @Service
@@ -19,9 +20,10 @@ import java.util.List;
 @Transactional
 public class PhiVanChuyenService {
 
-    private static final String KHAC = "Khác";
+    private static final String MAC_DINH = "Khu vực khác (mặc định)";
 
     private final PhiVanChuyenRepository phiVanChuyenRepository;
+    private final TinhThanhRepository tinhThanhRepository;
 
     @Transactional(readOnly = true)
     public List<PhiVanChuyenDto> list() {
@@ -29,36 +31,37 @@ public class PhiVanChuyenService {
     }
 
     public PhiVanChuyenDto tao(PhiVanChuyenDto d) {
-        if (phiVanChuyenRepository.existsByKhuVucIgnoreCase(d.khuVuc().trim())) {
-            throw new AppException(HttpStatus.CONFLICT, "Khu vực này đã có bảng phí");
+        if (d.maTinh() == null || d.maTinh().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn tỉnh / thành phố");
+        }
+        if (!tinhThanhRepository.existsById(d.maTinh())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Tỉnh / thành phố không hợp lệ");
+        }
+        if (phiVanChuyenRepository.existsByMaTinh(d.maTinh())) {
+            throw new AppException(HttpStatus.CONFLICT, "Tỉnh / thành phố này đã có bảng phí");
         }
         PhiVanChuyen p = new PhiVanChuyen();
         p.setMaPhi(IdGenerator.next("PVC"));
+        p.setMaTinh(d.maTinh());
         return luu(p, d);
     }
 
     public PhiVanChuyenDto sua(String ma, PhiVanChuyenDto d) {
-        PhiVanChuyen p = tim(ma);
-        if (KHAC.equals(p.getKhuVuc()) && !KHAC.equals(d.khuVuc().trim())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Không đổi tên khu vực mặc định \"Khác\"");
-        }
-        return luu(p, d);
+        return luu(tim(ma), d);
     }
 
     public void xoa(String ma) {
         PhiVanChuyen p = tim(ma);
-        if (KHAC.equals(p.getKhuVuc())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể xóa khu vực mặc định \"Khác\"");
+        if (p.getMaTinh() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể xóa mức phí mặc định");
         }
         phiVanChuyenRepository.delete(p);
     }
 
     @Transactional(readOnly = true)
-    public PhiVanChuyen theoDiaChi(String tinhThanh) {
-        List<PhiVanChuyen> all = phiVanChuyenRepository.findAll();
-        String key = chuanHoa(tinhThanh);
-        return all.stream().filter(p -> !key.isEmpty() && chuanHoa(p.getKhuVuc()).equals(key)).findFirst()
-                .or(() -> all.stream().filter(p -> KHAC.equals(p.getKhuVuc())).findFirst())
+    public PhiVanChuyen theoDiaChi(String maTinh) {
+        return phiVanChuyenRepository.findByMaTinh(maTinh)
+                .or(phiVanChuyenRepository::findByMaTinhIsNull)
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Chưa cấu hình phí vận chuyển cho khu vực này"));
     }
 
@@ -67,17 +70,7 @@ public class PhiVanChuyenService {
         return mienPhi ? BigDecimal.ZERO : p.getPhiCoBan();
     }
 
-    private String chuanHoa(String s) {
-        if (s == null) {
-            return "";
-        }
-        String bo = Normalizer.normalize(s.toLowerCase(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").replace('đ', 'd').replaceAll("[^a-z0-9]", "");
-        return bo.replaceFirst("^(thanhpho|tinh|tp)", "");
-    }
-
     private PhiVanChuyenDto luu(PhiVanChuyen p, PhiVanChuyenDto d) {
-        p.setKhuVuc(d.khuVuc().trim());
         p.setPhiCoBan(d.phiCoBan());
         p.setMienPhiTu(d.mienPhiTu());
         p.setThoiGianGiao(d.thoiGianGiao());
@@ -90,6 +83,8 @@ public class PhiVanChuyenService {
     }
 
     private PhiVanChuyenDto toDto(PhiVanChuyen p) {
-        return new PhiVanChuyenDto(p.getMaPhi(), p.getKhuVuc(), p.getPhiCoBan(), p.getMienPhiTu(), p.getThoiGianGiao());
+        String ten = p.getMaTinh() == null ? MAC_DINH
+                : tinhThanhRepository.findById(p.getMaTinh()).map(TinhThanh::getTenTinh).orElse(p.getMaTinh());
+        return new PhiVanChuyenDto(p.getMaPhi(), p.getMaTinh(), ten, p.getPhiCoBan(), p.getMienPhiTu(), p.getThoiGianGiao());
     }
 }

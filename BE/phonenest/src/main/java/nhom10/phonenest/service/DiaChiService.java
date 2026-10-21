@@ -2,8 +2,12 @@ package nhom10.phonenest.service;
 
 import nhom10.phonenest.dto.DiaChiDto;
 import nhom10.phonenest.entity.DiaChi;
+import nhom10.phonenest.entity.PhuongXa;
+import nhom10.phonenest.entity.TinhThanh;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.DiaChiRepository;
+import nhom10.phonenest.repository.PhuongXaRepository;
+import nhom10.phonenest.repository.TinhThanhRepository;
 import nhom10.phonenest.util.IdGenerator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DiaChiService {
 
     private final DiaChiRepository diaChiRepository;
+    private final PhuongXaRepository phuongXaRepository;
+    private final TinhThanhRepository tinhThanhRepository;
 
     @Transactional(readOnly = true)
     public List<DiaChiDto> list(String maKh) {
@@ -33,7 +39,11 @@ public class DiaChiService {
         d.setTenNguoiNhan(dto.tenNguoiNhan().trim());
         d.setSoDienThoaiNhan(dto.soDienThoaiNhan());
         d.setDiaChiNhanHang(dto.diaChiNhanHang().trim());
-        d.setTinhThanhPho(dto.tinhThanhPho());
+        PhuongXa px = phuongXaRepository.findById(dto.maPhuong())
+                .filter(p -> p.getMaTinh().equals(dto.maTinh()))
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Phường / xã không thuộc tỉnh / thành phố đã chọn"));
+        d.setMaTinh(px.getMaTinh());
+        d.setMaPhuong(px.getMaPhuong());
         if (dto.macDinh() || d.isMacDinh() || dauTien) {
             boMacDinh(maKh);
             d.setMacDinh(true);
@@ -69,7 +79,20 @@ public class DiaChiService {
     }
 
     private DiaChiDto toDto(DiaChi d) {
-        return new DiaChiDto(d.getMaDiaChi(), d.getTenNguoiNhan(), d.getSoDienThoaiNhan(), d.getDiaChiNhanHang(),
-                d.getTinhThanhPho(), d.isMacDinh());
+        return new DiaChiDto(d.getMaDiaChi(), d.getTenNguoiNhan(), d.getSoDienThoaiNhan(), d.getMaTinh(), d.getMaPhuong(),
+                d.getDiaChiNhanHang(), tenTinh(d.getMaTinh()), tenPhuong(d.getMaPhuong()), d.isMacDinh());
+    }
+
+    public String tenTinh(String maTinh) {
+        return tinhThanhRepository.findById(maTinh).map(TinhThanh::getTenTinh).orElse("");
+    }
+
+    public String tenPhuong(String maPhuong) {
+        return phuongXaRepository.findById(maPhuong).map(PhuongXa::getTenPhuong).orElse("");
+    }
+
+    public String diaChiDayDu(DiaChi d) {
+        return d.getTenNguoiNhan() + " - " + d.getSoDienThoaiNhan() + " - " + d.getDiaChiNhanHang()
+                + ", " + tenPhuong(d.getMaPhuong()) + ", " + tenTinh(d.getMaTinh());
     }
 }
