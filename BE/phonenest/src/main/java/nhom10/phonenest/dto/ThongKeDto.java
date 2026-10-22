@@ -11,13 +11,18 @@ public record ThongKeDto(
         int soYeuCauDoiTra,
         int soSapHetHang,
         int soHetHang,
+        int soConHang,
         Map<String, Integer> donTheoTrangThai,
         List<BanChay> banChay,
-        List<Ngay> doanhThuTheoNgay) {
+        List<Ngay> doanhThuTheoNgay,
+        List<Hang> theoHang) {
 
     public record BanChay(String maSanPham, String tenMay, int daBan) {
     }
 
-    public record Ngay(String ngay, BigDecimal doanhThu) {
+    public record Ngay(String ngay, BigDecimal doanhThu, int soDon) {
+    }
+
+    public record Hang(String ten, BigDecimal doanhThu, int daBan) {
     }
 }

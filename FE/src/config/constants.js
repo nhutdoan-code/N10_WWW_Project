@@ -42,6 +42,7 @@ export const CANCEL_REASONS = [
 
 export const PRODUCT_STATUS = {
   CON_HANG: 'Còn hàng',
+  SAP_HET: 'Sắp hết hàng',
   HET_HANG: 'Hết hàng',
   NGUNG_KINH_DOANH: 'Ngừng kinh doanh',
 };

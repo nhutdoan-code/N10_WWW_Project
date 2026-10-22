@@ -12,6 +12,7 @@ import useToast from '../hooks/useToast';
 import { productService } from '../service/productService';
 import { wishlistService } from '../service/wishlistService';
 import { errorMessage, formatPrice } from '../utils/format';
+import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
 
 export default function ProductDetailPage() {
@@ -53,7 +54,7 @@ export default function ProductDetailPage() {
         <h1>{sp.tenMay}</h1>
         <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · <span className="rating">{sp.diemDanhGiaTb}</span></p>
         <div className="price big">{formatPrice(sp.giaBan)}</div>
-        <p><StatusBadge status={sp.trangThai} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
+        <p><StatusBadge status={productStatus(sp)} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
         <p>{sp.moTa}</p>
         <div className="row">
           <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" />

@@ -4,6 +4,7 @@ import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage } from '../../utils/format';
+import { productStatus } from '../../utils/stock';
 
 const FILTERS = [
   { value: '', label: 'Tất cả' },
@@ -47,12 +48,12 @@ export default function AdminInventoryPage() {
                 <td>{p.maSanPham}</td>
                 <td>{p.tenMay}</td>
                 <td><b>{p.soLuongTon}</b></td>
-                <td><StatusBadge status={p.trangThai} /></td>
+                <td><StatusBadge status={productStatus(p)} /></td>
                 <td><input className="qty" type="number" min="0" value={amount[p.maSanPham] ?? ''} onChange={(e) => setAmount({ ...amount, [p.maSanPham]: e.target.value })} /></td>
-                <td className="row">
+                <td><div className="row">
                   <button className="btn" disabled={!n} onClick={() => run(() => adminService.importStock(p.maSanPham, n), 'Đã nhập kho')}>Nhập thêm</button>
                   <button className="btn" disabled={amount[p.maSanPham] === undefined || amount[p.maSanPham] === ''} onClick={() => run(() => adminService.setStock(p.maSanPham, n), 'Đã điều chỉnh tồn kho')}>Đặt lại</button>
-                </td>
+                </div></td>
               </tr>
             );
           })}

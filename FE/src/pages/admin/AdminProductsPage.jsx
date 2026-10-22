@@ -8,6 +8,7 @@ import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { productService } from '../../service/productService';
 import { errorMessage, formatPrice } from '../../utils/format';
+import { productStatus } from '../../utils/stock';
 
 export default function AdminProductsPage() {
   const [q, setQ] = useState('');
@@ -48,7 +49,7 @@ export default function AdminProductsPage() {
               <td>{p.tenLoai}</td>
               <td>{formatPrice(p.giaBan)}</td>
               <td>{p.soLuongTon}</td>
-              <td><StatusBadge status={p.trangThai} /></td>
+              <td><StatusBadge status={productStatus(p)} /></td>
               <td><div className="row">
                 <button className="btn" onClick={() => setEditing(p)}>Sửa</button>
                 <button
