@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import QuestionSection from '../components/QuestionSection';
 import ReviewSection from '../components/ReviewSection';
@@ -15,6 +15,7 @@ import { errorMessage, formatPrice } from '../utils/format';
 
 export default function ProductDetailPage() {
   const { ma } = useParams();
+  const navigate = useNavigate();
   const { isCustomer } = useAuth();
   const { add } = useCart();
   const { ids, toggle } = useCompare();
@@ -58,6 +59,11 @@ export default function ProductDetailPage() {
           <button className="btn btn-primary btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng')}>
             Thêm vào giỏ
           </button>
+          {isCustomer && (
+            <button className="btn btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => navigate(`/checkout?mua=${sp.maSanPham}&sl=${soLuong}`)}>
+              Mua ngay
+            </button>
+          )}
           {isCustomer && (
             <button className="btn" onClick={() => run(() => wishlistService.add(sp.maSanPham), 'Đã thêm vào yêu thích')}>
               ♡ Yêu thích

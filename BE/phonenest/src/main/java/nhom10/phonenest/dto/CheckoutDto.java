@@ -10,7 +10,11 @@ public record CheckoutDto(
         BigDecimal mienPhiTu,
         String khuVuc,
         String thoiGianGiao,
-        List<Voucher> vouchers) {
+        List<Voucher> vouchers,
+        List<Dong> items) {
+
+    public record Dong(String maSanPham, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
+    }
 
     public record Voucher(
             String maKm,

@@ -71,7 +71,8 @@ Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema
 ## Voucher và phí vận chuyển
 - **Phí vận chuyển** tính theo tỉnh/thành của địa chỉ giao hàng (bảng `PhiVanChuyen`, admin quản lý ở `/api/admin/shipping-fees`). Địa chỉ không khớp khu vực nào thì dùng dòng "Khác". Đơn đạt mức `mienPhiTu` của khu vực thì miễn phí giao hàng.
 - **Voucher** (`KhuyenMai`) có hai loại: `DON_HANG` (giảm trên tạm tính) và `VAN_CHUYEN` (giảm trên phí giao hàng). Mỗi đơn dùng tối đa 1 voucher mỗi loại. Có thêm đơn tối thiểu, số lượng giới hạn (`soLuong`/`daDung`), chỉ dành cho khách mua lần đầu (`chiKhachMoi`). Hủy đơn sẽ hoàn lại lượt dùng.
-- `GET /api/customer/checkout/preview?maDiaChi=...` trả về tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
+- **Mua ngay**: trang chi tiết sản phẩm (chỉ hiện khi đã đăng nhập Customer) chuyển sang `/checkout?mua={maSanPham}&sl={soLuong}`. `GET /checkout/preview` và `POST /orders` nhận thêm `maSanPham`, `soLuong` (tùy chọn); khi có thì chỉ đặt sản phẩm đó, không đọc và không xóa giỏ hàng.
+- `GET /api/customer/checkout/preview?maDiaChi=...` trả về `items` (dòng hàng), tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
 - `POST /api/customer/orders` nhận thêm `maKmVanChuyen`; BE kiểm tra lại toàn bộ điều kiện và lưu `giamGia`, `phiVanChuyen`, `giamPhiVanChuyen` vào đơn.
 
 ## Địa chỉ giao hàng (tỉnh / phường sau sáp nhập)

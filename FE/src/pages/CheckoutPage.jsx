@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AddressForm from '../components/AddressForm';
 import Modal from '../components/Modal';
 import VoucherCard from '../components/VoucherCard';
@@ -19,11 +19,14 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState('COD');
   const [chon, setChon] = useState({ dh: undefined, vc: undefined });
   const [xemHet, setXemHet] = useState({ DON_HANG: false, VAN_CHUYEN: false });
+  const [params] = useSearchParams();
+  const mua = params.get('mua');
+  const sl = Number(params.get('sl')) || 1;
   const toast = useToast();
   const navigate = useNavigate();
-  const { data: pv, loading: dangTinh, reload } = useFetch(
-    () => (maDiaChi ? orderService.preview(maDiaChi) : Promise.resolve(null)),
-    [maDiaChi]
+  const { data: pv, loading: dangTinh, error: loiPv, reload } = useFetch(
+    () => (maDiaChi ? orderService.preview(maDiaChi, mua || undefined, mua ? sl : undefined) : Promise.resolve(null)),
+    [maDiaChi, mua, sl]
   );
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export default function CheckoutPage() {
   const vDh = hieuLuc(ds('DON_HANG'), chon.dh);
   const vVc = hieuLuc(ds('VAN_CHUYEN'), chon.vc);
 
+  const dong = mua ? pv?.items || [] : items.map((i) => ({ maSanPham: i.sanPham.maSanPham, tenMay: i.sanPham.tenMay, soLuong: i.soLuong, donGia: i.sanPham.giaBan }));
   const tamTinh = pv ? Number(pv.tamTinh) : total;
   const phi = pv ? Number(pv.phiVanChuyen) : 0;
   const giamDh = vDh ? Number(vDh.soTienGiam) : 0;
@@ -56,8 +60,8 @@ export default function CheckoutPage() {
 
   const placeOrder = async () => {
     try {
-      const order = await orderService.checkout({ phuongThucTt: payment, maDiaChi, maKm: vDh?.maKm, maKmVanChuyen: vVc?.maKm });
-      reset();
+      const order = await orderService.checkout({ phuongThucTt: payment, maDiaChi, maKm: vDh?.maKm, maKmVanChuyen: vVc?.maKm, maSanPham: mua || undefined, soLuong: mua ? sl : undefined });
+      if (!mua) reset();
       toast('Đặt hàng thành công!');
       navigate(`/orders/${order.maDonHang}`);
     } catch (e) {
@@ -92,7 +96,8 @@ export default function CheckoutPage() {
     );
   };
 
-  if (items.length === 0) return <p className="muted">Giỏ hàng trống. <Link to="/">Tiếp tục mua sắm</Link></p>;
+  if (mua && loiPv) return <p className="muted">{errorMessage(loiPv)} <Link to="/">Quay lại mua sắm</Link></p>;
+  if (!mua && items.length === 0) return <p className="muted">Giỏ hàng trống. <Link to="/">Tiếp tục mua sắm</Link></p>;
 
   return (
     <>
@@ -132,17 +137,18 @@ export default function CheckoutPage() {
         <aside className="side">
           <div className="summary">
             <h3 style={{ margin: 0 }}>Đơn hàng của bạn</h3>
-            {items.map(({ sanPham: sp, soLuong }) => (
-              <div key={sp.maSanPham} className="row between" style={{ flexWrap: 'nowrap' }}>
-                <span>{sp.tenMay} × {soLuong}</span>
-                <span>{formatPrice(sp.giaBan * soLuong)}</span>
+            {dong.map((d) => (
+              <div key={d.maSanPham} className="row between" style={{ flexWrap: 'nowrap' }}>
+                <span>{d.tenMay} × {d.soLuong}</span>
+                <span>{formatPrice(d.donGia * d.soLuong)}</span>
               </div>
             ))}
-            <div className="row between total"><span>Tạm tính</span><span>{formatPrice(total)}</span></div>
+            <div className="row between total"><span>Tạm tính</span><span>{formatPrice(tamTinh)}</span></div>
             <div className="row between"><span>Phí vận chuyển</span><span>{pv ? (phi > 0 ? formatPrice(phi) : 'Miễn phí') : '—'}</span></div>
             {giamVc > 0 && <div className="row between"><span>Giảm phí vận chuyển</span><span>- {formatPrice(giamVc)}</span></div>}
             {giamDh > 0 && <div className="row between"><span>Voucher giảm giá</span><span>- {formatPrice(giamDh)}</span></div>}
             <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(tong)}</b></div>
+            {mua && <p className="muted">Mua ngay: giỏ hàng của bạn không bị thay đổi.</p>}
             {pv && <p className="muted">Giao đến {pv.khuVuc}, dự kiến {pv.thoiGianGiao}.</p>}
             {thieuMienPhi > 0 && <p className="muted">Mua thêm {formatPrice(thieuMienPhi)} để được miễn phí vận chuyển.</p>}
             <button className="btn btn-primary btn-lg" disabled={!maDiaChi || dangTinh} onClick={placeOrder}>Xác nhận đặt hàng</button>

@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class DonHangService {
     private final KhuyenMaiService khuyenMaiService;
     private final DiaChiService diaChiService;
     private final PhiVanChuyenService phiVanChuyenService;
+    private final ThanhToanService thanhToanService;
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
     private final TaiKhoanRepository taiKhoanRepository;
@@ -66,11 +68,8 @@ public class DonHangService {
     private final EmailService emailService;
 
     public DonHangDto datHang(String maKh, DonHangDto.Checkout req) {
-        GioHang gio = gioHangRepository.findByMaKh(maKh)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giỏ hàng"));
-        if (gio.getItems().isEmpty()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Giỏ hàng đang trống");
-        }
+        boolean muaNgay = req.maSanPham() != null && !req.maSanPham().isBlank();
+        Map<String, Integer> muc = thanhToanService.mucMua(maKh, req.maSanPham(), req.soLuong());
         DiaChi dc = diaChiRepository.findById(req.maDiaChi())
                 .filter(x -> x.getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Địa chỉ giao hàng không hợp lệ"));
@@ -84,7 +83,7 @@ public class DonHangService {
         d.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
         d.setDiaChiGiaoHang(diaChiService.diaChiDayDu(dc));
         BigDecimal tamTinh = BigDecimal.ZERO;
-        for (var e : gio.getItems().entrySet()) {
+        for (var e : muc.entrySet()) {
             SanPham s = sanPhamRepository.findById(e.getKey()).orElseThrow();
             if (s.getTrangThai() != TrangThaiSanPham.CON_HANG || e.getValue() > s.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, s.getTenMay() + " không đủ hàng, vui lòng cập nhật giỏ hàng");
@@ -108,7 +107,9 @@ public class DonHangService {
             d.setMaKmVanChuyen(k.getMaKm());
             d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
         }
-        gio.getItems().clear();
+        if (!muaNgay) {
+            gioHangRepository.findByMaKh(maKh).ifPresent(g -> g.getItems().clear());
+        }
         DonHang luu = donHangRepository.save(d);
         doiTonKho(luu, -1);
         DonHangDto dto = donHangMapper.toDto(luu);

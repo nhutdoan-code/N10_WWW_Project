@@ -53,7 +53,9 @@ public class DonHangController {
     }
 
     @GetMapping("/checkout/preview")
-    public CheckoutDto xemTruoc(@RequestParam String maDiaChi) {
-        return thanhToanService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi);
+    public CheckoutDto xemTruoc(@RequestParam String maDiaChi,
+                              @RequestParam(required = false) String maSanPham,
+                              @RequestParam(required = false) Integer soLuong) {
+        return thanhToanService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi, maSanPham, soLuong);
     }
 }

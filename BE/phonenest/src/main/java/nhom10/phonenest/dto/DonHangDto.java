@@ -36,7 +36,9 @@ public record DonHangDto(
     public record Checkout(@NotNull(message = "Vui lòng chọn phương thức thanh toán") PhuongThucTt phuongThucTt,
                            @NotBlank(message = "Vui lòng chọn địa chỉ giao hàng") String maDiaChi,
                            String maKm,
-                           String maKmVanChuyen) {
+                           String maKmVanChuyen,
+                           String maSanPham,
+                           Integer soLuong) {
     }
 
     public record HuyRequest(@NotBlank(message = "Vui lòng chọn lý do hủy đơn") String lyDo, String ghiChu) {
