@@ -1,5 +1,6 @@
 package nhom10.phonenest.entity;
 
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -32,7 +33,8 @@ public class SanPham {
     private String tenMay;
     private BigDecimal giaBan;
     private String moTa;
-    private String thongSoKyThuat;
+    @Embedded
+    private ThongSoKyThuat thongSo = new ThongSoKyThuat();
     private int soLuongTon;
 
     @Enumerated(EnumType.STRING)

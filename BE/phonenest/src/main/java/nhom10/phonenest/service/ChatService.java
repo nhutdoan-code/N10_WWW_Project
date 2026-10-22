@@ -144,7 +144,7 @@ public class ChatService {
     }
 
     private boolean khop(SanPhamDto s, String k) {
-        String noiDung = (s.tenMay() + " " + s.tenLoai() + " " + s.thongSoKyThuat()).toLowerCase();
+        String noiDung = (s.tenMay() + " " + s.tenLoai() + " " + s.thongSo().tomTat()).toLowerCase();
         return List.of(k.split("[^\\p{L}\\p{N}]+")).stream()
                 .filter(t -> t.length() >= 3 && !t.matches("\\d+"))
                 .anyMatch(noiDung::contains);
@@ -159,7 +159,7 @@ public class ChatService {
         return sanPhamService.list(null, null, null, null, null, false).stream()
                 .map(s -> "%s | %s | %s | %s VND | %s | %s".formatted(s.maSanPham(), s.tenMay(), s.tenLoai(),
                         s.giaBan().toBigInteger(), s.trangThai() == TrangThaiSanPham.CON_HANG ? "còn hàng" : "hết hàng",
-                        s.thongSoKyThuat()))
+                        s.thongSo().tomTat()))
                 .collect(Collectors.joining("\n"));
     }
 

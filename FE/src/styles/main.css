@@ -385,3 +385,17 @@ section > h3 { font-size: 1.2rem; margin: 28px 0 14px; }
 .star-input button { padding: 0 2px; border: 0; background: none; font-size: 1.9rem; line-height: 1; color: #d3d8e2; cursor: pointer; }
 .star-input button.on { color: var(--star); }
 .star-input span { margin-left: 8px; }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.form-title { margin: 14px 0 0; }
+.img-list { display: flex; flex-wrap: wrap; gap: 12px; }
+.img-item { position: relative; width: 120px; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; }
+.img-item.chinh { border-color: var(--brand); }
+.img-item img { width: 100%; height: 100px; object-fit: contain; background: #f2f4f7; border-radius: 8px; }
+.img-item .btn { font-size: 0.75rem; padding: 4px; }
+.img-remove { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; line-height: 1; }
+.img-add { width: 120px; min-height: 100px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--line-strong); border-radius: 10px; cursor: pointer; font-size: 0.85rem; text-align: center; }
+@media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
+.grid-3 input, .grid-2 input { width: 100%; box-sizing: border-box; }
+.img-list { align-items: flex-start; align-content: flex-start; flex: none; }
+.img-list, .img-item, .img-add { height: fit-content; }

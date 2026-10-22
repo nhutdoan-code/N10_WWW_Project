@@ -3394,20 +3394,20 @@ INSERT INTO LoaiSanPham (maLoai, tenLoai, moTa) VALUES
 ('L03','Xiaomi','Xiaomi, Redmi, POCO'),
 ('L04','OPPO','Dòng Find, Reno, A');
 
-INSERT INTO SanPham (maSanPham, maLoai, tenMay, giaBan, moTa, thongSoKyThuat, soLuongTon, trangThai, diemDanhGiaTb) VALUES
-('SP001','L01','iPhone 15 Pro Max 256GB',29990000,'Khung titan, chip A17 Pro, camera zoom 5x.','Màn hình 6.7 inch OLED 120Hz | Chip A17 Pro | RAM 8GB | Bộ nhớ 256GB | Camera 48MP + 12MP + 12MP | Pin 4422mAh',15,'CON_HANG',4.8),
-('SP002','L01','iPhone 15 128GB',19990000,'Dynamic Island, camera 48MP, cổng USB-C.','Màn hình 6.1 inch OLED | Chip A16 Bionic | RAM 6GB | Bộ nhớ 128GB | Camera 48MP + 12MP | Pin 3349mAh',25,'CON_HANG',4.7),
-('SP003','L01','iPhone 13 128GB',12990000,'Giá tốt, hiệu năng vẫn mạnh mẽ.','Màn hình 6.1 inch OLED | Chip A15 Bionic | RAM 4GB | Bộ nhớ 128GB | Camera 12MP + 12MP | Pin 3240mAh',0,'HET_HANG',4.6),
-('SP004','L02','Samsung Galaxy S24 Ultra 256GB',28990000,'Bút S Pen, Galaxy AI, camera 200MP.','Màn hình 6.8 inch AMOLED 120Hz | Snapdragon 8 Gen 3 | RAM 12GB | Bộ nhớ 256GB | Camera 200MP + 50MP + 12MP + 10MP | Pin 5000mAh',12,'CON_HANG',4.8),
-('SP005','L02','Samsung Galaxy Z Flip6 256GB',25990000,'Điện thoại gập nhỏ gọn, thời trang.','Màn hình 6.7 inch AMOLED gập | Snapdragon 8 Gen 3 | RAM 12GB | Bộ nhớ 256GB | Camera 50MP + 12MP | Pin 4000mAh',8,'CON_HANG',4.5),
-('SP006','L02','Samsung Galaxy A55 5G 128GB',9990000,'Thiết kế khung kim loại, pin bền.','Màn hình 6.6 inch Super AMOLED 120Hz | Exynos 1480 | RAM 8GB | Bộ nhớ 128GB | Camera 50MP + 12MP + 5MP | Pin 5000mAh',30,'CON_HANG',4.4),
-('SP007','L03','Xiaomi 14 12GB/256GB',19990000,'Ống kính Leica, sạc nhanh 90W.','Màn hình 6.36 inch AMOLED 120Hz | Snapdragon 8 Gen 3 | RAM 12GB | Bộ nhớ 256GB | Camera 50MP Leica x3 | Pin 4610mAh',10,'CON_HANG',4.6),
-('SP008','L03','Redmi Note 13 Pro 8GB/256GB',7490000,'Camera 200MP, màn hình AMOLED 120Hz.','Màn hình 6.67 inch AMOLED 120Hz | Snapdragon 7s Gen 2 | RAM 8GB | Bộ nhớ 256GB | Camera 200MP + 8MP + 2MP | Pin 5100mAh',40,'CON_HANG',4.5),
-('SP009','L03','POCO F6 12GB/512GB',10990000,'Hiệu năng chơi game mạnh trong tầm giá.','Màn hình 6.67 inch AMOLED 120Hz | Snapdragon 8s Gen 3 | RAM 12GB | Bộ nhớ 512GB | Camera 50MP + 8MP | Pin 5000mAh',18,'CON_HANG',4.6),
-('SP010','L03','Redmi 13C 4GB/128GB',3290000,'Điện thoại giá rẻ cho học sinh, sinh viên.','Màn hình 6.74 inch IPS 90Hz | Helio G85 | RAM 4GB | Bộ nhớ 128GB | Camera 50MP + 2MP | Pin 5000mAh',50,'CON_HANG',4.1),
-('SP011','L04','OPPO Find X7 Ultra 16GB/512GB',23990000,'Hai camera tiềm vọng, hợp tác Hasselblad.','Màn hình 6.82 inch AMOLED 120Hz | Snapdragon 8 Gen 3 | RAM 16GB | Bộ nhớ 512GB | Camera 50MP x4 | Pin 5000mAh',6,'CON_HANG',4.7),
-('SP012','L04','OPPO Reno12 F 8GB/256GB',8990000,'Thiết kế mỏng nhẹ, camera chân dung đẹp.','Màn hình 6.67 inch AMOLED 120Hz | Helio G100 | RAM 8GB | Bộ nhớ 256GB | Camera 50MP + 8MP + 2MP | Pin 5000mAh',22,'CON_HANG',4.3),
-('SP013','L04','OPPO A3 6GB/128GB',4990000,'Bền bỉ, chống nước IP54.','Màn hình 6.67 inch IPS 90Hz | Snapdragon 6s Gen 1 | RAM 6GB | Bộ nhớ 128GB | Camera 50MP + 2MP | Pin 5100mAh',35,'CON_HANG',4.2);
+INSERT INTO SanPham (maSanPham, maLoai, tenMay, giaBan, moTa, soLuongTon, trangThai, diemDanhGiaTb, kichThuocManHinh, loaiManHinh, tanSoQuet, chip, ram, boNho, cameraSau, cameraTruoc, pin, congSuatSac, heDieuHanh, nfc, ho5G, trongLuong) VALUES
+('SP001','L01','iPhone 15 Pro Max 256GB',29990000,'Khung titan, chip A17 Pro, camera zoom 5x.',15,'CON_HANG',4.8,6.7,'OLED',120,'Apple A17 Pro',8,256,'48MP + 12MP + 12MP',12,4422,27,'iOS 17',TRUE,TRUE,221),
+('SP002','L01','iPhone 15 128GB',19990000,'Dynamic Island, camera 48MP, cổng USB-C.',25,'CON_HANG',4.7,6.1,'OLED',60,'Apple A16 Bionic',6,128,'48MP + 12MP',12,3349,20,'iOS 17',TRUE,TRUE,171),
+('SP003','L01','iPhone 13 128GB',12990000,'Giá tốt, hiệu năng vẫn mạnh mẽ.',0,'HET_HANG',4.6,6.1,'OLED',60,'Apple A15 Bionic',4,128,'12MP + 12MP',12,3240,20,'iOS 15',TRUE,TRUE,174),
+('SP004','L02','Samsung Galaxy S24 Ultra 256GB',28990000,'Bút S Pen, Galaxy AI, camera 200MP.',12,'CON_HANG',4.8,6.8,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'200MP + 50MP + 12MP + 10MP',12,5000,45,'Android 14',TRUE,TRUE,232),
+('SP005','L02','Samsung Galaxy Z Flip6 256GB',25990000,'Điện thoại gập nhỏ gọn, thời trang.',8,'CON_HANG',4.5,6.7,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 12MP',10,4000,25,'Android 14',TRUE,TRUE,187),
+('SP006','L02','Samsung Galaxy A55 5G 128GB',9990000,'Thiết kế khung kim loại, pin bền.',30,'CON_HANG',4.4,6.6,'Super AMOLED',120,'Exynos 1480',8,128,'50MP + 12MP + 5MP',32,5000,25,'Android 14',TRUE,TRUE,213),
+('SP007','L03','Xiaomi 14 12GB/256GB',19990000,'Ống kính Leica, sạc nhanh 90W.',10,'CON_HANG',4.6,6.36,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 50MP + 50MP',32,4610,90,'Android 14',TRUE,TRUE,193),
+('SP008','L03','Redmi Note 13 Pro 8GB/256GB',7490000,'Camera 200MP, màn hình AMOLED 120Hz.',40,'CON_HANG',4.5,6.67,'AMOLED',120,'Snapdragon 7s Gen 2',8,256,'200MP + 8MP + 2MP',16,5100,67,'Android 13',TRUE,FALSE,187),
+('SP009','L03','POCO F6 12GB/512GB',10990000,'Hiệu năng chơi game mạnh trong tầm giá.',18,'CON_HANG',4.6,6.67,'AMOLED',120,'Snapdragon 8s Gen 3',12,512,'50MP + 8MP',20,5000,90,'Android 14',TRUE,TRUE,179),
+('SP010','L03','Redmi 13C 4GB/128GB',3290000,'Điện thoại giá rẻ cho học sinh, sinh viên.',50,'CON_HANG',4.1,6.74,'IPS LCD',90,'MediaTek Helio G85',4,128,'50MP + 2MP',5,5000,18,'Android 13',FALSE,FALSE,192),
+('SP011','L04','OPPO Find X7 Ultra 16GB/512GB',23990000,'Hai camera tiềm vọng, hợp tác Hasselblad.',6,'CON_HANG',4.7,6.82,'AMOLED',120,'Snapdragon 8 Gen 3',16,512,'50MP + 50MP + 50MP + 50MP',32,5000,100,'Android 14',TRUE,TRUE,221),
+('SP012','L04','OPPO Reno12 F 8GB/256GB',8990000,'Thiết kế mỏng nhẹ, camera chân dung đẹp.',22,'CON_HANG',4.3,6.67,'AMOLED',120,'MediaTek Helio G100',8,256,'50MP + 8MP + 2MP',32,5000,45,'Android 14',TRUE,FALSE,177),
+('SP013','L04','OPPO A3 6GB/128GB',4990000,'Bền bỉ, chống nước IP54.',35,'CON_HANG',4.2,6.67,'IPS LCD',90,'Snapdragon 6s Gen 1',6,128,'50MP + 2MP',8,5100,45,'Android 14',FALSE,FALSE,186);
 
 INSERT INTO HinhAnhSanPham (maHinhAnh, maSanPham, duongDan, gocChup, anhChinh) VALUES
 ('HA0011','SP001','https://placehold.co/600x600/e8eefc/1e3a8a/png?text=iPhone+15','Mặt trước',TRUE),

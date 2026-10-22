@@ -1,12 +1,9 @@
 import { Link } from 'react-router-dom';
-import { SPEC_LABELS } from '../config/constants';
 import useCompare from '../hooks/useCompare';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
 import { formatPrice } from '../utils/format';
-
-const specs = (sp) => (sp.thongSoKyThuat || '').split('|').map((t) => t.trim());
-const strip = (text, label) => (text.toLowerCase().startsWith(label.toLowerCase()) ? text.slice(label.length).trim() : text);
+import { SPEC_FIELDS, specValue } from '../utils/specs';
 
 export default function ComparePage() {
   const { ids, toggle, clear } = useCompare();
@@ -14,8 +11,6 @@ export default function ComparePage() {
 
   if (ids.length === 0) return <p className="muted">Chưa chọn sản phẩm nào để so sánh. <Link to="/">Chọn sản phẩm</Link> (bấm nút ⇄).</p>;
   if (loading || !products) return <p className="muted">Đang tải...</p>;
-
-  const rows = Math.max(...products.map((p) => specs(p).length));
 
   return (
     <>
@@ -38,10 +33,10 @@ export default function ComparePage() {
           <tr><th>Giá bán</th>{products.map((p) => <td key={p.maSanPham} className="price">{formatPrice(p.giaBan)}</td>)}</tr>
           <tr><th>Hãng</th>{products.map((p) => <td key={p.maSanPham}>{p.tenLoai}</td>)}</tr>
           <tr><th>Đánh giá</th>{products.map((p) => <td key={p.maSanPham}>★ {p.diemDanhGiaTb}</td>)}</tr>
-          {Array.from({ length: rows }, (_, i) => (
-            <tr key={i}>
-              <th>{SPEC_LABELS[i] || `Thông số ${i + 1}`}</th>
-              {products.map((p) => <td key={p.maSanPham}>{strip(specs(p)[i] || '-', SPEC_LABELS[i] || '')}</td>)}
+          {SPEC_FIELDS.map((f) => (
+            <tr key={f.key}>
+              <th>{f.label}</th>
+              {products.map((p) => <td key={p.maSanPham}>{specValue(f, p.thongSo)}</td>)}
             </tr>
           ))}
         </tbody>

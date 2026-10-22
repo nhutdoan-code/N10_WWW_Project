@@ -4,6 +4,11 @@ const save = (base) => (ma, data) => (ma ? api.put(`${base}/${ma}`, data) : api.
 
 export const adminService = {
   products: (q) => api.get('/admin/products', { params: { q } }),
+  uploadImage: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return api.post('/admin/uploads', body);
+  },
   saveProduct: save('/admin/products'),
   deleteProduct: (ma) => api.delete(`/admin/products/${ma}`),
   saveCategory: save('/admin/categories'),

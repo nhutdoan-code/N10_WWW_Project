@@ -12,6 +12,7 @@ import useToast from '../hooks/useToast';
 import { productService } from '../service/productService';
 import { wishlistService } from '../service/wishlistService';
 import { errorMessage, formatPrice } from '../utils/format';
+import { SPEC_FIELDS, specValue } from '../utils/specs';
 
 export default function ProductDetailPage() {
   const { ma } = useParams();
@@ -75,8 +76,8 @@ export default function ProductDetailPage() {
         </div>
         <h3>Thông số kỹ thuật</h3>
         <ul className="specs">
-          {(sp.thongSoKyThuat || '').split('|').map((t) => (
-            <li key={t}>{t.trim()}</li>
+          {SPEC_FIELDS.map((f) => (
+            <li key={f.key}><span className="muted">{f.label}</span><br />{specValue(f, sp.thongSo)}</li>
           ))}
         </ul>
       </div>

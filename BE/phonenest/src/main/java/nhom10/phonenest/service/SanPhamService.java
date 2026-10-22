@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.entity.HinhAnhSanPham;
 import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.entity.ThongSoKyThuat;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
@@ -116,12 +117,12 @@ public class SanPhamService {
         s.setTenMay(d.tenMay());
         s.setGiaBan(d.giaBan());
         s.setMoTa(d.moTa());
-        s.setThongSoKyThuat(d.thongSoKyThuat());
+        s.setThongSo(thongSo(d.thongSo()));
         s.setSoLuongTon(d.soLuongTon());
         s.setTrangThai(d.trangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH ? TrangThaiSanPham.NGUNG_KINH_DOANH
                 : d.soLuongTon() > 0 ? TrangThaiSanPham.CON_HANG : TrangThaiSanPham.HET_HANG);
         s = sanPhamRepository.save(s);
-        luuAnhChinh(s, d.anhChinh());
+        luuAnh(s, d.hinhAnhs(), d.anhChinh());
         return SanPhamMapper.toDto(s);
     }
 
@@ -139,20 +140,42 @@ public class SanPhamService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm"));
     }
 
-    private void luuAnhChinh(SanPham s, String url) {
-        if (url == null || url.isBlank()) {
+    private ThongSoKyThuat thongSo(SanPhamDto.ThongSo t) {
+        ThongSoKyThuat r = new ThongSoKyThuat();
+        if (t == null) {
+            return r;
+        }
+        r.setKichThuocManHinh(t.kichThuocManHinh());
+        r.setLoaiManHinh(t.loaiManHinh());
+        r.setTanSoQuet(t.tanSoQuet());
+        r.setChip(t.chip());
+        r.setRam(t.ram());
+        r.setBoNho(t.boNho());
+        r.setCameraSau(t.cameraSau());
+        r.setCameraTruoc(t.cameraTruoc());
+        r.setPin(t.pin());
+        r.setCongSuatSac(t.congSuatSac());
+        r.setHeDieuHanh(t.heDieuHanh());
+        r.setNfc(t.nfc());
+        r.setHo5G(t.ho5G());
+        r.setTrongLuong(t.trongLuong());
+        return r;
+    }
+
+    private void luuAnh(SanPham s, List<String> urls, String chinh) {
+        if (urls == null) {
             return;
         }
-        HinhAnhSanPham anh = s.getHinhAnhs().stream().filter(HinhAnhSanPham::isAnhChinh).findFirst().orElseGet(() -> {
-            HinhAnhSanPham moi = new HinhAnhSanPham();
-            moi.setMaHinhAnh(IdGenerator.next("HA"));
-            moi.setSanPham(s);
-            moi.setAnhChinh(true);
-            s.getHinhAnhs().add(moi);
-            return moi;
-        });
-        anh.setDuongDan(url.trim());
-        hinhAnhRepository.save(anh);
+        hinhAnhRepository.deleteAll(s.getHinhAnhs());
+        s.getHinhAnhs().clear();
+        for (String url : urls) {
+            HinhAnhSanPham anh = new HinhAnhSanPham();
+            anh.setMaHinhAnh(IdGenerator.next("HA"));
+            anh.setSanPham(s);
+            anh.setDuongDan(url);
+            anh.setAnhChinh(url.equals(chinh) || (chinh == null && s.getHinhAnhs().isEmpty()));
+            s.getHinhAnhs().add(hinhAnhRepository.save(anh));
+        }
     }
 
     private Sort sortOf(String sort) {

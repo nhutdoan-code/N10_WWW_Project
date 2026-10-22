@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.LoaiSanPhamDto;
 import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.service.LoaiSanPhamService;
+import nhom10.phonenest.service.LuuTruAnhService;
 import nhom10.phonenest.service.SanPhamService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,8 +18,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -27,6 +30,12 @@ public class AdminSanPhamController {
 
     private final SanPhamService sanPhamService;
     private final LoaiSanPhamService loaiSanPhamService;
+    private final LuuTruAnhService luuTruAnhService;
+
+    @PostMapping("/uploads")
+    public Map<String, String> upload(@RequestParam MultipartFile file) {
+        return Map.of("url", luuTruAnhService.luu(file));
+    }
 
     @GetMapping("/products")
     public List<SanPhamDto> products(@RequestParam(required = false) String q) {

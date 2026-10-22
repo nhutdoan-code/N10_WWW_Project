@@ -55,4 +55,3 @@ export const RETURN_STATUS = {
 
 export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DANG_XU_LY', 'DANG_GIAO', 'DA_GIAO'];
 
-export const SPEC_LABELS = ['Màn hình', 'Vi xử lý', 'RAM', 'Bộ nhớ', 'Camera', 'Pin'];
