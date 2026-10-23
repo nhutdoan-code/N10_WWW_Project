@@ -572,3 +572,13 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .rank-item img { width: 46px; height: 46px; }
 .rank-more { flex: none; width: 100%; margin-top: 4px; border: none; border-top: 1px solid var(--line); background: none; color: var(--brand); font: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer; }
 .rank-more:hover { color: var(--brand-dark); background: var(--brand-soft); }
+.desc, .commit { margin-top: 22px; padding-top: 4px; }
+.desc h3, .commit h3 { margin: 0 0 10px; }
+.desc p { margin: 0 0 10px; line-height: 1.7; color: var(--text); text-align: justify; }
+.commit { padding: 16px; background: var(--brand-soft); border-radius: var(--radius-lg); }
+.commit ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.commit li { display: flex; gap: 10px; align-items: flex-start; }
+.commit li svg { flex: none; color: var(--brand); margin-top: 2px; }
+.commit li span { display: flex; flex-direction: column; font-size: 0.86rem; color: var(--muted); line-height: 1.45; }
+.commit li b { color: var(--ink); font-size: 0.92rem; }
+@media (max-width: 640px) { .commit ul { grid-template-columns: 1fr; } }

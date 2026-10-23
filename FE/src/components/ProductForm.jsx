@@ -77,7 +77,7 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
       </div>
       <label className="field">
         <span>Mô tả</span>
-        <textarea rows="2" value={form.moTa || ''} onChange={set('moTa')} />
+        <textarea rows="8" value={form.moTa || ''} onChange={set('moTa')} />
       </label>
 
       <h4 className="form-title">Thông số kỹ thuật</h4>

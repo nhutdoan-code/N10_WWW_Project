@@ -3395,19 +3395,71 @@ INSERT INTO LoaiSanPham (maLoai, tenLoai, moTa) VALUES
 ('L04','OPPO','Dòng Find, Reno, A');
 
 INSERT INTO SanPham (maSanPham, maLoai, tenMay, giaBan, moTa, soLuongTon, trangThai, diemDanhGiaTb, kichThuocManHinh, loaiManHinh, tanSoQuet, chip, ram, boNho, cameraSau, cameraTruoc, pin, congSuatSac, heDieuHanh, nfc, ho5G, trongLuong) VALUES
-('SP001','L01','iPhone 15 Pro Max 256GB',29990000,'Khung titan, chip A17 Pro, camera zoom 5x.',15,'CON_HANG',4.8,6.7,'OLED',120,'Apple A17 Pro',8,256,'48MP + 12MP + 12MP',12,4422,27,'iOS 17',TRUE,TRUE,221),
-('SP002','L01','iPhone 15 128GB',19990000,'Dynamic Island, camera 48MP, cổng USB-C.',25,'CON_HANG',4.7,6.1,'OLED',60,'Apple A16 Bionic',6,128,'48MP + 12MP',12,3349,20,'iOS 17',TRUE,TRUE,171),
-('SP003','L01','iPhone 13 128GB',12990000,'Giá tốt, hiệu năng vẫn mạnh mẽ.',0,'HET_HANG',4.6,6.1,'OLED',60,'Apple A15 Bionic',4,128,'12MP + 12MP',12,3240,20,'iOS 15',TRUE,TRUE,174),
-('SP004','L02','Samsung Galaxy S24 Ultra 256GB',28990000,'Bút S Pen, Galaxy AI, camera 200MP.',12,'CON_HANG',4.8,6.8,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'200MP + 50MP + 12MP + 10MP',12,5000,45,'Android 14',TRUE,TRUE,232),
-('SP005','L02','Samsung Galaxy Z Flip6 256GB',25990000,'Điện thoại gập nhỏ gọn, thời trang.',8,'CON_HANG',4.5,6.7,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 12MP',10,4000,25,'Android 14',TRUE,TRUE,187),
-('SP006','L02','Samsung Galaxy A55 5G 128GB',9990000,'Thiết kế khung kim loại, pin bền.',30,'CON_HANG',4.4,6.6,'Super AMOLED',120,'Exynos 1480',8,128,'50MP + 12MP + 5MP',32,5000,25,'Android 14',TRUE,TRUE,213),
-('SP007','L03','Xiaomi 14 12GB/256GB',19990000,'Ống kính Leica, sạc nhanh 90W.',10,'CON_HANG',4.6,6.36,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 50MP + 50MP',32,4610,90,'Android 14',TRUE,TRUE,193),
-('SP008','L03','Redmi Note 13 Pro 8GB/256GB',7490000,'Camera 200MP, màn hình AMOLED 120Hz.',40,'CON_HANG',4.5,6.67,'AMOLED',120,'Snapdragon 7s Gen 2',8,256,'200MP + 8MP + 2MP',16,5100,67,'Android 13',TRUE,FALSE,187),
-('SP009','L03','POCO F6 12GB/512GB',10990000,'Hiệu năng chơi game mạnh trong tầm giá.',18,'CON_HANG',4.6,6.67,'AMOLED',120,'Snapdragon 8s Gen 3',12,512,'50MP + 8MP',20,5000,90,'Android 14',TRUE,TRUE,179),
-('SP010','L03','Redmi 13C 4GB/128GB',3290000,'Điện thoại giá rẻ cho học sinh, sinh viên.',50,'CON_HANG',4.1,6.74,'IPS LCD',90,'MediaTek Helio G85',4,128,'50MP + 2MP',5,5000,18,'Android 13',FALSE,FALSE,192),
-('SP011','L04','OPPO Find X7 Ultra 16GB/512GB',23990000,'Hai camera tiềm vọng, hợp tác Hasselblad.',6,'CON_HANG',4.7,6.82,'AMOLED',120,'Snapdragon 8 Gen 3',16,512,'50MP + 50MP + 50MP + 50MP',32,5000,100,'Android 14',TRUE,TRUE,221),
-('SP012','L04','OPPO Reno12 F 8GB/256GB',8990000,'Thiết kế mỏng nhẹ, camera chân dung đẹp.',22,'CON_HANG',4.3,6.67,'AMOLED',120,'MediaTek Helio G100',8,256,'50MP + 8MP + 2MP',32,5000,45,'Android 14',TRUE,FALSE,177),
-('SP013','L04','OPPO A3 6GB/128GB',4990000,'Bền bỉ, chống nước IP54.',35,'CON_HANG',4.2,6.67,'IPS LCD',90,'Snapdragon 6s Gen 1',6,128,'50MP + 2MP',8,5100,45,'Android 14',FALSE,FALSE,186);
+('SP001','L01','iPhone 15 Pro Max 256GB',29990000,'iPhone 15 Pro Max là mẫu iPhone lớn nhất và cao cấp nhất của thế hệ 15, lần đầu dùng khung viền titan nên nhẹ hơn và bền hơn đời thép trước. Màn hình Super Retina XDR OLED 6.7 inch hỗ trợ 120Hz ProMotion cho thao tác cuộn và chơi game rất mượt, kèm Dynamic Island hiển thị thông báo và hoạt động nền gọn gàng.
+
+Chip A17 Pro cùng 8GB RAM xử lý tốt cả game đồ họa nặng lẫn chỉnh sửa video. Bộ nhớ 256GB đủ lưu nhiều ảnh, video 4K trong thời gian dài. Cổng kết nối chuyển sang USB-C, dùng chung cáp với laptop và nhiều phụ kiện hiện nay.
+
+Cụm camera gồm cảm biến chính 48MP, ultra-wide 12MP và tele 12MP zoom quang học 5x, phù hợp chụp chân dung, du lịch và quay phim chuyên nghiệp. Pin 4422mAh cho thời gian dùng cả ngày, hỗ trợ sạc nhanh. Máy hợp với người cần hiệu năng và camera hàng đầu trong hệ sinh thái Apple.',15,'CON_HANG',4.8,6.7,'OLED',120,'Apple A17 Pro',8,256,'48MP + 12MP + 12MP',12,4422,27,'iOS 17',TRUE,TRUE,221),
+('SP002','L01','iPhone 15 128GB',19990000,'iPhone 15 mang Dynamic Island từ dòng Pro xuống bản tiêu chuẩn, cùng màn hình OLED 6.1 inch sáng, màu đẹp và thân máy nhôm với mặt lưng kính nhám pha màu. Kích thước vừa tay, dễ dùng một tay.
+
+Máy dùng chip A16 Bionic với 6GB RAM, đáp ứng mượt mọi tác vụ hằng ngày, chơi game và chỉnh ảnh. Bộ nhớ 128GB phù hợp nhu cầu cơ bản. Cổng USB-C giúp sạc và truyền dữ liệu thuận tiện hơn.
+
+Camera chính 48MP chụp ảnh chi tiết, cho phép crop zoom 2x mà vẫn rõ nét, đi kèm camera ultra-wide 12MP. Pin 3349mAh đủ dùng trong ngày. Đây là lựa chọn cân bằng giữa giá, hiệu năng và trải nghiệm cho người mới chuyển sang iPhone.',25,'CON_HANG',4.7,6.1,'OLED',60,'Apple A16 Bionic',6,128,'48MP + 12MP',12,3349,20,'iOS 17',TRUE,TRUE,171),
+('SP003','L01','iPhone 13 128GB',12990000,'iPhone 13 vẫn là lựa chọn đáng cân nhắc nhờ mức giá mềm hơn các đời sau. Máy có màn hình OLED 6.1 inch, khung nhôm vuông vức và kính Ceramic Shield tăng khả năng chống va đập.
+
+Chip A15 Bionic cùng 4GB RAM vẫn xử lý mượt các ứng dụng và game phổ biến, được Apple cập nhật iOS trong nhiều năm. Bản 128GB đủ cho nhu cầu thông thường.
+
+Hai camera sau 12MP chụp ảnh màu sắc ổn định, có chế độ quay Cinematic làm nét theo chủ thể. Pin 3240mAh cho thời gian dùng ổn định cả ngày. Máy phù hợp học sinh, sinh viên hoặc người dùng muốn trải nghiệm iPhone chính hãng với chi phí hợp lý.',0,'HET_HANG',4.6,6.1,'OLED',60,'Apple A15 Bionic',4,128,'12MP + 12MP',12,3240,20,'iOS 15',TRUE,TRUE,174),
+('SP004','L02','Samsung Galaxy S24 Ultra 256GB',28990000,'Galaxy S24 Ultra là flagship cao cấp nhất của Samsung đời S24, dùng khung titan và màn hình Dynamic AMOLED 2X 6.8 inch tần số quét 120Hz, hiển thị sáng rõ ngoài trời. Máy đi kèm bút S Pen tích hợp để ghi chú, phác thảo và điều khiển từ xa.
+
+Chip Snapdragon 8 Gen 3 cùng 12GB RAM mang lại hiệu năng đứng đầu phân khúc Android, đi cùng các tính năng Galaxy AI như dịch trực tiếp cuộc gọi, tìm kiếm bằng cách khoanh vùng và hỗ trợ ghi chú. Bộ nhớ 256GB.
+
+Hệ thống bốn camera sau gồm cảm biến chính 200MP, ultra-wide 12MP và hai ống kính tele 10MP, 50MP cho khả năng zoom xa sắc nét. Pin 5000mAh hỗ trợ sạc nhanh. Máy hợp với người cần một thiết bị làm việc, giải trí và chụp ảnh toàn diện.',12,'CON_HANG',4.8,6.8,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'200MP + 50MP + 12MP + 10MP',12,5000,45,'Android 14',TRUE,TRUE,232),
+('SP005','L02','Samsung Galaxy Z Flip6 256GB',25990000,'Galaxy Z Flip6 là điện thoại gập dạng vỏ sò nhỏ gọn: khi gập chỉ bằng một viên gạch nhỏ, mở ra là màn hình AMOLED 6.7 inch 120Hz. Màn hình phụ bên ngoài cho xem giờ, thông báo và chụp ảnh tự sướng mà không cần mở máy.
+
+Máy dùng Snapdragon 8 Gen 3 và 12GB RAM, hiệu năng mạnh ngang các flagship thanh gạch, hỗ trợ các tính năng Galaxy AI. Bản 256GB đủ dùng thoải mái.
+
+Camera sau 50MP kết hợp ultra-wide 12MP, cho phép đặt máy ở góc gập để chụp rảnh tay. Pin 4000mAh hỗ trợ sạc nhanh. Đây là mẫu máy thời trang, phù hợp người trẻ thích sự khác biệt và cần chiếc điện thoại gọn trong túi.',8,'CON_HANG',4.5,6.7,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 12MP',10,4000,25,'Android 14',TRUE,TRUE,187),
+('SP006','L02','Samsung Galaxy A55 5G 128GB',9990000,'Galaxy A55 5G thuộc phân khúc tầm trung cao với khung kim loại và mặt lưng kính, cho cảm giác cầm chắc tay hơn các máy khung nhựa. Màn hình Super AMOLED 6.6 inch 120Hz hiển thị đẹp, mượt, có kháng nước bụi theo chuẩn IP67.
+
+Chip Exynos 1480 với 8GB RAM đáp ứng tốt học tập, làm việc, xem phim và chơi game ở mức cấu hình trung bình đến cao. Bộ nhớ 128GB, hỗ trợ mạng 5G.
+
+Camera chính 50MP chống rung quang học cùng ultra-wide 12MP và macro 5MP; camera trước 32MP cho ảnh selfie rõ nét. Pin 5000mAh dùng trọn ngày. Máy phù hợp người cần thiết bị bền, đẹp và ổn định với giá dễ tiếp cận.',30,'CON_HANG',4.4,6.6,'Super AMOLED',120,'Exynos 1480',8,128,'50MP + 12MP + 5MP',32,5000,25,'Android 14',TRUE,TRUE,213),
+('SP007','L03','Xiaomi 14 12GB/256GB',19990000,'Xiaomi 14 là flagship nhỏ gọn với màn hình AMOLED 6.36 inch 120Hz, viền mỏng, độ sáng cao và dễ cầm một tay. Thân máy hoàn thiện cao cấp, mang dấu ấn thiết kế đặc trưng của dòng số.
+
+Chip Snapdragon 8 Gen 3 cùng 12GB RAM cho hiệu năng hàng đầu, bộ nhớ 256GB. Điểm nổi bật là sạc nhanh có dây 90W giúp nạp đầy pin trong thời gian ngắn dù dung lượng 4610mAh.
+
+Bộ ba camera 50MP được tinh chỉnh cùng Leica, cho màu sắc và độ tương phản đậm chất điện ảnh, đủ bao quát góc rộng, chính và tele chân dung. Máy hợp với người thích camera đẹp, hiệu năng cao nhưng không muốn dùng máy quá lớn.',10,'CON_HANG',4.6,6.36,'AMOLED',120,'Snapdragon 8 Gen 3',12,256,'50MP + 50MP + 50MP',32,4610,90,'Android 14',TRUE,TRUE,193),
+('SP008','L03','Redmi Note 13 Pro 8GB/256GB',7490000,'Redmi Note 13 Pro nổi bật trong tầm giá nhờ camera chính 200MP, chụp ảnh chi tiết, cho phép gộp điểm ảnh khi chụp thiếu sáng. Màn hình AMOLED 6.67 inch 120Hz hiển thị rực rỡ, mượt mà khi lướt web và xem phim.
+
+Chip Snapdragon 7s Gen 2 cùng 8GB RAM đủ sức cho học tập, giải trí và các game phổ biến. Bộ nhớ 256GB rộng rãi. Máy hỗ trợ mạng 4G.
+
+Pin 5100mAh kết hợp sạc nhanh 67W giúp nạp đầy nhanh, thuận tiện cho người hay di chuyển. Camera trước 16MP phục vụ selfie và họp trực tuyến. Máy phù hợp người dùng ưu tiên camera, màn hình đẹp và pin tốt với chi phí hợp lý.',40,'CON_HANG',4.5,6.67,'AMOLED',120,'Snapdragon 7s Gen 2',8,256,'200MP + 8MP + 2MP',16,5100,67,'Android 13',TRUE,FALSE,187),
+('SP009','L03','POCO F6 12GB/512GB',10990000,'POCO F6 hướng tới game thủ và người cần hiệu năng cao mà vẫn tiết kiệm. Máy dùng chip Snapdragon 8s Gen 3 với 12GB RAM, cho khung hình ổn định ở các game nặng, bộ nhớ 512GB chứa được nhiều game và dữ liệu.
+
+Màn hình AMOLED 6.67 inch 120Hz hiển thị mượt, có độ sáng cao ngoài trời. Hệ thống tản nhiệt giúp máy giữ hiệu năng khi chơi lâu. Pin 5000mAh đi cùng sạc nhanh 90W.
+
+Camera chính 50MP cùng ultra-wide 8MP đáp ứng chụp ảnh hằng ngày, camera trước 20MP cho selfie. Máy hợp với người trẻ thích chơi game, dùng nhiều đa nhiệm và quan tâm giá trị trên hiệu năng.',18,'CON_HANG',4.6,6.67,'AMOLED',120,'Snapdragon 8s Gen 3',12,512,'50MP + 8MP',20,5000,90,'Android 14',TRUE,TRUE,179),
+('SP010','L03','Redmi 13C 4GB/128GB',3290000,'Redmi 13C là điện thoại giá rẻ dành cho học sinh, sinh viên và người lớn tuổi cần một chiếc máy đơn giản, bền bỉ. Màn hình IPS 6.74 inch lớn, tần số quét 90Hz giúp thao tác mượt hơn các máy cùng giá.
+
+Chip MediaTek Helio G85 với 4GB RAM đáp ứng tốt nhu cầu gọi điện, nhắn tin, mạng xã hội, xem video và game nhẹ. Bộ nhớ 128GB đủ dùng.
+
+Camera chính 50MP chụp ảnh rõ nét trong điều kiện đủ sáng, camera trước 5MP cho cuộc gọi video. Pin 5000mAh dùng được cả ngày dài. Đây là lựa chọn tiết kiệm cho nhu cầu cơ bản.',50,'CON_HANG',4.1,6.74,'IPS LCD',90,'MediaTek Helio G85',4,128,'50MP + 2MP',5,5000,18,'Android 13',FALSE,FALSE,192),
+('SP011','L04','OPPO Find X7 Ultra 16GB/512GB',23990000,'OPPO Find X7 Ultra là flagship nhiếp ảnh của OPPO với bốn camera 50MP: cảm biến chính cỡ lớn, ultra-wide và hai ống kính tele tiềm vọng cho zoom xa, được tinh chỉnh cùng Hasselblad cho màu sắc tự nhiên. Màn hình AMOLED 6.82 inch 120Hz hiển thị sắc nét, độ sáng cao.
+
+Chip Snapdragon 8 Gen 3 cùng 16GB RAM và 512GB bộ nhớ cho hiệu năng mạnh nhất, thoải mái đa nhiệm, chơi game và lưu ảnh chất lượng cao.
+
+Pin 5000mAh đi cùng sạc nhanh 100W có dây và sạc không dây, rút ngắn thời gian chờ. Máy hợp với người đam mê chụp ảnh, quay video và muốn một thiết bị cao cấp, nhiều dung lượng.',6,'CON_HANG',4.7,6.82,'AMOLED',120,'Snapdragon 8 Gen 3',16,512,'50MP + 50MP + 50MP + 50MP',32,5000,100,'Android 14',TRUE,TRUE,221),
+('SP012','L04','OPPO Reno12 F 8GB/256GB',8990000,'OPPO Reno12 F có thiết kế mỏng nhẹ, mặt lưng bóng nhiều màu, tập trung vào chụp ảnh chân dung. Màn hình AMOLED 6.67 inch 120Hz cho hình ảnh sống động, xem phim và lướt mạng đều mượt.
+
+Chip MediaTek Helio G100 cùng 8GB RAM và 256GB bộ nhớ đáp ứng ổn định nhu cầu học tập, làm việc và giải trí phổ thông.
+
+Camera chính 50MP kèm góc rộng 8MP và cảm biến phụ 2MP, camera trước 32MP cho ảnh selfie đẹp. Pin 5000mAh hỗ trợ sạc nhanh 45W. Máy hợp với người trẻ thích thiết kế đẹp, chụp ảnh chân dung và dùng bền cả ngày.',22,'CON_HANG',4.3,6.67,'AMOLED',120,'MediaTek Helio G100',8,256,'50MP + 8MP + 2MP',32,5000,45,'Android 14',TRUE,FALSE,177),
+('SP013','L04','OPPO A3 6GB/128GB',4990000,'OPPO A3 hướng đến độ bền và sự ổn định với khả năng kháng nước bụi IP54, chịu được mưa nhẹ và bụi bẩn khi dùng hằng ngày. Màn hình IPS 6.67 inch 90Hz lớn, thao tác khá mượt trong tầm giá.
+
+Chip Snapdragon 6s Gen 1 cùng 6GB RAM và 128GB bộ nhớ đáp ứng tốt các ứng dụng thông dụng, mạng xã hội và game nhẹ.
+
+Pin 5100mAh dùng thoải mái cả ngày, hỗ trợ sạc nhanh 45W. Camera chính 50MP chụp ảnh đủ chi tiết cho nhu cầu đời thường, camera trước 8MP cho gọi video. Máy phù hợp người cần chiếc điện thoại bền, pin lâu với chi phí thấp.',35,'CON_HANG',4.2,6.67,'IPS LCD',90,'Snapdragon 6s Gen 1',6,128,'50MP + 2MP',8,5100,45,'Android 14',FALSE,FALSE,186);
 
 INSERT INTO HinhAnhSanPham (maHinhAnh, maSanPham, duongDan, gocChup, anhChinh) VALUES
 ('HA0011','SP001','/uploads/sp001-1.jpg','Mặt trước',TRUE),

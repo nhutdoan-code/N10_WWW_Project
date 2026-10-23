@@ -16,6 +16,13 @@ import { errorMessage, formatPrice } from '../utils/format';
 import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
 
+const COMMITS = [
+  { icon: 'shield', title: 'Hàng chính hãng', text: 'Nguyên seal, bảo hành theo chính sách của hãng.' },
+  { icon: 'refresh', title: 'Đổi trả ngay trên web', text: 'Gửi yêu cầu đổi trả hoặc hoàn tiền và theo dõi trạng thái xử lý.' },
+  { icon: 'truck', title: 'Phí giao hàng rõ ràng', text: 'Phí theo khu vực, hiển thị trước khi đặt; miễn phí khi đủ điều kiện.' },
+  { icon: 'gift', title: 'Voucher tự động', text: 'Hệ thống tự chọn mã giảm giá tốt nhất ở bước thanh toán.' },
+];
+
 export default function ProductDetailPage() {
   const { ma } = useParams();
   const navigate = useNavigate();
@@ -55,13 +62,27 @@ export default function ProductDetailPage() {
             <img key={url} src={url} alt="" onClick={() => setImage(url)} />
           ))}
         </div>
+        <section className="desc">
+          <h3>Mô tả sản phẩm</h3>
+          {(sp.moTa || 'Đang cập nhật mô tả cho sản phẩm này.').split(/\n\s*\n/).map((t) => <p key={t}>{t}</p>)}
+        </section>
+        <section className="commit">
+          <h3>PhoneNest cam kết</h3>
+          <ul>
+            {COMMITS.map((c) => (
+              <li key={c.title}>
+                <Icon name={c.icon} size={22} />
+                <span><b>{c.title}</b>{c.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
       <div>
         <h1>{sp.tenMay}</h1>
         <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · <span className="rating">{sp.diemDanhGiaTb}</span></p>
         <div className="price big">{formatPrice(sp.giaBan)}</div>
         <p><StatusBadge status={productStatus(sp)} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
-        <p>{sp.moTa}</p>
         <div className="row">
           <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" />
           <button className="btn btn-primary btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng')}>
@@ -81,11 +102,6 @@ export default function ProductDetailPage() {
             ⇄ {ids.includes(sp.maSanPham) ? 'Bỏ so sánh' : 'So sánh'}
           </button>
         </div>
-        <ul className="perks">
-          <li><Icon name="shield" size={18} /> Hàng chính hãng, bảo hành đầy đủ</li>
-          <li><Icon name="truck" size={18} /> Giao hàng toàn quốc, phí ship hiển thị khi thanh toán</li>
-          <li><Icon name="refresh" size={18} /> Hỗ trợ đổi trả khi máy lỗi</li>
-        </ul>
         <h3>Thông số kỹ thuật</h3>
         <ul className="specs">
           {SPEC_FIELDS.filter((f) => specValue(f, sp.thongSo) !== '—').map((f) => (
