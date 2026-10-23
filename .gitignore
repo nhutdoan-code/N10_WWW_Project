@@ -13,4 +13,5 @@ FE/dist/
 .DS_Store
 *.log
 .env
-BE/phonenest/uploads/
+BE/phonenest/uploads/*
+!BE/phonenest/uploads/README.txt

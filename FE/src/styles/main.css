@@ -554,3 +554,21 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 }
 @media (max-width: 760px) { .header .btn { padding: 7px 10px; font-size: 0.85rem; } .header .logo { font-size: 1.15rem; } .header .logo img { width: 28px; height: 28px; } .nav-item { padding: 8px; } }
 @media (max-width: 760px) { .container { padding: 0 12px; } .header .actions { gap: 0; } .header-inner { column-gap: 6px; } }
+.hero-side { display: flex; flex-direction: column; gap: 6px; padding: 14px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.hero-side h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.rank-item { display: grid; grid-template-columns: 22px 54px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px; border-radius: 10px; color: var(--text); }
+.rank-item:hover { background: var(--brand-soft); color: var(--text); }
+.rank-no { width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; }
+.rank-item:nth-of-type(n+3) .rank-no { background: #98a2b3; }
+.rank-item img { width: 54px; height: 54px; object-fit: contain; background: #f2f4f7; border-radius: 8px; }
+.rank-item span { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.rank-item em { font-style: normal; font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-item strong { color: var(--price); font-size: 0.88rem; }
+.rank-more { margin-top: auto; text-align: center; padding: 8px; font-weight: 600; font-size: 0.88rem; border-top: 1px solid var(--line); }
+@media (max-width: 1000px) { .hero-side { display: none; } }
+.hero-side { height: 340px; } .rank-item { padding: 4px 6px; } .rank-more { padding: 6px; }
+.hero-side { overflow: hidden; gap: 2px; }
+.rank-item { flex: 1 1 0; min-height: 0; padding: 2px 6px; }
+.rank-item img { width: 46px; height: 46px; }
+.rank-more { flex: none; width: 100%; margin-top: 4px; border: none; border-top: 1px solid var(--line); background: none; color: var(--brand); font: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+.rank-more:hover { color: var(--brand-dark); background: var(--brand-soft); }

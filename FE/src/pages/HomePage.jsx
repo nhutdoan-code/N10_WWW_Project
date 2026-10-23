@@ -70,10 +70,17 @@ export default function HomePage() {
         <>
           <section className="hero-grid">
             <HeroSlider slides={slides} />
-            <div className="hero-side">
-              <Link to="/?gia=1" className="side-banner sb-1"><b>Dưới 5 triệu</b><span>Điện thoại giá rẻ, pin trâu</span></Link>
-              <Link to="/?gia=4" className="side-banner sb-2"><b>Flagship trên 20 triệu</b><span>Camera & hiệu năng hàng đầu</span></Link>
-            </div>
+            <aside className="hero-side">
+              <h3>Bán chạy nhất</h3>
+              {conHang.slice(0, 4).map((p, i) => (
+                <Link key={p.maSanPham} to={`/products/${p.maSanPham}`} className="rank-item">
+                  <b className="rank-no">{i + 1}</b>
+                  <img src={p.anhChinh} alt="" />
+                  <span><em>{p.tenMay}</em><strong>{formatPrice(p.giaBan)}</strong></span>
+                </Link>
+              ))}
+              <button className="rank-more" onClick={() => document.getElementById('tat-ca')?.scrollIntoView({ behavior: 'smooth' })}>Xem tất cả sản phẩm</button>
+            </aside>
           </section>
 
           <section className="services">
@@ -92,8 +99,8 @@ export default function HomePage() {
           </section>
 
           {conHang.length > 0 && (
-            <Section title="Bán chạy nhất">
-              <div className="grid grid-5">{conHang.slice(0, 5).map((sp) => <ProductCard key={sp.maSanPham} sp={sp} />)}</div>
+            <Section title="Được đánh giá cao">
+              <div className="grid grid-5">{danhGia.slice(0, 5).map((sp) => <ProductCard key={sp.maSanPham} sp={sp} />)}</div>
             </Section>
           )}
           {giaTot.length > 0 && (
