@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
 import QuestionSection from '../components/QuestionSection';
 import ReviewSection from '../components/ReviewSection';
@@ -41,6 +42,11 @@ export default function ProductDetailPage() {
 
   return (
     <>
+    <nav className="crumbs" aria-label="Đường dẫn">
+      <Link to="/">Trang chủ</Link><span>›</span>
+      <Link to={`/?loai=${sp.maLoai}`}>{sp.tenLoai}</Link><span>›</span>
+      <b>{sp.tenMay}</b>
+    </nav>
     <div className="detail">
       <div>
         <img className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} />
@@ -75,10 +81,15 @@ export default function ProductDetailPage() {
             ⇄ {ids.includes(sp.maSanPham) ? 'Bỏ so sánh' : 'So sánh'}
           </button>
         </div>
+        <ul className="perks">
+          <li><Icon name="shield" size={18} /> Hàng chính hãng, bảo hành đầy đủ</li>
+          <li><Icon name="truck" size={18} /> Giao hàng toàn quốc, phí ship hiển thị khi thanh toán</li>
+          <li><Icon name="refresh" size={18} /> Hỗ trợ đổi trả khi máy lỗi</li>
+        </ul>
         <h3>Thông số kỹ thuật</h3>
         <ul className="specs">
-          {SPEC_FIELDS.map((f) => (
-            <li key={f.key}><span className="muted">{f.label}</span><br />{specValue(f, sp.thongSo)}</li>
+          {SPEC_FIELDS.filter((f) => specValue(f, sp.thongSo) !== '—').map((f) => (
+            <li key={f.key}><span>{f.label}</span><b>{specValue(f, sp.thongSo)}</b></li>
           ))}
         </ul>
       </div>
