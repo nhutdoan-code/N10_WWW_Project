@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
@@ -35,6 +35,16 @@ export default function ProductDetailPage() {
   const { data: sp, loading, error } = useFetch(() => productService.get(ma), [ma]);
   const { data: related } = useFetch(() => productService.related(ma), [ma]);
 
+  const boxRef = useRef(null);
+  const [showBar, setShowBar] = useState(false);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return undefined;
+    const io = new IntersectionObserver(([e]) => setShowBar(!e.isIntersecting && e.boundingClientRect.top < 0));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [sp]);
+
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
 
@@ -46,6 +56,10 @@ export default function ProductDetailPage() {
       toast(e.response ? errorMessage(e) : e.message, 'error');
     }
   };
+
+  const conHang = sp.trangThai === 'CON_HANG';
+  const themVaoGio = () => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng');
+  const muaNgay = () => navigate(`/checkout?mua=${sp.maSanPham}&sl=${soLuong}`);
 
   return (
     <>
@@ -83,24 +97,28 @@ export default function ProductDetailPage() {
         <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · <span className="rating">{sp.diemDanhGiaTb}</span></p>
         <div className="price big">{formatPrice(sp.giaBan)}</div>
         <p><StatusBadge status={productStatus(sp)} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
-        <div className="row">
-          <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" />
-          <button className="btn btn-primary btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng')}>
-            Thêm vào giỏ
-          </button>
-          {isCustomer && (
-            <button className="btn btn-lg" disabled={sp.trangThai !== 'CON_HANG'} onClick={() => navigate(`/checkout?mua=${sp.maSanPham}&sl=${soLuong}`)}>
-              Mua ngay
+        <div className="buy-box" ref={boxRef}>
+          <div className="buy-main">
+            <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" aria-label="Số lượng" />
+            <button className="btn btn-primary btn-lg" disabled={!conHang} onClick={themVaoGio}>
+              Thêm vào giỏ
             </button>
-          )}
-          {isCustomer && (
-            <button className="btn" onClick={() => run(() => wishlistService.add(sp.maSanPham), 'Đã thêm vào yêu thích')}>
-              ♡ Yêu thích
+            {isCustomer && (
+              <button className="btn btn-buy btn-lg" disabled={!conHang} onClick={muaNgay}>
+                Mua ngay
+              </button>
+            )}
+          </div>
+          <div className="buy-sub">
+            {isCustomer && (
+              <button className="btn" onClick={() => run(() => wishlistService.add(sp.maSanPham), 'Đã thêm vào yêu thích')}>
+                <Icon name="heart" size={16} /> Yêu thích
+              </button>
+            )}
+            <button className="btn" onClick={() => run(() => toggle(sp.maSanPham), ids.includes(sp.maSanPham) ? 'Đã bỏ khỏi so sánh' : 'Đã thêm vào so sánh')}>
+              <Icon name="compare" size={16} /> {ids.includes(sp.maSanPham) ? 'Bỏ so sánh' : 'So sánh'}
             </button>
-          )}
-          <button className="btn" onClick={() => run(() => toggle(sp.maSanPham), ids.includes(sp.maSanPham) ? 'Đã bỏ khỏi so sánh' : 'Đã thêm vào so sánh')}>
-            ⇄ {ids.includes(sp.maSanPham) ? 'Bỏ so sánh' : 'So sánh'}
-          </button>
+          </div>
         </div>
         <h3>Thông số kỹ thuật</h3>
         <ul className="specs">
@@ -118,6 +136,21 @@ export default function ProductDetailPage() {
         <div className="grid">{related.map((r) => <ProductCard key={r.maSanPham} sp={r} />)}</div>
       </section>
     )}
+    <div className="sticky-spacer no-print" />
+    <div className={showBar ? 'sticky-bar on no-print' : 'sticky-bar no-print'} aria-hidden={!showBar}>
+      <div className="container sticky-inner">
+        <img src={sp.anhChinh} alt="" />
+        <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(sp.giaBan)}</span></div>
+        <div className="sticky-total">
+          <span className="muted">Tạm tính</span>
+          <b>{formatPrice(sp.giaBan * (soLuong || 1))}</b>
+        </div>
+        <div className="sticky-actions">
+          <button className="btn" disabled={!conHang} tabIndex={showBar ? 0 : -1} onClick={themVaoGio}><Icon name="cart" size={18} /> Thêm vào giỏ</button>
+          {isCustomer && <button className="btn btn-primary" disabled={!conHang} tabIndex={showBar ? 0 : -1} onClick={muaNgay}>Mua ngay</button>}
+        </div>
+      </div>
+    </div>
     </>
   );
 }

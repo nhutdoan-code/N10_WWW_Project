@@ -582,3 +582,26 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .commit li span { display: flex; flex-direction: column; font-size: 0.86rem; color: var(--muted); line-height: 1.45; }
 .commit li b { color: var(--ink); font-size: 0.92rem; }
 @media (max-width: 640px) { .commit ul { grid-template-columns: 1fr; } }
+.buy-box { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+.buy-main { display: flex; gap: 10px; }
+.buy-main .qty { flex: none; width: 64px; height: 48px; padding: 0; }
+.buy-main .btn { flex: 1; height: 48px; }
+.btn-buy { background: #fff; border-color: var(--brand); color: var(--brand); }
+.btn-buy:hover { background: var(--brand-soft); color: var(--brand-dark); }
+.buy-sub { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
+.buy-sub .btn { height: 42px; }
+.sticky-spacer { height: 76px; }
+.sticky-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(11, 27, 58, 0.1); transform: translateY(110%); transition: transform 0.25s ease; }
+.sticky-bar.on { transform: none; }
+.sticky-inner { display: flex; align-items: center; gap: 16px; height: 68px; }
+.sticky-inner img { width: 46px; height: 46px; object-fit: contain; background: #f2f4f7; border-radius: 8px; flex: none; }
+.sticky-name { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.35; }
+.sticky-name b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sticky-name .muted { font-size: 0.82rem; }
+.sticky-total { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+.sticky-total b { color: var(--price); font-size: 1.05rem; }
+.sticky-actions { display: flex; gap: 10px; }
+.sticky-actions .btn { height: 44px; min-width: 140px; }
+.sticky-actions .btn:not(.btn-primary) { border-color: var(--brand); color: var(--brand); }
+@media (max-width: 760px) { .sticky-total, .sticky-name .muted { display: none; } .sticky-actions .btn { min-width: 0; padding: 0 12px; } .sticky-name b { font-size: 0.85rem; } }
+.sticky-inner { padding-right: 84px; } @media (max-width: 760px) { .sticky-inner { padding-right: 76px; } }
