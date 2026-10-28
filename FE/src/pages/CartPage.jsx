@@ -19,11 +19,12 @@ export default function CartPage() {
     }
   };
 
-  const toWishlist = (sp) =>
-    run(async () => {
+  const toWishlist = (item) => {
+    const sp = item.sanPham;
+    return run(async () => {
       await wishlistService.add(sp.maSanPham);
-      await remove(sp);
-    }, 'Đã chuyển sang danh sách yêu thích');
+      await remove(item);
+    }, 'Đã chuyển sang danh sách yêu thích'); };
 
   if (items.length === 0) {
     return <p className="muted">Giỏ hàng trống. <Link to="/">Tiếp tục mua sắm</Link></p>;
@@ -34,32 +35,33 @@ export default function CartPage() {
       <h2>Giỏ hàng <span className="muted">({count} sản phẩm)</span></h2>
       <div className="cart-layout">
         <div className="section">
-          {items.map(({ sanPham: sp, soLuong }) => (
-            <div key={sp.maSanPham} className="cart-item">
+          {items.map((item) => { const { sanPham: sp, phienBan: pb, soLuong } = item; return (
+            <div key={pb.maPhienBan} className="cart-item">
               <Link to={`/products/${sp.maSanPham}`}><img src={sp.anhChinh} alt="" /></Link>
               <div>
                 <h4><Link to={`/products/${sp.maSanPham}`}>{sp.tenMay}</Link></h4>
-                <span className="price">{formatPrice(sp.giaBan)}</span>
-                {soLuong >= sp.soLuongTon && <small className="error"> · Đã đạt tối đa tồn kho ({sp.soLuongTon})</small>}
+                <span className="price">{formatPrice(pb.giaBan)}</span>
+                <div className="muted variant-line">{pb.ram}GB RAM · {pb.boNho}GB · {pb.mauSac}</div>
+                {soLuong >= pb.soLuongTon && <small className="error"> · Đã đạt tối đa tồn kho ({pb.soLuongTon})</small>}
                 <div className="tools">
                   <div className="qty-box">
-                    <button aria-label="Giảm" onClick={() => run(() => setQuantity(sp, soLuong - 1))}>−</button>
+                    <button aria-label="Giảm" onClick={() => run(() => setQuantity(item, soLuong - 1))}>−</button>
                     <input
                       type="number"
                       min="1"
-                      max={sp.soLuongTon}
+                      max={pb.soLuongTon}
                       value={soLuong}
-                      onChange={(e) => run(() => setQuantity(sp, Number(e.target.value)))}
+                      onChange={(e) => run(() => setQuantity(item, Number(e.target.value)))}
                     />
-                    <button aria-label="Tăng" disabled={soLuong >= sp.soLuongTon} onClick={() => run(() => setQuantity(sp, soLuong + 1))}>+</button>
+                    <button aria-label="Tăng" disabled={soLuong >= pb.soLuongTon} onClick={() => run(() => setQuantity(item, soLuong + 1))}>+</button>
                   </div>
-                  {isCustomer && <button className="link-btn" onClick={() => toWishlist(sp)}>Để sau</button>}
-                  <button className="link-btn" onClick={() => run(() => remove(sp))}>Xóa</button>
+                  {isCustomer && <button className="link-btn" onClick={() => toWishlist(item)}>Để sau</button>}
+                  <button className="link-btn" onClick={() => run(() => remove(item))}>Xóa</button>
                 </div>
               </div>
-              <b>{formatPrice(sp.giaBan * soLuong)}</b>
+              <b>{formatPrice(pb.giaBan * soLuong)}</b>
             </div>
-          ))}
+          );})}
         </div>
         <aside className="side">
           <div className="summary">

@@ -3,187 +3,740 @@ package nhom10.phonenest.service;
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.entity.HinhAnhSanPham;
+import nhom10.phonenest.entity.LoaiSanPham;
+import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
-import nhom10.phonenest.entity.ThongSoKyThuat;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
+import nhom10.phonenest.repository.BienDongKhoRepository;
+import nhom10.phonenest.repository.ChiTietDonHangRepository;
+import nhom10.phonenest.repository.ChiTietGioHangRepository;
 import nhom10.phonenest.repository.DonHangRepository;
 import nhom10.phonenest.repository.HinhAnhSanPhamRepository;
 import nhom10.phonenest.repository.LoaiSanPhamRepository;
+import nhom10.phonenest.repository.PhienBanSanPhamRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.repository.ThuongHieuRepository;
 import nhom10.phonenest.util.IdGenerator;
-import org.springframework.data.domain.Sort;
+
 import org.springframework.http.HttpStatus;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import nhom10.phonenest.enums.TrangThaiDonHang;
-import nhom10.phonenest.entity.LoaiSanPham;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class SanPhamService {
 
-    private static final BigDecimal GIA_TOI_DA = new BigDecimal("999999999999");
+    private final SanPhamRepository spRepo;
+    private final LoaiSanPhamRepository loaiRepo;
+    private final ThuongHieuRepository thRepo;
+    private final PhienBanSanPhamRepository pbRepo;
+    private final HinhAnhSanPhamRepository anhRepo;
+    private final DonHangRepository donRepo;
+    private final ChiTietDonHangRepository chiTietDonHangRepo;
+    private final ChiTietGioHangRepository chiTietGioHangRepo;
+    private final BienDongKhoRepository bienDongKhoRepo;
 
-    private final SanPhamRepository sanPhamRepository;
-    private final LoaiSanPhamRepository loaiSanPhamRepository;
-    private final HinhAnhSanPhamRepository hinhAnhRepository;
-    private final DonHangRepository donHangRepository;
+    public List<SanPhamDto> list(
+            String q,
+            String maLoai,
+            BigDecimal min,
+            BigDecimal max,
+            String sort,
+            boolean admin
+    ) {
+        List<SanPham> all = spRepo.findAll();
 
-    @Transactional(readOnly = true)
-    public List<SanPhamDto> list(String q, String maLoai, BigDecimal min, BigDecimal max, String sort, boolean admin) {
-        Set<String> loais = maLoai == null || maLoai.isBlank() ? null : nhomLoai(maLoai);
-        List<SanPhamDto> kq = sanPhamRepository.search(
-                        q == null ? "" : q.trim(),
-                        "",
-                        min == null ? BigDecimal.ZERO : min,
-                        max == null ? GIA_TOI_DA : max,
-                        sortOf(sort))
-                .stream()
-                .filter(s -> admin || s.getTrangThai() != TrangThaiSanPham.NGUNG_KINH_DOANH)
-                .filter(s -> loais == null || loais.contains(s.getLoai().getMaLoai()))
-                .map(SanPhamMapper::toDto)
+        /*
+         * =========================================================
+         * FILTER
+         * =========================================================
+         */
+
+        String qq = q == null
+                ? ""
+                : q.trim().toLowerCase();
+
+        Set<String> loais =
+                maLoai == null || maLoai.isBlank()
+                        ? null
+                        : nhomLoai(maLoai);
+
+        List<SanPham> filtered = all.stream()
+
+                // Khách hàng chỉ thấy sản phẩm đang kinh doanh
+                .filter(s ->
+                        admin
+                                || s.getTrangThai()
+                                == TrangThaiSanPham.DANG_KINH_DOANH
+                )
+
+                // Tìm kiếm theo tên hoặc mã
+                .filter(s ->
+                        qq.isEmpty()
+                                || (
+                                s.getTenMay() != null
+                                        && s.getTenMay()
+                                        .toLowerCase()
+                                        .contains(qq)
+                        )
+                                || (
+                                s.getMaSanPham() != null
+                                        && s.getMaSanPham()
+                                        .toLowerCase()
+                                        .contains(qq)
+                        )
+                )
+
+                // Lọc loại sản phẩm
+                .filter(s ->
+                        loais == null
+                                || (
+                                s.getLoai() != null
+                                        && loais.contains(
+                                        s.getLoai().getMaLoai()
+                                )
+                        )
+                )
+
                 .toList();
-        if ("ban_chay".equals(sort)) {
-            Map<String, Integer> daBan = daBan();
-            kq = kq.stream()
-                    .sorted(Comparator.comparingInt((SanPhamDto s) -> daBan.getOrDefault(s.maSanPham(), 0)).reversed())
-                    .toList();
+
+        /*
+         * =========================================================
+         * ENTITY -> DTO
+         * =========================================================
+         */
+
+        List<SanPhamDto> dtos = new ArrayList<>();
+
+        for (SanPham sanPham : filtered) {
+
+            SanPhamDto dto = SanPhamMapper.toDto(sanPham);
+
+            // Lọc giá thấp nhất
+            if (min != null) {
+                if (dto.giaBan() == null
+                        || dto.giaBan().compareTo(min) < 0) {
+                    continue;
+                }
+            }
+
+            // Lọc giá cao nhất
+            if (max != null) {
+                if (dto.giaBan() == null
+                        || dto.giaBan().compareTo(max) > 0) {
+                    continue;
+                }
+            }
+
+            dtos.add(dto);
         }
-        return kq;
+
+        /*
+         * =========================================================
+         * SORT
+         * =========================================================
+         */
+
+        Comparator<SanPhamDto> comparator;
+
+        if ("gia_asc".equals(sort)) {
+
+            comparator = Comparator.comparing(
+                    SanPhamDto::giaBan,
+                    Comparator.nullsLast(
+                            Comparator.naturalOrder()
+                    )
+            );
+
+        } else if ("gia_desc".equals(sort)) {
+
+            comparator = Comparator.comparing(
+                    SanPhamDto::giaBan,
+                    Comparator.nullsLast(
+                            Comparator.reverseOrder()
+                    )
+            );
+
+        } else if ("danh_gia".equals(sort)) {
+
+            comparator = Comparator.comparing(
+                    SanPhamDto::diemDanhGiaTb,
+                    Comparator.nullsLast(
+                            Comparator.reverseOrder()
+                    )
+            );
+
+        } else {
+
+            comparator = Comparator.comparing(
+                    SanPhamDto::maSanPham,
+                    Comparator.nullsLast(
+                            Comparator.reverseOrder()
+                    )
+            );
+        }
+
+        return dtos.stream()
+                .sorted(comparator)
+                .toList();
     }
 
-    @Transactional(readOnly = true)
+    public SanPhamDto get(String ma, boolean admin) {
+
+        SanPham s = find(ma);
+
+        if (!admin
+                && s.getTrangThai()
+                == TrangThaiSanPham.NGUNG_KINH_DOANH) {
+
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "Không tìm thấy sản phẩm"
+            );
+        }
+
+        return SanPhamMapper.toDto(s);
+    }
+
     public List<SanPhamDto> lienQuan(String ma) {
-        SanPham goc = find(ma);
-        return list(null, goc.getLoai().getMaLoai(), null, null, null, false).stream()
-                .filter(s -> !s.maSanPham().equals(ma))
+
+        SanPham s = find(ma);
+
+        return list(
+                null,
+                s.getLoai().getMaLoai(),
+                null,
+                null,
+                null,
+                false
+        )
+                .stream()
+                .filter(x ->
+                        !x.maSanPham().equals(ma)
+                )
                 .limit(4)
                 .toList();
     }
 
-    private Map<String, Integer> daBan() {
-        Map<String, Integer> kq = new HashMap<>();
-        donHangRepository.findAll().stream()
-                .filter(d -> d.getTrangThai() != TrangThaiDonHang.DA_HUY)
-                .flatMap(d -> d.getChiTiet().stream())
-                .forEach(c -> kq.merge(c.getMaSanPham(), c.getSoLuong(), Integer::sum));
-        return kq;
-    }
+    public SanPhamDto save(
+            String ma,
+            SanPhamDto d
+    ) {
 
-    private Set<String> nhomLoai(String ma) {
-        List<LoaiSanPham> tatCa = loaiSanPhamRepository.findAll();
-        Set<String> ids = new HashSet<>();
-        ids.add(ma);
-        boolean doi = true;
-        while (doi) {
-            doi = false;
-            for (LoaiSanPham l : tatCa) {
-                if (l.getMaLoaiCha() != null && ids.contains(l.getMaLoaiCha()) && ids.add(l.getMaLoai())) {
-                    doi = true;
+        SanPham s =
+                ma == null
+                        ? new SanPham()
+                        : find(ma);
+
+        if (ma == null) {
+
+            s.setMaSanPham(
+                    IdGenerator.next("SP")
+            );
+
+            s.setDiemDanhGiaTb(
+                    BigDecimal.ZERO
+            );
+        }
+
+        if (d.maThuongHieu() == null || d.maThuongHieu().isBlank()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Vui lòng chọn thương hiệu"
+            );
+        }
+
+        s.setThuongHieu(
+                thRepo.findById(d.maThuongHieu())
+                        .orElseThrow(() ->
+                                new AppException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Thương hiệu không tồn tại"
+                                )
+                        )
+        );
+
+        s.setLoai(
+                loaiRepo.findById(d.maLoai())
+                        .orElseThrow(() ->
+                                new AppException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Loại sản phẩm không tồn tại"
+                                )
+                        )
+        );
+
+        s.setTenMay(d.tenMay());
+        s.setMoTa(d.moTa());
+
+        s.setTrangThai(
+                d.trangThai()
+                        == TrangThaiSanPham.NGUNG_KINH_DOANH
+
+                        ? TrangThaiSanPham.NGUNG_KINH_DOANH
+                        : TrangThaiSanPham.DANG_KINH_DOANH
+        );
+
+        /*
+         * =========================================================
+         * THÔNG SỐ KỸ THUẬT
+         * =========================================================
+         */
+
+        if (d.thongSo() != null) {
+
+            var t = d.thongSo();
+
+            s.setKichThuocManHinh(
+                    t.kichThuocManHinh()
+            );
+
+            s.setLoaiManHinh(
+                    t.loaiManHinh()
+            );
+
+            s.setTanSoQuet(
+                    t.tanSoQuet()
+            );
+
+            s.setChip(
+                    t.chip()
+            );
+
+            s.setCameraSau(
+                    t.cameraSau()
+            );
+
+            s.setCameraTruoc(
+                    t.cameraTruoc() == null
+                            ? null
+                            : String.valueOf(
+                            t.cameraTruoc()
+                    )
+            );
+
+            s.setPin(
+                    t.pin()
+            );
+
+            s.setCongSuatSac(
+                    t.congSuatSac()
+            );
+
+            s.setHeDieuHanh(
+                    t.heDieuHanh()
+            );
+
+            s.setNfc(
+                    t.nfc()
+            );
+
+            s.setHo5G(
+                    t.ho5G()
+            );
+
+            s.setTrongLuong(
+                    t.trongLuong()
+            );
+        }
+
+        s = spRepo.save(s);
+
+        /*
+         * =========================================================
+         * PHIÊN BẢN
+         * =========================================================
+         */
+
+        if (d.phienBans() == null || d.phienBans().isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm phải có ít nhất một phiên bản hợp lệ");
+        }
+
+        Map<String, PhienBanSanPham> existing = new HashMap<>();
+        if (s.getPhienBans() != null) {
+            for (PhienBanSanPham ep : s.getPhienBans()) {
+                existing.put(ep.getMaPhienBan(), ep);
+            }
+        }
+
+        Set<String> guiLen = new HashSet<>();
+        for (SanPhamDto.PhienBan pbDto : d.phienBans()) {
+            if (pbDto.maPhienBan() != null) {
+                guiLen.add(pbDto.maPhienBan());
+            }
+        }
+
+        /*
+         * Xử lý các phiên bản bị bỏ khỏi form TRƯỚC khi thêm/sửa phiên bản mới.
+         * - Đã phát sinh giao dịch/tồn kho: chỉ ngừng kinh doanh, giữ lịch sử.
+         * - Chưa phát sinh: xóa vật lý và flush ngay để tránh vi phạm
+         *   ràng buộc duy nhất (maSanPham, ram, boNho, mauSac) khi thêm lại
+         *   cùng một tổ hợp trong cùng một lần lưu.
+         */
+
+        Set<String> comboDaCo = new HashSet<>();
+        List<PhienBanSanPham> toRemove = new ArrayList<>();
+
+        if (s.getPhienBans() != null) {
+            for (PhienBanSanPham ep : s.getPhienBans()) {
+                if (!guiLen.contains(ep.getMaPhienBan())) {
+                    toRemove.add(ep);
                 }
             }
         }
-        return ids;
-    }
 
-    @Transactional(readOnly = true)
-    public SanPhamDto get(String ma, boolean admin) {
-        SanPham s = find(ma);
-        if (!admin && s.getTrangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH) {
-            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm");
+        for (PhienBanSanPham rm : toRemove) {
+            if (daDuocThamChieu(rm.getMaPhienBan())) {
+                rm.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
+                pbRepo.save(rm);
+                comboDaCo.add(comboKey(rm));
+            } else {
+                pbRepo.delete(rm);
+                s.getPhienBans().remove(rm);
+            }
         }
-        return SanPhamMapper.toDto(s);
-    }
 
-    public SanPhamDto save(String ma, SanPhamDto d) {
-        SanPham s = ma == null ? new SanPham() : find(ma);
-        if (ma == null) {
-            s.setMaSanPham(IdGenerator.next("SP"));
-            s.setDiemDanhGiaTb(BigDecimal.ZERO);
+        pbRepo.flush();
+
+        List<PhienBanSanPham> toKeep = new ArrayList<>();
+        Set<String> seenCombo = new HashSet<>();
+        Set<String> seenSku = new HashSet<>();
+
+        for (SanPhamDto.PhienBan pbDto : d.phienBans()) {
+            String mauSac = pbDto.mauSac() == null ? "" : pbDto.mauSac().trim();
+
+            if (pbDto.ram() <= 0 || pbDto.boNho() <= 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "RAM và bộ nhớ phải lớn hơn 0");
+            }
+            if (mauSac.isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Màu sắc không được để trống");
+            }
+            if (pbDto.giaBan() == null || pbDto.giaBan().compareTo(BigDecimal.ZERO) < 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Giá bán không hợp lệ");
+            }
+            if (pbDto.giaNiemYet() != null && pbDto.giaNiemYet().compareTo(pbDto.giaBan()) < 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Giá niêm yết không được nhỏ hơn giá bán");
+            }
+            if (pbDto.soLuongTon() < 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Số lượng tồn không được âm");
+            }
+
+            String combo = comboKey(pbDto.ram(), pbDto.boNho(), mauSac);
+
+            if (comboDaCo.contains(combo)) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Tổ hợp " + pbDto.ram() + "GB / " + pbDto.boNho() + "GB / " + mauSac
+                                + " đang thuộc phiên bản đã phát sinh giao dịch, không thể tạo trùng");
+            }
+            if (!seenCombo.add(combo)) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Tổ hợp " + pbDto.ram() + "GB / " + pbDto.boNho() + "GB / " + mauSac + " bị trùng");
+            }
+
+            PhienBanSanPham p;
+            if (pbDto.maPhienBan() != null && existing.containsKey(pbDto.maPhienBan())) {
+                p = existing.get(pbDto.maPhienBan());
+            } else {
+                p = new PhienBanSanPham();
+                p.setMaPhienBan(IdGenerator.next("PB"));
+                p.setSanPham(s);
+                s.getPhienBans().add(p);
+            }
+
+            String sku = pbDto.sku() == null ? "" : pbDto.sku().trim();
+            if (sku.isEmpty()) {
+                sku = ensureUniqueSku(
+                        generateSku(s.getMaSanPham(), pbDto.ram(), pbDto.boNho(), mauSac),
+                        p.getMaPhienBan(),
+                        seenSku
+                );
+            } else {
+                PhienBanSanPham trung = pbRepo.findBySku(sku).orElse(null);
+                if (trung != null && !Objects.equals(trung.getMaPhienBan(), p.getMaPhienBan())) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "SKU đã tồn tại: " + sku);
+                }
+            }
+
+            if (!seenSku.add(sku.toLowerCase())) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "SKU bị trùng: " + sku);
+            }
+
+            p.setSku(sku);
+            p.setRam(pbDto.ram());
+            p.setBoNho(pbDto.boNho());
+            p.setMauSac(mauSac);
+            p.setGiaBan(pbDto.giaBan());
+            p.setGiaNiemYet(pbDto.giaNiemYet());
+            p.setSoLuongTon(pbDto.soLuongTon());
+            p.setTrangThai(pbDto.trangThai() == null ? s.getTrangThai() : pbDto.trangThai());
+            pbRepo.save(p);
+            toKeep.add(p);
         }
-        s.setLoai(loaiSanPhamRepository.findById(d.maLoai())
-                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Loại sản phẩm không tồn tại")));
-        s.setTenMay(d.tenMay());
-        s.setGiaBan(d.giaBan());
-        s.setMoTa(d.moTa());
-        s.setThongSo(thongSo(d.thongSo()));
-        s.setSoLuongTon(d.soLuongTon());
-        s.setTrangThai(d.trangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH ? TrangThaiSanPham.NGUNG_KINH_DOANH
-                : d.soLuongTon() > 0 ? TrangThaiSanPham.CON_HANG : TrangThaiSanPham.HET_HANG);
-        s = sanPhamRepository.save(s);
-        luuAnh(s, d.hinhAnhs(), d.anhChinh());
+
+        if (s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH
+                && toKeep.stream().noneMatch(p -> p.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Sản phẩm đang kinh doanh phải có ít nhất một phiên bản đang kinh doanh");
+        }
+
+        /*
+         * =========================================================
+         * HÌNH ẢNH
+         * =========================================================
+         */
+
+        luuAnh(
+                s,
+                d.hinhAnhs(),
+                d.anhChinh()
+        );
+
         return SanPhamMapper.toDto(s);
     }
 
     public void delete(String ma) {
-        if (donHangRepository.daCoTrongDonHang(ma)) {
-            throw new AppException(HttpStatus.CONFLICT,
-                    "Sản phẩm đã có trong đơn hàng, hãy chuyển sang ngừng kinh doanh");
+
+        if (donRepo.daCoTrongDonHang(ma)) {
+
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Sản phẩm đã có trong đơn hàng, hãy chuyển sang ngừng kinh doanh"
+            );
         }
-        sanPhamRepository.delete(find(ma));
-        sanPhamRepository.flush();
+
+        SanPham s = find(ma);
+
+        boolean coThamChieu = s.getPhienBans()
+                .stream()
+                .anyMatch(p -> daDuocThamChieu(p.getMaPhienBan()));
+
+        if (coThamChieu) {
+
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Phiên bản sản phẩm đã phát sinh giao dịch hoặc tồn kho, hãy chuyển sang ngừng kinh doanh"
+            );
+        }
+
+        anhRepo.deleteAll(s.getHinhAnhs());
+        pbRepo.deleteAll(s.getPhienBans());
+
+        s.getHinhAnhs().clear();
+        s.getPhienBans().clear();
+
+        spRepo.delete(s);
     }
 
     private SanPham find(String ma) {
-        return sanPhamRepository.findById(ma)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm"));
+
+        return spRepo.findById(ma)
+                .orElseThrow(() ->
+                        new AppException(
+                                HttpStatus.NOT_FOUND,
+                                "Không tìm thấy sản phẩm"
+                        )
+                );
     }
 
-    private ThongSoKyThuat thongSo(SanPhamDto.ThongSo t) {
-        ThongSoKyThuat r = new ThongSoKyThuat();
-        if (t == null) {
-            return r;
+    private Set<String> nhomLoai(String ma) {
+
+        List<LoaiSanPham> all =
+                loaiRepo.findAll();
+
+        Set<String> ids =
+                new HashSet<>();
+
+        ids.add(ma);
+
+        boolean doi = true;
+
+        while (doi) {
+
+            doi = false;
+
+            for (LoaiSanPham l : all) {
+
+                if (l.getMaLoaiCha() != null
+                        && ids.contains(
+                        l.getMaLoaiCha()
+                )
+                        && ids.add(
+                        l.getMaLoai()
+                )) {
+
+                    doi = true;
+                }
+            }
         }
-        r.setKichThuocManHinh(t.kichThuocManHinh());
-        r.setLoaiManHinh(t.loaiManHinh());
-        r.setTanSoQuet(t.tanSoQuet());
-        r.setChip(t.chip());
-        r.setRam(t.ram());
-        r.setBoNho(t.boNho());
-        r.setCameraSau(t.cameraSau());
-        r.setCameraTruoc(t.cameraTruoc());
-        r.setPin(t.pin());
-        r.setCongSuatSac(t.congSuatSac());
-        r.setHeDieuHanh(t.heDieuHanh());
-        r.setNfc(t.nfc());
-        r.setHo5G(t.ho5G());
-        r.setTrongLuong(t.trongLuong());
-        return r;
+
+        return ids;
     }
 
-    private void luuAnh(SanPham s, List<String> urls, String chinh) {
+    private void luuAnh(
+            SanPham s,
+            List<String> urls,
+            String chinh
+    ) {
+
         if (urls == null) {
             return;
         }
-        hinhAnhRepository.deleteAll(s.getHinhAnhs());
-        s.getHinhAnhs().clear();
-        for (String url : urls) {
-            HinhAnhSanPham anh = new HinhAnhSanPham();
-            anh.setMaHinhAnh(IdGenerator.next("HA"));
-            anh.setSanPham(s);
-            anh.setDuongDan(url);
-            anh.setAnhChinh(url.equals(chinh) || (chinh == null && s.getHinhAnhs().isEmpty()));
-            s.getHinhAnhs().add(hinhAnhRepository.save(anh));
+
+        anhRepo.deleteAll(
+                s.getHinhAnhs()
+        );
+
+        s.getHinhAnhs()
+                .clear();
+
+        for (String u : urls) {
+
+            HinhAnhSanPham a =
+                    new HinhAnhSanPham();
+
+            a.setMaHinhAnh(
+                    IdGenerator.next("HA")
+            );
+
+            a.setSanPham(s);
+
+            a.setDuongDan(u);
+
+            a.setAnhChinh(
+                    u.equals(chinh)
+                            || (
+                            chinh == null
+                                    && s.getHinhAnhs()
+                                    .isEmpty()
+                    )
+            );
+
+            s.getHinhAnhs()
+                    .add(
+                            anhRepo.save(a)
+                    );
         }
     }
 
-    private Sort sortOf(String sort) {
-        return switch (sort == null ? "" : sort) {
-            case "gia_asc" -> Sort.by("giaBan");
-            case "gia_desc" -> Sort.by("giaBan").descending();
-            case "danh_gia" -> Sort.by("diemDanhGiaTb").descending();
-            default -> Sort.by("maSanPham").descending();
-        };
+    /**
+     * Sinh SKU ổn định cho phiên bản, không phụ thuộc thứ tự khai báo.
+     * Ví dụ: PN-013-6-128-DEN
+     */
+    private String generateSku(
+            String maSanPham,
+            int ram,
+            int boNho,
+            String mauSac
+    ) {
+
+        String so = maSanPham == null
+                ? ""
+                : maSanPham.replaceAll("\\D+", "");
+
+        if (so.isEmpty()) {
+            so = maSanPham == null || maSanPham.isBlank()
+                    ? "MOI"
+                    : slug(maSanPham);
+        }
+
+        return "PN-" + so + "-" + ram + "-" + boNho + "-" + slug(mauSac);
+    }
+
+    /**
+     * Bỏ dấu tiếng Việt và ký tự đặc biệt để tạo phần màu trong SKU.
+     */
+    private String slug(String value) {
+
+        if (value == null) {
+            return "MAU";
+        }
+
+        String khongDau = Normalizer
+                .normalize(value.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replace('đ', 'D')
+                .replace('Đ', 'D')
+                .replaceAll("[^A-Za-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "")
+                .toUpperCase();
+
+        return khongDau.isEmpty() ? "MAU" : khongDau;
+    }
+
+    /**
+     * Đảm bảo SKU là duy nhất trên toàn hệ thống. Nếu trùng với phiên bản khác
+     * thì thêm hậu tố -2, -3... (SKU của chính phiên bản đang sửa được giữ nguyên).
+     */
+    private String ensureUniqueSku(
+            String base,
+            String maPhienBan,
+            Set<String> daDung
+    ) {
+
+        String candidate = base;
+        int thuTu = 2;
+
+        while (true) {
+
+            PhienBanSanPham trung = pbRepo.findBySku(candidate).orElse(null);
+
+            boolean trungTrongDb = trung != null
+                    && !Objects.equals(trung.getMaPhienBan(), maPhienBan);
+
+            boolean trungTrongPayload = daDung.contains(candidate.toLowerCase());
+
+            if (!trungTrongDb && !trungTrongPayload) {
+                return candidate;
+            }
+
+            candidate = base + "-" + thuTu++;
+        }
+    }
+
+    private String comboKey(PhienBanSanPham p) {
+
+        return comboKey(
+                p.getRam(),
+                p.getBoNho(),
+                p.getMauSac()
+        );
+    }
+
+    private String comboKey(
+            int ram,
+            int boNho,
+            String mauSac
+    ) {
+
+        return ram
+                + "|"
+                + boNho
+                + "|"
+                + (mauSac == null ? "" : mauSac.trim().toLowerCase());
+    }
+
+    private boolean daDuocThamChieu(String maPhienBan) {
+
+        if (maPhienBan == null) {
+            return false;
+        }
+
+        return chiTietDonHangRepo.existsByPhienBanMaPhienBan(maPhienBan)
+                || chiTietGioHangRepo.existsByPhienBanMaPhienBan(maPhienBan)
+                || bienDongKhoRepo.existsByPhienBanMaPhienBan(maPhienBan);
     }
 }

@@ -477,6 +477,55 @@ section > h3 { font-size: 1.2rem; margin: 28px 0 14px; }
 .legend li { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; }
 .legend li.on { background: var(--brand-soft); }
 .legend li span { flex: 1; }
+
+/* ---- Admin product variant form ---- */
+.modal-wide { max-width: 860px; }
+.modal-wide .modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -22px -26px 10px;
+  padding: 16px 26px 12px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.variant-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.variant-section-head .form-title { margin: 8px 0 0; }
+.variant-list { display: flex; flex-direction: column; gap: 14px; }
+.variant-card { border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: #fbfcff; padding: 14px 16px 16px; }
+.variant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.variant-card-title { font-weight: 700; color: var(--ink); }
+.variant-card-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 0.82rem; font-weight: 500; }
+.variant-card .btn-danger { flex: 0 0 auto; }
+.variant-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.variant-card .field select,
+.variant-card .field input { width: 100%; }
+.variant-colors { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+.variant-colors-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.variant-colors-head b { color: var(--ink); }
+.color-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(90px, 0.6fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.color-row:last-of-type { border-bottom: 0; }
+.color-row .field input,
+.color-row .field select { width: 100%; }
+.color-row .color-remove { margin-bottom: 1px; white-space: nowrap; }
+.color-sku { grid-column: 1 / -1; margin-top: -4px; }
+.variant-errors,
+.variant-warning,
+.variant-card-alert { border-radius: var(--radius); padding: 10px 14px; font-size: 0.9rem; }
+.variant-errors { border: 1px solid #f4c7c3; background: #fef3f2; color: var(--danger); }
+.variant-warning { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; }
+.variant-card-alert { margin-bottom: 10px; padding: 8px 10px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 0.85rem; }
+.variant-errors ul,
+.variant-warning ul { margin: 6px 0 0; padding-left: 20px; }
+
+@media (max-width: 720px) {
+  .modal-wide .modal-head { margin: -22px -26px 10px; padding: 14px 16px 10px; }
+  .variant-card-head { flex-direction: column; }
+  .variant-card-grid { grid-template-columns: 1fr; }
+  .color-row { grid-template-columns: 1fr; gap: 8px; }
+  .color-row .color-remove { justify-self: start; }
+  .variant-section-head { flex-direction: column; align-items: flex-start; }
+}
 .legend i, .stack i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .row-legend { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
 .row-legend li { flex: none; }
@@ -605,3 +654,13 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .sticky-actions .btn:not(.btn-primary) { border-color: var(--brand); color: var(--brand); }
 @media (max-width: 760px) { .sticky-total, .sticky-name .muted { display: none; } .sticky-actions .btn { min-width: 0; padding: 0 12px; } .sticky-name b { font-size: 0.85rem; } }
 .sticky-inner { padding-right: 84px; } @media (max-width: 760px) { .sticky-inner { padding-right: 76px; } }
+
+
+/* Product variants (SKU) */
+.variant-picker { margin: 18px 0; }
+.variant-options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.variant-option { min-width: 135px; padding: 10px 12px; border: 1px solid #d8dde6; border-radius: 10px; background: #fff; cursor: pointer; display: grid; gap: 3px; text-align: left; }
+.variant-option span, .variant-option small { color: #667085; }
+.variant-option.active { border: 2px solid #111827; padding: 9px 11px; }
+.variant-option:disabled { opacity: .45; cursor: not-allowed; }
+.variant-line { margin-top: 4px; font-size: .9rem; }

@@ -1,12 +1,3 @@
 package nhom10.phonenest.repository;
-
-import java.util.List;
-import java.util.Optional;
-import nhom10.phonenest.entity.YeuCauDoiTra;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, String> {
-    Optional<YeuCauDoiTra> findByMaDonHang(String maDonHang);
-
-    List<YeuCauDoiTra> findAllByOrderByNgayTaoDesc();
-}
+import nhom10.phonenest.entity.YeuCauDoiTra; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*;
+public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra,String>{ List<YeuCauDoiTra> findByDonHangMaDonHangOrderByNgayTaoDesc(String maDonHang); }

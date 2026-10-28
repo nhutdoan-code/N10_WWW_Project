@@ -65,7 +65,7 @@ export default function OrdersPage() {
             {o.maKm && ` · Mã ${o.maKm}`}
           </p>
           {o.chiTiet.slice(0, SHOW_ITEMS).map((d) => (
-            <div key={d.maSanPham} className="row between">
+            <div key={d.maPhienBan || d.maSanPham} className="row between">
               <span className="row"><img className="thumb" src={d.anhChinh} alt="" />{d.tenMay} × {d.soLuong}</span>
               <span>{formatPrice(d.donGia * d.soLuong)}</span>
             </div>

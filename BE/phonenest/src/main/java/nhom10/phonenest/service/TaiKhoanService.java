@@ -57,7 +57,7 @@ public class TaiKhoanService {
         if (quanTriVienRepository.existsById(ma)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không thể xóa tài khoản quản trị");
         }
-        if (donHangRepository.existsByMaKh(ma)) {
+        if (donHangRepository.existsByKhachHangMaKh(ma)) {
             throw new AppException(HttpStatus.CONFLICT, "Tài khoản đã từng đặt hàng, hãy khóa tài khoản thay vì xóa");
         }
         taiKhoanRepository.delete(tk);

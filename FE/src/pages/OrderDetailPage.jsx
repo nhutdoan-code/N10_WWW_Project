@@ -77,7 +77,7 @@ export default function OrderDetailPage() {
           <div className="section">
             <h3>Sản phẩm</h3>
             {o.chiTiet.map((d) => (
-              <div key={d.maSanPham} className="line-item">
+              <div key={d.maPhienBan || d.maSanPham} className="line-item">
                 <img className="thumb" src={d.anhChinh} alt="" />
                 <div className="grow">
                   <Link to={`/products/${d.maSanPham}`}>{d.tenMay}</Link>

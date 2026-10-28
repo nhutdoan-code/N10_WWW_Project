@@ -82,18 +82,23 @@ public class ThongKeService {
                 .map(e -> new ThongKeDto.Hang(e.getKey(), e.getValue(), slHang.get(e.getKey()))).toList();
 
         int soDoiTra = (int) yeuCauDoiTraRepository.findAll().stream()
-                .filter(y -> !y.getNgayTao().isBefore(batDau(tu)) && !y.getNgayTao().isAfter(ketThuc(den)))
+                .filter(y -> !y.getNgayTao().toLocalDate().isBefore(batDau(tu)) && !y.getNgayTao().toLocalDate().isAfter(ketThuc(den)))
                 .count();
         List<SanPham> sanPhams = sanPhamRepository.findAll().stream()
                 .filter(s -> s.getTrangThai() != TrangThaiSanPham.NGUNG_KINH_DOANH)
                 .toList();
         int sapHet = (int) sanPhams.stream()
-                .filter(s -> s.getSoLuongTon() > 0 && s.getSoLuongTon() <= KhoService.NGUONG_SAP_HET).count();
-        int hetHang = (int) sanPhams.stream().filter(s -> s.getSoLuongTon() == 0).count();
+                .filter(s -> tongTon(s) > 0 && tongTon(s) <= KhoService.NGUONG_SAP_HET).count();
+        int hetHang = (int) sanPhams.stream().filter(s -> tongTon(s) == 0).count();
         int conHang = sanPhams.size() - sapHet - hetHang;
 
         return new ThongKeDto(doanhThu, dtos.size(), theoTrangThai.get(TrangThaiDonHang.DA_HUY.name()), soDoiTra,
                 sapHet, hetHang, conHang, theoTrangThai, banChay, ngay, theoHang);
+    }
+
+    private int tongTon(SanPham sanPham) {
+        // Chỉ tính variant đang kinh doanh, đồng bộ với SanPham.getSoLuongTon().
+        return sanPham.getSoLuongTon();
     }
 
     private String tenHang(String maSanPham) {

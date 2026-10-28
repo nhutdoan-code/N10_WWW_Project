@@ -42,6 +42,11 @@ public class AdminSanPhamController {
         return sanPhamService.list(q, null, null, null, null, true);
     }
 
+    @GetMapping("/products/{ma}")
+    public SanPhamDto product(@PathVariable String ma) {
+        return sanPhamService.get(ma, true);
+    }
+
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     public SanPhamDto create(@Valid @RequestBody SanPhamDto d) {
