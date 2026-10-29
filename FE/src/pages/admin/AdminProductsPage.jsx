@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../components/Modal';
 import ProductForm from '../../components/ProductForm';
+import ProductImage from '../../components/ProductImage';
 import StatusBadge from '../../components/StatusBadge';
 import useDebounce from '../../hooks/useDebounce';
 import useFetch from '../../hooks/useFetch';
@@ -45,7 +46,7 @@ export default function AdminProductsPage() {
           {products?.map((p) => (
             <tr key={p.maSanPham}>
               <td>{p.maSanPham}</td>
-              <td><img className="thumb" src={p.anhChinh} alt="" /></td>
+              <td><ProductImage className="thumb" src={p.anhChinh} alt="" /></td>
               <td>{p.tenMay}</td>
               <td>{p.tenThuongHieu || p.tenLoai}</td>
               <td>{formatPrice(p.giaBan)}</td>

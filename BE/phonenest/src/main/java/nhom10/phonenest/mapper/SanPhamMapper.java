@@ -40,7 +40,7 @@ public final class SanPhamMapper {
         SanPhamDto.ThongSo ts = new SanPhamDto.ThongSo(
                 s.getKichThuocManHinh(), s.getLoaiManHinh(), s.getTanSoQuet(), s.getChip(),
                 p == null ? null : p.getRam(), p == null ? null : p.getBoNho(),
-                s.getCameraSau(), null, s.getPin(), s.getCongSuatSac(), s.getHeDieuHanh(),
+                s.getCameraSau(), mp(s.getCameraTruoc()), s.getPin(), s.getCongSuatSac(), s.getHeDieuHanh(),
                 s.isNfc(), s.isHo5G(), s.getTrongLuong());
 
         List<SanPhamDto.PhienBan> pbs = s.getPhienBans().stream()
@@ -49,11 +49,39 @@ public final class SanPhamMapper {
                         x.getGiaBan(), x.getGiaNiemYet(), x.getSoLuongTon(), x.getTrangThai()))
                 .toList();
 
+        List<SanPhamDto.Anh> anhs = anh.stream()
+                .map(x -> new SanPhamDto.Anh(
+                        x.getMaHinhAnh(), x.getDuongDan(), x.getGocChup()))
+                .toList();
+
         return new SanPhamDto(
                 s.getMaSanPham(), s.getLoai().getMaLoai(), s.getLoai().getTenLoai(),
                 s.getThuongHieu() == null ? null : s.getThuongHieu().getMaThuongHieu(),
                 s.getThuongHieu() == null ? null : s.getThuongHieu().getTenThuongHieu(),
                 s.getTenMay(), gia, s.getMoTa(), ts, ton, s.getTrangThai(), s.getDiemDanhGiaTb(),
-                chinh, anh.stream().map(HinhAnhSanPham::getDuongDan).toList(), pbs);
+                chinh, anhs, pbs);
+    }
+
+    /**
+     * DB lưu camera trước dạng chuỗi (ví dụ "12 MP" hoặc "12"); DTO trả về số MP
+     * để FE hiển thị thống nhất.
+     */
+    private static Integer mp(String value) {
+
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        StringBuilder so = new StringBuilder();
+
+        for (char c : value.toCharArray()) {
+            if (Character.isDigit(c)) {
+                so.append(c);
+            } else if (so.length() > 0) {
+                break;
+            }
+        }
+
+        return so.length() == 0 ? null : Integer.valueOf(so.toString());
     }
 }

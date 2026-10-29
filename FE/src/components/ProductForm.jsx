@@ -11,6 +11,7 @@ import {
   validateConfigurations,
 } from '../utils/variantForm';
 import FormField from './FormField';
+import ProductImage from './ProductImage';
 import VariantConfigurationCard from './VariantConfigurationCard';
 
 const NUM = ['kichThuocManHinh', 'tanSoQuet', 'ram', 'boNho', 'cameraTruoc', 'pin', 'congSuatSac', 'trongLuong'];
@@ -48,16 +49,24 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     try {
       const urls = [];
       for (const f of files) urls.push((await adminService.uploadImage(f)).url);
-      setForm((f) => ({ ...f, hinhAnhs: [...f.hinhAnhs, ...urls], anhChinh: f.anhChinh || urls[0] }));
+      setForm((f) => ({
+        ...f,
+        hinhAnhs: [...f.hinhAnhs, ...urls.map((url) => ({ duongDan: url }))],
+        anhChinh: f.anhChinh || urls[0],
+      }));
     } catch (err) {
       toast(errorMessage(err), 'error');
     }
     setUploading(false);
   };
 
-  const removeImage = (url) => {
-    const rest = form.hinhAnhs.filter((u) => u !== url);
-    setForm({ ...form, hinhAnhs: rest, anhChinh: form.anhChinh === url ? rest[0] || null : form.anhChinh });
+  const removeImage = (anh) => {
+    const rest = form.hinhAnhs.filter((a) => a !== anh);
+    setForm({
+      ...form,
+      hinhAnhs: rest,
+      anhChinh: form.anhChinh === anh.duongDan ? rest[0]?.duongDan || null : form.anhChinh,
+    });
   };
 
   const updateConfig = (configKey, patch) => {
@@ -146,7 +155,23 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     const tonActive = phienBans
       .filter((p) => p.trangThai === 'DANG_KINH_DOANH')
       .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
-    onSubmit({ ...form, giaBan: giaBanMin, soLuongTon: tonActive, thongSo, phienBans });
+
+    // Chỉ gửi identity + metadata ảnh; backend reconcile theo maHinhAnh.
+    const hinhAnhs = (form.hinhAnhs || []).map((anh) => ({
+      maHinhAnh: anh.maHinhAnh || null,
+      duongDan: anh.duongDan,
+      gocChup: anh.gocChup ?? null,
+    }));
+
+    onSubmit({
+      ...form,
+      giaBan: giaBanMin,
+      soLuongTon: tonActive,
+      thongSo,
+      phienBans,
+      hinhAnhs,
+      anhChinh: form.anhChinh || hinhAnhs[0]?.duongDan || null,
+    });
   };
 
   const spec = (label, key, props = {}) => (
@@ -246,15 +271,18 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
 
       <h4 className="form-title">Hình ảnh sản phẩm</h4>
       <div className="img-list">
-        {(form.hinhAnhs || []).map((url) => (
-          <div key={url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
-            <img src={url} alt="" />
-            <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, anhChinh: url })} disabled={form.anhChinh === url}>
-              {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
-            </button>
-            <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(url)}>×</button>
-          </div>
-        ))}
+        {(form.hinhAnhs || []).map((anh) => {
+          const url = anh.duongDan;
+          return (
+            <div key={anh.maHinhAnh || url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
+              <ProductImage src={url} alt="" />
+              <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, anhChinh: url })} disabled={form.anhChinh === url}>
+                {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
+              </button>
+              <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(anh)}>×</button>
+            </div>
+          );
+        })}
         <label className="img-add">
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={upload} disabled={uploading} />
           {uploading ? 'Đang tải...' : '+ Tải ảnh lên'}

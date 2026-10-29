@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import ProductImage from './ProductImage';
 import { chatService } from '../service/chatService';
 import { formatPrice } from '../utils/format';
 
@@ -67,7 +68,7 @@ export default function ChatWidget() {
                 <p>{m.content}</p>
                 {m.products?.map((p) => (
                   <Link key={p.maSanPham} className="chat-product" to={`/products/${p.maSanPham}`} onClick={() => setOpen(false)}>
-                    <img src={p.anhChinh} alt="" />
+                    <ProductImage src={p.anhChinh} alt="" />
                     <span>{p.tenMay}<b>{formatPrice(p.giaBan)}</b></span>
                   </Link>
                 ))}

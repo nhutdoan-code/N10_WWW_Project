@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Anh san pham dang cap nhat">
   <rect width="600" height="600" fill="#f3f4f6"/>
   <rect x="205" y="90" width="190" height="360" rx="28" fill="none" stroke="#9ca3af" stroke-width="14"/>
   <rect x="230" y="125" width="140" height="270" rx="10" fill="#e5e7eb"/>
   <circle cx="300" cy="422" r="10" fill="#9ca3af"/>
   <text x="300" y="510" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" fill="#6b7280">PhoneNest</text>
-  <text x="300" y="545" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#9ca3af">Ảnh đang cập nhật</text>
+  <text x="300" y="545" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#9ca3af">Anh dang cap nhat</text>
 </svg>

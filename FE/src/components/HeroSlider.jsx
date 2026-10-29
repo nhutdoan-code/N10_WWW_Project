@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import ProductImage from './ProductImage';
 
 const INTERVAL = 5000;
 
@@ -35,7 +36,7 @@ export default function HeroSlider({ slides }) {
           </div>
           {s.image && (
             <Link to={s.to} className="slide-visual" tabIndex={-1} aria-hidden="true">
-              <img src={s.image} alt="" />
+              <ProductImage src={s.image} alt="" />
               {s.price && <span className="slide-price">{s.price}</span>}
             </Link>
           )}
