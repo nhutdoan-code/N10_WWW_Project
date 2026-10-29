@@ -4,6 +4,7 @@ import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import ReviewForm from '../components/ReviewForm';
 import OrderSteps from '../components/OrderSteps';
+import ProductImage from '../components/ProductImage';
 import StatusBadge from '../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
@@ -77,8 +78,8 @@ export default function OrderDetailPage() {
           <div className="section">
             <h3>Sản phẩm</h3>
             {o.chiTiet.map((d) => (
-              <div key={d.maSanPham} className="line-item">
-                <img className="thumb" src={d.anhChinh} alt="" />
+              <div key={d.maPhienBan || d.maSanPham} className="line-item">
+                <ProductImage className="thumb" src={d.anhChinh} alt="" />
                 <div className="grow">
                   <Link to={`/products/${d.maSanPham}`}>{d.tenMay}</Link>
                   <p className="muted">{formatPrice(d.donGia)} × {d.soLuong}</p>

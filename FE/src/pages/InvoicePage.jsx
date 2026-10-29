@@ -27,7 +27,7 @@ export default function InvoicePage() {
         </thead>
         <tbody>
           {o.chiTiet.map((d) => (
-            <tr key={d.maSanPham}>
+            <tr key={d.maPhienBan || d.maSanPham}>
               <td>{d.tenMay}</td>
               <td>{formatPrice(d.donGia)}</td>
               <td>{d.soLuong}</td>

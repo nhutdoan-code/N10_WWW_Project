@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
+import ProductImage from '../components/ProductImage';
 import QuestionSection from '../components/QuestionSection';
 import ReviewSection from '../components/ReviewSection';
 import StatusBadge from '../components/StatusBadge';
@@ -32,6 +33,7 @@ export default function ProductDetailPage() {
   const toast = useToast();
   const [image, setImage] = useState(null);
   const [soLuong, setSoLuong] = useState(1);
+  const [maPhienBan, setMaPhienBan] = useState('');
   const { data: sp, loading, error } = useFetch(() => productService.get(ma), [ma]);
   const { data: related } = useFetch(() => productService.related(ma), [ma]);
 
@@ -45,6 +47,16 @@ export default function ProductDetailPage() {
     return () => io.disconnect();
   }, [sp]);
 
+  useEffect(() => {
+    if (sp?.phienBans?.length) {
+      // Chỉ chọn trong các variant còn kinh doanh; không fallback sang NGUNG_KINH_DOANH.
+      const active = sp.phienBans.filter((p) => p.trangThai === 'DANG_KINH_DOANH');
+      const first = active.find((p) => p.soLuongTon > 0) || active[0];
+      setMaPhienBan(first?.maPhienBan || '');
+      setSoLuong(1);
+    }
+  }, [sp?.maSanPham]);
+
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
 
@@ -57,9 +69,37 @@ export default function ProductDetailPage() {
     }
   };
 
-  const conHang = sp.trangThai === 'CON_HANG';
-  const themVaoGio = () => run(() => add(sp, soLuong), 'Đã thêm vào giỏ hàng');
-  const muaNgay = () => navigate(`/checkout?mua=${sp.maSanPham}&sl=${soLuong}`);
+  // Chỉ hiển thị tổ hợp thực sự tồn tại trong DB và còn kinh doanh, không tạo combination giả
+  const pbs = (sp.phienBans || []).filter((p) => p.trangThai === 'DANG_KINH_DOANH');
+
+  const phienBan = pbs.find((p) => p.maPhienBan === maPhienBan) || pbs[0] || null;
+  const conHang = phienBan?.trangThai === 'DANG_KINH_DOANH' && phienBan.soLuongTon > 0;
+  const giaBan = Number(phienBan?.giaBan ?? sp.giaBan);
+  const themVaoGio = () => { if(!phienBan || !conHang) return; return run(() => add(sp, phienBan, soLuong), 'Đã thêm vào giỏ hàng'); };
+  // Buy Now: truyền variant qua React Router state (không lộ ID trên URL).
+  // state nằm trong history nên vẫn còn khi refresh; query vẫn được CheckoutPage
+  // chấp nhận để tương thích link cũ.
+  const muaNgay = () => { if(!phienBan || !conHang) return; navigate('/checkout', { state: { mua: phienBan.maPhienBan, sl: soLuong } }); };
+  const conTheBan = (pv) => pv && pv.trangThai === 'DANG_KINH_DOANH' && Number(pv.soLuongTon) > 0;
+  const keyDungLuong = (pv) => `${pv.ram}-${pv.boNho}`;
+  const curKey = phienBan ? keyDungLuong(phienBan) : null;
+  const dungLuongs = [...new Map(pbs.map((pv) => [keyDungLuong(pv), { ram: pv.ram, boNho: pv.boNho }])).values()];
+  const mauSacs = curKey
+    ? [...new Set(pbs.filter((pv) => keyDungLuong(pv) === curKey).map((pv) => pv.mauSac).filter(Boolean))]
+    : [];
+  const chonDungLuong = (dl) => {
+    const list = pbs.filter((pv) => pv.ram === dl.ram && pv.boNho === dl.boNho);
+    const sel = list.find((pv) => conTheBan(pv) && pv.mauSac === phienBan?.mauSac) || list.find(conTheBan) || list[0];
+    if (!sel) return;
+    setMaPhienBan(sel.maPhienBan);
+    setSoLuong(1);
+  };
+  const chonMauSac = (mau) => {
+    const sel = pbs.find((pv) => pv.ram === phienBan?.ram && pv.boNho === phienBan?.boNho && pv.mauSac === mau);
+    if (!sel) return;
+    setMaPhienBan(sel.maPhienBan);
+    setSoLuong(1);
+  };
 
   return (
     <>
@@ -70,11 +110,12 @@ export default function ProductDetailPage() {
     </nav>
     <div className="detail">
       <div>
-        <img className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} />
+        <ProductImage className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} />
         <div className="thumbs">
-          {sp.hinhAnhs.map((url) => (
-            <img key={url} src={url} alt="" onClick={() => setImage(url)} />
-          ))}
+          {sp.hinhAnhs.map((anh) => {
+            const url = anh.duongDan;
+            return <ProductImage key={anh.maHinhAnh || url} src={url} alt="" onClick={() => setImage(url)} />;
+          })}
         </div>
         <section className="desc">
           <h3>Mô tả sản phẩm</h3>
@@ -94,17 +135,68 @@ export default function ProductDetailPage() {
       </div>
       <div>
         <h1>{sp.tenMay}</h1>
-        <p className="muted">Hãng: {sp.tenLoai} · Mã: {sp.maSanPham} · <span className="rating">{sp.diemDanhGiaTb}</span></p>
-        <div className="price big">{formatPrice(sp.giaBan)}</div>
-        <p><StatusBadge status={productStatus(sp)} /> {sp.trangThai === 'CON_HANG' && <span className="muted">(còn {sp.soLuongTon})</span>}</p>
+        <p className="muted">Hãng: {sp.tenThuongHieu || sp.tenLoai}</p>
+        <div className="price big">{formatPrice(giaBan)}{phienBan?.giaNiemYet && Number(phienBan.giaNiemYet) > giaBan ? <span style={{marginLeft:"12px",textDecoration:"line-through",color:"#666"}}>{formatPrice(phienBan.giaNiemYet)}</span> : null}</div>
+        {pbs.length > 0 && (
+          <>
+            {dungLuongs.length > 0 && (
+              <div className="variant-picker">
+                <b>Dung lượng</b>
+                <div className="variant-options">
+                  {dungLuongs.map((dl) => {
+                    const active = phienBan?.ram === dl.ram && phienBan?.boNho === dl.boNho;
+                    const conHangDl = pbs.some((pv) => pv.ram === dl.ram && pv.boNho === dl.boNho && conTheBan(pv));
+                    return (
+                      <button
+                        key={`${dl.ram}-${dl.boNho}`}
+                        type="button"
+                        className={`variant-option ${active ? 'active' : ''} ${conHangDl ? '' : 'disabled'}`}
+                        onClick={() => chonDungLuong(dl)}
+                        disabled={!conHangDl}
+                      >
+                        <b>{dl.ram}GB / {dl.boNho}GB</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {mauSacs.length > 0 && (
+              <div className="variant-picker">
+                <b>Màu sắc</b>
+                <div className="variant-options">
+                  {mauSacs.map((mau) => {
+                    const pv = pbs.find((x) => x.ram === phienBan?.ram && x.boNho === phienBan?.boNho && x.mauSac === mau);
+                    const active = pv?.maPhienBan === phienBan?.maPhienBan;
+                    const hetHangMau = !conTheBan(pv);
+                    return (
+                      <button
+                        key={mau}
+                        type="button"
+                        className={`variant-option ${active ? 'active' : ''} ${hetHangMau ? 'disabled' : ''}`}
+                        onClick={() => chonMauSac(mau)}
+                        title={hetHangMau ? 'Hết hàng' : mau}
+                        disabled={hetHangMau}
+                      >
+                        <span>{mau}</span>
+                        {hetHangMau && <small className="muted"> (Hết hàng)</small>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        <p><StatusBadge status={conHang ? "CON_HANG" : "HET_HANG"} /> {!conHang && <span className="muted">Hết hàng</span>}</p>
         <div className="buy-box" ref={boxRef}>
           <div className="buy-main">
-            <input type="number" min="1" max={sp.soLuongTon} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" aria-label="Số lượng" />
-            <button className="btn btn-primary btn-lg" disabled={!conHang} onClick={themVaoGio}>
+            <input type="number" min="1" max={phienBan?.soLuongTon || 1} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" aria-label="Số lượng" />
+            <button className="btn btn-primary btn-lg" disabled={!conHang || !phienBan} onClick={themVaoGio}>
               Thêm vào giỏ
             </button>
             {isCustomer && (
-              <button className="btn btn-buy btn-lg" disabled={!conHang} onClick={muaNgay}>
+              <button className="btn btn-buy btn-lg" disabled={!conHang || !phienBan} onClick={muaNgay}>
                 Mua ngay
               </button>
             )}
@@ -139,15 +231,15 @@ export default function ProductDetailPage() {
     <div className="sticky-spacer no-print" />
     <div className={showBar ? 'sticky-bar on no-print' : 'sticky-bar no-print'} aria-hidden={!showBar}>
       <div className="container sticky-inner">
-        <img src={sp.anhChinh} alt="" />
-        <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(sp.giaBan)}</span></div>
+        <ProductImage src={sp.anhChinh} alt="" />
+        <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(giaBan)}</span></div>
         <div className="sticky-total">
           <span className="muted">Tạm tính</span>
-          <b>{formatPrice(sp.giaBan * (soLuong || 1))}</b>
+          <b>{formatPrice(giaBan * (soLuong || 1))}</b>
         </div>
         <div className="sticky-actions">
-          <button className="btn" disabled={!conHang} tabIndex={showBar ? 0 : -1} onClick={themVaoGio}><Icon name="cart" size={18} /> Thêm vào giỏ</button>
-          {isCustomer && <button className="btn btn-primary" disabled={!conHang} tabIndex={showBar ? 0 : -1} onClick={muaNgay}>Mua ngay</button>}
+          <button className="btn" disabled={!conHang || !phienBan} tabIndex={showBar ? 0 : -1} onClick={themVaoGio}><Icon name="cart" size={18} /> Thêm vào giỏ</button>
+          {isCustomer && <button className="btn btn-primary" disabled={!conHang || !phienBan} tabIndex={showBar ? 0 : -1} onClick={muaNgay}>Mua ngay</button>}
         </div>
       </div>
     </div>

@@ -56,7 +56,7 @@ export default function AdminOrdersPage() {
           <p className="muted">Khách: {selected.tenKhach || selected.maKh} · {formatDate(selected.ngayMua)}</p>
           <p>Giao đến: {selected.diaChiGiaoHang || '—'}</p>
           {selected.chiTiet.map((d) => (
-            <div key={d.maSanPham} className="row between">
+            <div key={d.maPhienBan} className="row between">
               <span>{d.tenMay} · {formatPrice(d.donGia)}</span>
               {selected.trangThai === 'CHO_XAC_NHAN' ? (
                 <input
@@ -64,7 +64,7 @@ export default function AdminOrdersPage() {
                   type="number"
                   min="0"
                   defaultValue={d.soLuong}
-                  onBlur={(e) => Number(e.target.value) !== d.soLuong && run(() => adminService.updateOrderLine(selected.maDonHang, d.maSanPham, Number(e.target.value)), 'Đã cập nhật số lượng')}
+                  onBlur={(e) => Number(e.target.value) !== d.soLuong && run(() => adminService.updateOrderLine(selected.maDonHang, d.maPhienBan, Number(e.target.value)), 'Đã cập nhật số lượng')}
                 />
               ) : (
                 <span>× {d.soLuong}</span>

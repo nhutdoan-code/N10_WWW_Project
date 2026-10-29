@@ -30,7 +30,7 @@ public record DonHangDto(
         String lyDoHuy,
         List<Dong> chiTiet) {
 
-    public record Dong(String maSanPham, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
+    public record Dong(String maSanPham, String maPhienBan, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
     }
 
     public record Checkout(@NotNull(message = "Vui lòng chọn phương thức thanh toán") PhuongThucTt phuongThucTt,

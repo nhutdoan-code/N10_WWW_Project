@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ProductImage from '../components/ProductImage';
 import useCompare from '../hooks/useCompare';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
@@ -25,7 +26,7 @@ export default function ComparePage() {
             <th></th>
             {products.map((p) => (
               <td key={p.maSanPham}>
-                <Link to={`/products/${p.maSanPham}`}><img className="thumb-lg" src={p.anhChinh} alt="" /><br /><b>{p.tenMay}</b></Link>
+                <Link to={`/products/${p.maSanPham}`}><ProductImage className="thumb-lg" src={p.anhChinh} alt="" /><br /><b>{p.tenMay}</b></Link>
                 <br /><button className="btn btn-ghost" onClick={() => toggle(p.maSanPham)}>Bỏ</button>
               </td>
             ))}

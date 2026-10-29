@@ -110,7 +110,7 @@ public class ChatService {
         }
         return ma.stream().limit(3)
                 .map(sanPhamRepository::findById).flatMap(Optional::stream)
-                .filter(s -> s.getTrangThai() == TrangThaiSanPham.CON_HANG)
+                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
                 .map(SanPhamMapper::toDto)
                 .toList();
     }
@@ -127,12 +127,12 @@ public class ChatService {
         }
         BigDecimal toiDa = nganSach(k);
         List<SanPhamDto> kq = sanPhamService.list(null, null, null, toiDa, "ban_chay", false).stream()
-                .filter(s -> s.trangThai() == TrangThaiSanPham.CON_HANG)
+                .filter(s -> s.trangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
                 .filter(s -> khop(s, k))
                 .limit(3).toList();
         if (kq.isEmpty()) {
             kq = sanPhamService.list(null, null, null, toiDa, null, false).stream()
-                    .filter(s -> s.trangThai() == TrangThaiSanPham.CON_HANG)
+                    .filter(s -> s.trangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
                     .sorted(Comparator.comparing(SanPhamDto::diemDanhGiaTb).reversed())
                     .limit(3).toList();
         }
@@ -158,7 +158,7 @@ public class ChatService {
     private String sanPhamText() {
         return sanPhamService.list(null, null, null, null, null, false).stream()
                 .map(s -> "%s | %s | %s | %s VND | %s | %s".formatted(s.maSanPham(), s.tenMay(), s.tenLoai(),
-                        s.giaBan().toBigInteger(), s.trangThai() == TrangThaiSanPham.CON_HANG ? "còn hàng" : "hết hàng",
+                        s.giaBan().toBigInteger(), s.trangThai() == TrangThaiSanPham.DANG_KINH_DOANH ? "còn hàng" : "hết hàng",
                         s.thongSo().tomTat()))
                 .collect(Collectors.joining("\n"));
     }

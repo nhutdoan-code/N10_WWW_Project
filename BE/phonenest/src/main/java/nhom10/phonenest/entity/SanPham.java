@@ -1,47 +1,16 @@
 package nhom10.phonenest.entity;
-
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.Setter;
-import nhom10.phonenest.enums.TrangThaiSanPham;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-
-@Entity
-@Table(name = "SanPham")
-@Getter
-@Setter
+import jakarta.persistence.*; import lombok.Getter; import lombok.Setter; import nhom10.phonenest.enums.TrangThaiSanPham; import java.math.BigDecimal; import java.util.*;
+@Entity @Table(name="SanPham") @Getter @Setter
 public class SanPham {
-
-    @Id
-    private String maSanPham;
-
-    @ManyToOne
-    @JoinColumn(name = "maLoai")
-    private LoaiSanPham loai;
-
-    private String tenMay;
-    private BigDecimal giaBan;
-    private String moTa;
-    @Embedded
-    private ThongSoKyThuat thongSo = new ThongSoKyThuat();
-    private int soLuongTon;
-
-    @Enumerated(EnumType.STRING)
-    private TrangThaiSanPham trangThai;
-
-    private BigDecimal diemDanhGiaTb;
-
-    @OneToMany(mappedBy = "sanPham")
-    private List<HinhAnhSanPham> hinhAnhs = new ArrayList<>();
+ @Id private String maSanPham;
+ @ManyToOne @JoinColumn(name="maLoai", nullable=false) private LoaiSanPham loai;
+ @ManyToOne @JoinColumn(name="maThuongHieu", nullable=false) private ThuongHieu thuongHieu;
+ private String tenMay; @Column(columnDefinition="TEXT") private String moTa;
+ private BigDecimal kichThuocManHinh; private String loaiManHinh; private Integer tanSoQuet; private String chip; private String cameraSau; private String cameraTruoc; private Integer pin; private Integer congSuatSac; private String heDieuHanh; private boolean nfc; @Column(name="ho5G") private boolean ho5G; private Integer trongLuong; private int thoiHanBaoHanhThang = 12;
+ @Enumerated(EnumType.STRING) private TrangThaiSanPham trangThai = TrangThaiSanPham.DANG_KINH_DOANH;
+ private BigDecimal diemDanhGiaTb = BigDecimal.ZERO;
+ @OneToMany(mappedBy="sanPham") private List<PhienBanSanPham> phienBans = new ArrayList<>();
+ @OneToMany(mappedBy="sanPham") private List<HinhAnhSanPham> hinhAnhs = new ArrayList<>();
+ @Transient public int getSoLuongTon(){ return phienBans.stream().filter(p -> p.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH).mapToInt(PhienBanSanPham::getSoLuongTon).sum(); }
+ @Transient public BigDecimal getGiaBan(){ return phienBans.stream().filter(p -> p.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH).map(PhienBanSanPham::getGiaBan).filter(Objects::nonNull).min(BigDecimal::compareTo).orElse(BigDecimal.ZERO); }
 }

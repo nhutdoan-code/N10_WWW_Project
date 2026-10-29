@@ -3,21 +3,37 @@ import useToast from '../hooks/useToast';
 import { adminService } from '../service/adminService';
 import { errorMessage } from '../utils/format';
 import { categoryLabel, flattenTree } from '../utils/tree';
+import {
+  flattenConfigurations,
+  groupVariantsForForm,
+  newColorRow,
+  newConfiguration,
+  validateConfigurations,
+} from '../utils/variantForm';
 import FormField from './FormField';
+import ProductImage from './ProductImage';
+import VariantConfigurationCard from './VariantConfigurationCard';
 
 const NUM = ['kichThuocManHinh', 'tanSoQuet', 'ram', 'boNho', 'cameraTruoc', 'pin', 'congSuatSac', 'trongLuong'];
 const EMPTY_SPEC = { loaiManHinh: '', chip: '', cameraSau: '', heDieuHanh: '', nfc: false, ho5G: false };
 
-export default function ProductForm({ product, categories, onSubmit, onCancel }) {
+export default function ProductForm({ product, categories, brands = [], onSubmit, onCancel }) {
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
+  const [groupedInitial] = useState(() => groupVariantsForForm(product?.phienBans));
+  const [configurations, setConfigurations] = useState(() =>
+    groupedInitial.configurations.length > 0 ? groupedInitial.configurations : [newConfiguration()],
+  );
+  const [variantErrors, setVariantErrors] = useState([]);
+  const [priceWarnings] = useState(groupedInitial.warnings);
   const [form, setForm] = useState({
     maLoai: categories[0]?.maLoai || '',
+    maThuongHieu: '',
     tenMay: '',
     giaBan: '',
     soLuongTon: 0,
     moTa: '',
-    trangThai: 'CON_HANG',
+    trangThai: 'DANG_KINH_DOANH',
     hinhAnhs: [],
     anhChinh: null,
     ...product,
@@ -33,27 +49,129 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
     try {
       const urls = [];
       for (const f of files) urls.push((await adminService.uploadImage(f)).url);
-      setForm((f) => ({ ...f, hinhAnhs: [...f.hinhAnhs, ...urls], anhChinh: f.anhChinh || urls[0] }));
+      setForm((f) => ({
+        ...f,
+        hinhAnhs: [...f.hinhAnhs, ...urls.map((url) => ({ duongDan: url }))],
+        anhChinh: f.anhChinh || urls[0],
+      }));
     } catch (err) {
       toast(errorMessage(err), 'error');
     }
     setUploading(false);
   };
 
-  const removeImage = (url) => {
-    const rest = form.hinhAnhs.filter((u) => u !== url);
-    setForm({ ...form, hinhAnhs: rest, anhChinh: form.anhChinh === url ? rest[0] || null : form.anhChinh });
+  const removeImage = (anh) => {
+    const rest = form.hinhAnhs.filter((a) => a !== anh);
+    setForm({
+      ...form,
+      hinhAnhs: rest,
+      anhChinh: form.anhChinh === anh.duongDan ? rest[0]?.duongDan || null : form.anhChinh,
+    });
+  };
+
+  const updateConfig = (configKey, patch) => {
+    setVariantErrors([]);
+    setConfigurations((list) => list.map((c) => (c.key === configKey ? { ...c, ...patch } : c)));
+  };
+
+  const addConfiguration = () => {
+    setVariantErrors([]);
+    setConfigurations((list) => [...list, newConfiguration()]);
+  };
+
+  const removeConfiguration = (configKey) => {
+    setVariantErrors([]);
+    setConfigurations((list) => (list.length <= 1 ? list : list.filter((c) => c.key !== configKey)));
+  };
+
+  const addColor = (configKey) => {
+    setVariantErrors([]);
+    setConfigurations((list) =>
+      list.map((c) => (c.key === configKey ? { ...c, colors: [...c.colors, newColorRow()] } : c)),
+    );
+  };
+
+  const updateColor = (configKey, colorKey, patch) => {
+    setVariantErrors([]);
+    setConfigurations((list) =>
+      list.map((c) =>
+        c.key === configKey
+          ? { ...c, colors: c.colors.map((color) => (color.key === colorKey ? { ...color, ...patch } : color)) }
+          : c,
+      ),
+    );
+  };
+
+  const removeColor = (configKey, colorKey) => {
+    setVariantErrors([]);
+    setConfigurations((list) =>
+      list.map((c) =>
+        c.key === configKey && c.colors.length > 1
+          ? { ...c, colors: c.colors.filter((color) => color.key !== colorKey) }
+          : c,
+      ),
+    );
   };
 
   const submit = (e) => {
     e.preventDefault();
-    if (form.hinhAnhs.length === 0) return toast('Vui lòng tải lên ít nhất 1 ảnh sản phẩm', 'error');
+    if (!form.maThuongHieu) return toast('Vui lòng chọn thương hiệu', 'error');
+    if ((form.hinhAnhs || []).length === 0) return toast('Vui lòng tải lên ít nhất 1 ảnh sản phẩm', 'error');
+
+    const errors = validateConfigurations(configurations);
+    setVariantErrors(errors);
+    if (errors.length > 0) {
+      toast(errors[0], 'error');
+      requestAnimationFrame(() => {
+        document.getElementById('variant-errors')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return;
+    }
+
+    if (configurations.some((c) => c.priceConflict)) {
+      const message = `${priceWarnings.join('\n')}\n\nTiếp tục lưu và áp dụng giá của phiên bản cho tất cả màu?`;
+      if (!window.confirm(message)) return;
+    }
+
+    const phienBans = flattenConfigurations(configurations);
+
+    if ((form.trangThai || 'DANG_KINH_DOANH') === 'DANG_KINH_DOANH'
+      && !phienBans.some((p) => p.trangThai === 'DANG_KINH_DOANH')) {
+      return toast('Sản phẩm đang kinh doanh phải có ít nhất một phiên bản đang kinh doanh', 'error');
+    }
+
     const thongSo = { ...form.thongSo };
     Object.keys(thongSo).forEach((k) => {
       if (thongSo[k] === '' || thongSo[k] == null) thongSo[k] = null;
       else if (NUM.includes(k)) thongSo[k] = Number(thongSo[k]);
     });
-    onSubmit({ ...form, giaBan: Number(form.giaBan), soLuongTon: Number(form.soLuongTon), thongSo });
+
+    // Trường giá/tồn cấp sản phẩm chỉ để thoả DTO; backend luôn tính lại từ phiên bản.
+    // Ưu tiên giá thấp nhất của phiên bản đang kinh doanh, không lấy variant ngừng bán.
+    const activePrices = phienBans
+      .filter((p) => p.trangThai === 'DANG_KINH_DOANH' && Number.isFinite(Number(p.giaBan)))
+      .map((p) => Number(p.giaBan));
+    const giaBanMin = activePrices.length ? Math.min(...activePrices) : 0;
+    const tonActive = phienBans
+      .filter((p) => p.trangThai === 'DANG_KINH_DOANH')
+      .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
+
+    // Chỉ gửi identity + metadata ảnh; backend reconcile theo maHinhAnh.
+    const hinhAnhs = (form.hinhAnhs || []).map((anh) => ({
+      maHinhAnh: anh.maHinhAnh || null,
+      duongDan: anh.duongDan,
+      gocChup: anh.gocChup ?? null,
+    }));
+
+    onSubmit({
+      ...form,
+      giaBan: giaBanMin,
+      soLuongTon: tonActive,
+      thongSo,
+      phienBans,
+      hinhAnhs,
+      anhChinh: form.anhChinh || hinhAnhs[0]?.duongDan || null,
+    });
   };
 
   const spec = (label, key, props = {}) => (
@@ -63,6 +181,15 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
   return (
     <form className="form" onSubmit={submit}>
       <label className="field">
+        <span>Thương hiệu</span>
+        <select value={form.maThuongHieu || ''} onChange={set('maThuongHieu')}>
+          <option value="">-- Chọn thương hiệu --</option>
+          {brands.map((b) => (
+            <option key={b.maThuongHieu} value={b.maThuongHieu}>{b.tenThuongHieu}</option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
         <span>Hãng / Loại sản phẩm</span>
         <select value={form.maLoai} onChange={set('maLoai')}>
           {flattenTree(categories).map((c) => (
@@ -71,14 +198,54 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
         </select>
       </label>
       <FormField label="Tên máy" value={form.tenMay} onChange={set('tenMay')} required />
-      <div className="grid-2">
-        <FormField label="Giá bán (₫)" type="number" min="1" value={form.giaBan} onChange={set('giaBan')} required />
-        <FormField label="Số lượng tồn" type="number" min="0" value={form.soLuongTon} onChange={set('soLuongTon')} required />
-      </div>
       <label className="field">
         <span>Mô tả</span>
         <textarea rows="8" value={form.moTa || ''} onChange={set('moTa')} />
       </label>
+
+      <div className="variant-section-head">
+        <h4 className="form-title">Phiên bản sản phẩm</h4>
+        <small className="muted">Mỗi phiên bản là một cấu hình RAM / bộ nhớ; thêm nhiều màu trong cùng phiên bản.</small>
+      </div>
+
+      {variantErrors.length > 0 && (
+        <div className="variant-errors" id="variant-errors" role="alert">
+          <b>Vui lòng kiểm tra lại:</b>
+          <ul>
+            {variantErrors.map((message, index) => (
+              <li key={`${index}-${message}`}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {priceWarnings.length > 0 && (
+        <div className="variant-warning" role="status">
+          <b>Cảnh báo dữ liệu giá cũ:</b>
+          <ul>
+            {priceWarnings.map((message) => <li key={message}>{message}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <div className="variant-list">
+        {configurations.map((config, index) => (
+          <VariantConfigurationCard
+            key={config.key}
+            config={config}
+            index={index}
+            canRemove={configurations.length > 1}
+            onChange={(patch) => updateConfig(config.key, patch)}
+            onRemove={() => removeConfiguration(config.key)}
+            onAddColor={() => addColor(config.key)}
+            onUpdateColor={(colorKey, patch) => updateColor(config.key, colorKey, patch)}
+            onRemoveColor={(colorKey) => removeColor(config.key, colorKey)}
+          />
+        ))}
+      </div>
+      <button type="button" className="btn" onClick={addConfiguration} style={{ alignSelf: 'flex-start' }}>
+        + Thêm phiên bản
+      </button>
 
       <h4 className="form-title">Thông số kỹ thuật</h4>
       <div className="grid-3">
@@ -88,10 +255,6 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
       </div>
       <div className="grid-3">
         {spec('Chip xử lý', 'chip')}
-        {spec('RAM (GB)', 'ram', { type: 'number', min: '1' })}
-        {spec('Bộ nhớ trong (GB)', 'boNho', { type: 'number', min: '1' })}
-      </div>
-      <div className="grid-3">
         {spec('Camera sau', 'cameraSau', { placeholder: '48MP + 12MP + 12MP' })}
         {spec('Camera trước (MP)', 'cameraTruoc', { type: 'number', min: '1' })}
         {spec('Hệ điều hành', 'heDieuHanh', { placeholder: 'Android 14, iOS 17...' })}
@@ -108,15 +271,18 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
 
       <h4 className="form-title">Hình ảnh sản phẩm</h4>
       <div className="img-list">
-        {form.hinhAnhs.map((url) => (
-          <div key={url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
-            <img src={url} alt="" />
-            <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, anhChinh: url })} disabled={form.anhChinh === url}>
-              {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
-            </button>
-            <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(url)}>×</button>
-          </div>
-        ))}
+        {(form.hinhAnhs || []).map((anh) => {
+          const url = anh.duongDan;
+          return (
+            <div key={anh.maHinhAnh || url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
+              <ProductImage src={url} alt="" />
+              <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, anhChinh: url })} disabled={form.anhChinh === url}>
+                {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
+              </button>
+              <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(anh)}>×</button>
+            </div>
+          );
+        })}
         <label className="img-add">
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={upload} disabled={uploading} />
           {uploading ? 'Đang tải...' : '+ Tải ảnh lên'}
@@ -128,7 +294,7 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
         <input
           type="checkbox"
           checked={form.trangThai === 'NGUNG_KINH_DOANH'}
-          onChange={(e) => setForm({ ...form, trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'CON_HANG' })}
+          onChange={(e) => setForm({ ...form, trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'DANG_KINH_DOANH' })}
         />
         Ngừng kinh doanh
       </label>

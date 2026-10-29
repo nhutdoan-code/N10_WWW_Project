@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useDebounce from '../hooks/useDebounce';
 import Icon from './Icon';
+import ProductImage from './ProductImage';
 import { productService } from '../service/productService';
 import { formatPrice } from '../utils/format';
 
@@ -62,7 +63,7 @@ export default function SearchBox() {
           {!loading && results.length === 0 && <div className="muted pad">Không tìm thấy sản phẩm</div>}
           {results.map((sp) => (
             <Link key={sp.maSanPham} to={`/products/${sp.maSanPham}`} onClick={() => setOpen(false)}>
-              <img src={sp.anhChinh} alt="" />
+              <ProductImage src={sp.anhChinh} alt="" />
               <span>{sp.tenMay}</span>
               <b>{formatPrice(sp.giaBan)}</b>
             </Link>

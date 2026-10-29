@@ -15,3 +15,13 @@ FE/dist/
 .env
 BE/phonenest/uploads/*
 !BE/phonenest/uploads/README.txt
+!BE/phonenest/uploads/product-placeholder.svg
+# Ảnh thật Galaxy A56 dùng trong seed (DB/02_data.sql)
+!BE/phonenest/uploads/d04df2f0-2635-413d-af63-7751a9f18603.webp
+!BE/phonenest/uploads/372dbc48-2222-4ce0-b636-78b48bfa3bbc.webp
+!BE/phonenest/uploads/d5e222c2-4ce0-4a11-8f01-9fee30fbab01.webp
+!BE/phonenest/uploads/50597215-8e0c-463e-95cc-482e18ec4fcc.webp
+!BE/phonenest/uploads/2729f436-67d2-4eac-a514-da057d086bc8.webp
+!BE/phonenest/uploads/1bd541ef-0fbd-40ae-a0e2-8869470ed948.webp
+!BE/phonenest/uploads/3a8cf13b-36cd-4660-be78-b41a8e7f751e.webp
+!BE/phonenest/uploads/26b54904-ccdc-402c-be95-d35263d2b515.webp

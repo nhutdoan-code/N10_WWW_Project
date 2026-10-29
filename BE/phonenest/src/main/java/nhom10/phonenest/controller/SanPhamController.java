@@ -5,10 +5,12 @@ import nhom10.phonenest.dto.DanhGiaDto;
 import nhom10.phonenest.dto.HoiDapDto;
 import nhom10.phonenest.dto.LoaiSanPhamDto;
 import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.dto.ThuongHieuDto;
 import nhom10.phonenest.service.DanhGiaService;
 import nhom10.phonenest.service.HoiDapService;
 import nhom10.phonenest.service.LoaiSanPhamService;
 import nhom10.phonenest.service.SanPhamService;
+import nhom10.phonenest.service.ThuongHieuService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +27,7 @@ public class SanPhamController {
 
     private final SanPhamService sanPhamService;
     private final LoaiSanPhamService loaiSanPhamService;
+    private final ThuongHieuService thuongHieuService;
     private final DanhGiaService danhGiaService;
     private final HoiDapService hoiDapService;
 
@@ -60,5 +63,10 @@ public class SanPhamController {
     @GetMapping("/categories")
     public List<LoaiSanPhamDto> categories() {
         return loaiSanPhamService.list();
+    }
+
+    @GetMapping("/brands")
+    public List<ThuongHieuDto> brands() {
+        return thuongHieuService.list();
     }
 }

@@ -7,6 +7,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import nhom10.phonenest.entity.TaiKhoan;
+import nhom10.phonenest.enums.Role;
+import nhom10.phonenest.repository.QuanTriVienRepository;
+import nhom10.phonenest.repository.TaiKhoanRepository;
 import nhom10.phonenest.util.JwtUtil;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,6 +26,8 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final TaiKhoanRepository taiKhoanRepository;
+    private final QuanTriVienRepository quanTriVienRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -30,13 +36,24 @@ public class JwtFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 Claims claims = jwtUtil.parse(header.substring(7));
-                String role = claims.get("role", String.class);
-                if (role != null) {
-                    var authority = new SimpleGrantedAuthority("ROLE_" + role);
-                    SecurityContextHolder.getContext().setAuthentication(
-                            new UsernamePasswordAuthenticationToken(claims.getSubject(), null, List.of(authority)));
+                String maTk = claims.getSubject();
+                String tokenRole = claims.get("role", String.class);
+                // Reset-password tokens carry no role claim, so they can never authenticate as a bearer.
+                if (maTk != null && tokenRole != null) {
+                    // Re-check against the database so locked accounts and role changes take effect
+                    // immediately instead of waiting for the token to expire.
+                    TaiKhoan tk = taiKhoanRepository.findById(maTk).orElse(null);
+                    if (tk != null && tk.isTrangThaiHoatDong()) {
+                        Role dbRole = quanTriVienRepository.existsById(maTk) ? Role.ADMIN : Role.CUSTOMER;
+                        if (dbRole.name().equals(tokenRole)) {
+                            var authority = new SimpleGrantedAuthority("ROLE_" + dbRole.name());
+                            SecurityContextHolder.getContext().setAuthentication(
+                                    new UsernamePasswordAuthenticationToken(maTk, null, List.of(authority)));
+                        }
+                    }
                 }
             } catch (JwtException | IllegalArgumentException e) {
+                // Invalid/expired/malformed token -> no authentication. Protected routes return 401.
                 SecurityContextHolder.clearContext();
             }
         }
