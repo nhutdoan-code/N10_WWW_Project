@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleOther(Exception e) {
-        log.error("Unhandled exception", e);
+        log.error("Unhandled exception: {} - {}", e.getClass().getName(), e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("message", "He thong dang gap su co ky thuat, vui long thu lai sau!"));
     }

@@ -1,3 +1,4 @@
+
 package nhom10.phonenest.util;
 
 import io.jsonwebtoken.Claims;
@@ -14,15 +15,22 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    // Thời hạn reset mật khẩu: 15 phút
+    private static final long RESET_EXPIRATION_MS = 15 * 60 * 1000L;
     private final SecretKey key;
     private final long expirationMs;
 
-    public JwtUtil(@Value("${app.jwt.secret}") String secret,
-                   @Value("${app.jwt.expiration-ms}") long expirationMs) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    public JwtUtil(
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.expiration-ms}") long expirationMs) {
+
+        // Secret phải đủ dài cho thuật toán HMAC được sử dụng.
+        this.key = Keys.hmacShaKeyFor(
+                secret.getBytes(StandardCharsets.UTF_8)
+        );
         this.expirationMs = expirationMs;
     }
-
+    // Tạo JWT dùng cho đăng nhập
     public String generate(String maTk, Role role) {
         Date now = new Date();
         return Jwts.builder()
@@ -33,7 +41,7 @@ public class JwtUtil {
                 .signWith(key)
                 .compact();
     }
-
+    // Tạo token đặt lại mật khẩu
     public String generateReset(String maTk, String vanTay) {
         Date now = new Date();
         return Jwts.builder()
@@ -41,12 +49,16 @@ public class JwtUtil {
                 .claim("type", "reset")
                 .claim("pv", vanTay)
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + 15 * 60 * 1000))
+                .expiration(new Date(now.getTime() + RESET_EXPIRATION_MS))
                 .signWith(key)
                 .compact();
     }
-
+    // Kiểm tra chữ ký và thời hạn token, sau đó lấy thông tin bên trong.
     public Claims parse(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

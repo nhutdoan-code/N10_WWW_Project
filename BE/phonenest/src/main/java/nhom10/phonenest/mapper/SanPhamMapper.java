@@ -1,87 +1,97 @@
+
 package nhom10.phonenest.mapper;
 
 import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.entity.HinhAnhSanPham;
-import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
-import nhom10.phonenest.enums.TrangThaiSanPham;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
 import java.util.List;
 
-public final class SanPhamMapper {
+public class SanPhamMapper {
 
     private SanPhamMapper() {
+        // Không tạo đối tượng Mapper
     }
 
     public static SanPhamDto toDto(SanPham s) {
 
-        List<HinhAnhSanPham> anh = s.getHinhAnhs();
-        String chinh = anh.stream()
+        // 1. Lấy danh sách hình ảnh
+        List<HinhAnhSanPham> hinhAnhs =
+                s.getHinhAnhs() == null
+                        ? List.of()
+                        : s.getHinhAnhs();
+
+        // 2. Tìm ảnh chính
+        String anhChinh = hinhAnhs.stream()
                 .filter(HinhAnhSanPham::isAnhChinh)
                 .map(HinhAnhSanPham::getDuongDan)
                 .findFirst()
-                .orElse(anh.isEmpty() ? null : anh.get(0).getDuongDan());
+                .orElseGet(() ->
+                        hinhAnhs.stream()
+                                .map(HinhAnhSanPham::getDuongDan)
+                                .findFirst()
+                                .orElse(null)
+                );
 
-        // Chỉ variant đang kinh doanh mới được tính vào giá/tồn hiển thị.
-        List<PhienBanSanPham> active = s.getPhienBans().stream()
-                .filter(x -> x.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
+        // 3. Chuyển danh sách hình ảnh sang DTO
+        List<SanPhamDto.Anh> dsAnh = hinhAnhs.stream()
+                .map(a -> new SanPhamDto.Anh(
+                        a.getMaHinhAnh(),
+                        a.getDuongDan(),
+                        a.getGocChup()
+                ))
                 .toList();
 
-        PhienBanSanPham p = active.stream()
-                .filter(x -> x.getGiaBan() != null)
-                .min(Comparator.comparing(PhienBanSanPham::getGiaBan))
-                .orElse(null);
+        // 4. Lấy thông số kỹ thuật trực tiếp từ sản phẩm
+        SanPhamDto.ThongSo thongSo = new SanPhamDto.ThongSo(
+                s.getKichThuocManHinh(),
+                s.getLoaiManHinh(),
+                s.getTanSoQuet(),
+                s.getChip(),
+                s.getRam(),
+                s.getBoNho(),
+                s.getCameraSau(),
+                s.getCameraTruoc(),
+                s.getPin(),
+                s.getCongSuatSac(),
+                s.getHeDieuHanh(),
+                s.isNfc(),
+                s.isHo5G(),
+                s.getTrongLuong()
+        );
 
-        BigDecimal gia = p == null ? BigDecimal.ZERO : p.getGiaBan();
-        int ton = active.stream().mapToInt(PhienBanSanPham::getSoLuongTon).sum();
+        // 5. Giá bán và số lượng tồn lấy trực tiếp từ bảng SanPham
+        BigDecimal giaBan = s.getGiaBan() == null
+                ? BigDecimal.ZERO
+                : s.getGiaBan();
 
-        SanPhamDto.ThongSo ts = new SanPhamDto.ThongSo(
-                s.getKichThuocManHinh(), s.getLoaiManHinh(), s.getTanSoQuet(), s.getChip(),
-                p == null ? null : p.getRam(), p == null ? null : p.getBoNho(),
-                s.getCameraSau(), mp(s.getCameraTruoc()), s.getPin(), s.getCongSuatSac(), s.getHeDieuHanh(),
-                s.isNfc(), s.isHo5G(), s.getTrongLuong());
+        int soLuongTon = s.getSoLuongTon() == null
+                ? 0
+                : s.getSoLuongTon();
 
-        List<SanPhamDto.PhienBan> pbs = s.getPhienBans().stream()
-                .map(x -> new SanPhamDto.PhienBan(
-                        x.getMaPhienBan(), x.getSku(), x.getRam(), x.getBoNho(), x.getMauSac(),
-                        x.getGiaBan(), x.getGiaNiemYet(), x.getSoLuongTon(), x.getTrangThai()))
-                .toList();
-
-        List<SanPhamDto.Anh> anhs = anh.stream()
-                .map(x -> new SanPhamDto.Anh(
-                        x.getMaHinhAnh(), x.getDuongDan(), x.getGocChup()))
-                .toList();
-
+        // 6. Trả về DTO
         return new SanPhamDto(
-                s.getMaSanPham(), s.getLoai().getMaLoai(), s.getLoai().getTenLoai(),
-                s.getThuongHieu() == null ? null : s.getThuongHieu().getMaThuongHieu(),
-                s.getThuongHieu() == null ? null : s.getThuongHieu().getTenThuongHieu(),
-                s.getTenMay(), gia, s.getMoTa(), ts, ton, s.getTrangThai(), s.getDiemDanhGiaTb(),
-                chinh, anhs, pbs);
-    }
+                s.getMaSanPham(),
+                s.getLoai() == null ? null : s.getLoai().getMaLoai(),
+                s.getLoai() == null ? null : s.getLoai().getTenLoai(),
 
-    /**
-     * DB lưu camera trước dạng chuỗi (ví dụ "12 MP" hoặc "12"); DTO trả về số MP
-     * để FE hiển thị thống nhất.
-     */
-    private static Integer mp(String value) {
+                // Database hiện tại chưa có cột maThuongHieu
+                null,
+                null,
 
-        if (value == null || value.isBlank()) {
-            return null;
-        }
+                s.getTenMay(),
+                giaBan,
+                s.getMoTa(),
+                thongSo,
+                soLuongTon,
+                s.getTrangThai(),
+                s.getDiemDanhGiaTb(),
+                anhChinh,
+                dsAnh,
 
-        StringBuilder so = new StringBuilder();
-
-        for (char c : value.toCharArray()) {
-            if (Character.isDigit(c)) {
-                so.append(c);
-            } else if (so.length() > 0) {
-                break;
-            }
-        }
-
-        return so.length() == 0 ? null : Integer.valueOf(so.toString());
+                // Mô hình hiện tại không dùng phiên bản sản phẩm
+                List.of()
+        );
     }
 }
