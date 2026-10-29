@@ -588,47 +588,124 @@ public class SanPhamService {
 
     private void luuAnh(
             SanPham s,
-            List<String> urls,
+            List<SanPhamDto.Anh> anhs,
             String chinh
     ) {
 
-        if (urls == null) {
+        if (anhs == null) {
             return;
         }
 
-        anhRepo.deleteAll(
-                s.getHinhAnhs()
-        );
+        /*
+         * Reconcile theo identity maHinhAnh:
+         * - Ảnh có id và còn tồn tại: cập nhật tại chỗ, giữ nguyên record + metadata.
+         * - Ảnh không có id: tạo record mới (ảnh vừa upload).
+         * - Record cũ không còn trong payload: xóa đúng record đó.
+         * Không xóa/tạo lại toàn bộ collection.
+         */
 
-        s.getHinhAnhs()
-                .clear();
+        List<HinhAnhSanPham> hienCo = new ArrayList<>(s.getHinhAnhs());
+        Map<String, HinhAnhSanPham> theoId = new HashMap<>();
+        for (HinhAnhSanPham a : hienCo) {
+            theoId.put(a.getMaHinhAnh(), a);
+        }
 
-        for (String u : urls) {
+        Set<String> daDung = new HashSet<>();
+        List<HinhAnhSanPham> ketQua = new ArrayList<>();
 
-            HinhAnhSanPham a =
-                    new HinhAnhSanPham();
+        for (SanPhamDto.Anh dto : anhs) {
 
-            a.setMaHinhAnh(
-                    IdGenerator.next("HA")
-            );
+            String duongDan = dto.duongDan() == null ? null : dto.duongDan().trim();
+            if (duongDan == null || duongDan.isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Đường dẫn ảnh không hợp lệ");
+            }
 
-            a.setSanPham(s);
+            HinhAnhSanPham anh = null;
+            if (dto.maHinhAnh() != null && !dto.maHinhAnh().isBlank()) {
+                anh = theoId.get(dto.maHinhAnh());
+            }
 
-            a.setDuongDan(u);
+            /*
+             * Tương thích payload cũ chỉ gửi URL (không có maHinhAnh):
+             * fallback khớp duongDan trong phạm vi sản phẩm, không dùng index.
+             */
+            if (anh == null && (dto.maHinhAnh() == null || dto.maHinhAnh().isBlank())) {
+                for (HinhAnhSanPham x : hienCo) {
+                    if (!daDung.contains(x.getMaHinhAnh()) && duongDan.equals(x.getDuongDan())) {
+                        anh = x;
+                        break;
+                    }
+                }
+            }
 
-            a.setAnhChinh(
-                    u.equals(chinh)
-                            || (
-                            chinh == null
-                                    && s.getHinhAnhs()
-                                    .isEmpty()
-                    )
-            );
+            boolean moi = false;
+            if (anh == null) {
+                anh = new HinhAnhSanPham();
+                anh.setMaHinhAnh(IdGenerator.next("HA"));
+                anh.setSanPham(s);
+                moi = true;
+            } else if (!daDung.add(anh.getMaHinhAnh())) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Danh sách ảnh bị trùng");
+            }
 
-            s.getHinhAnhs()
-                    .add(
-                            anhRepo.save(a)
-                    );
+            if (moi) {
+                daDung.add(anh.getMaHinhAnh());
+            }
+
+            anh.setDuongDan(duongDan);
+
+            // null = client không gửi metadata -> giữ nguyên gocChup hiện có.
+            if (dto.gocChup() != null) {
+                anh.setGocChup(dto.gocChup());
+            }
+
+            anh.setAnhChinh(false);
+
+            anh = anhRepo.save(anh);
+            if (moi) {
+                s.getHinhAnhs().add(anh);
+            }
+            ketQua.add(anh);
+        }
+
+        for (HinhAnhSanPham cu : hienCo) {
+            if (!daDung.contains(cu.getMaHinhAnh())) {
+                s.getHinhAnhs().remove(cu);
+                anhRepo.delete(cu);
+            }
+        }
+
+        ganAnhChinh(ketQua, chinh);
+    }
+
+    /**
+     * Đảm bảo đúng một ảnh chính, nhất quán với fallback của SanPhamMapper
+     * và Product Detail: nếu URL ảnh chính không còn trong danh sách thì lấy ảnh đầu tiên.
+     */
+    private void ganAnhChinh(
+            List<HinhAnhSanPham> anhs,
+            String chinh
+    ) {
+
+        if (anhs.isEmpty()) {
+            return;
+        }
+
+        String chinhHienTai = chinh;
+        boolean coTrongDanhSach = chinhHienTai != null
+                && anhs.stream().anyMatch(a -> chinhHienTai.equals(a.getDuongDan()));
+        String duongDanChinh = coTrongDanhSach
+                ? chinhHienTai
+                : anhs.get(0).getDuongDan();
+
+        boolean daGan = false;
+        for (HinhAnhSanPham a : anhs) {
+            boolean laChinh = !daGan && duongDanChinh.equals(a.getDuongDan());
+            if (laChinh) {
+                daGan = true;
+            }
+            a.setAnhChinh(laChinh);
+            anhRepo.save(a);
         }
     }
 

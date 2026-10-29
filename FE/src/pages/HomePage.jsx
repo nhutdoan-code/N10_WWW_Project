@@ -4,6 +4,7 @@ import CategoryTree from '../components/CategoryTree';
 import HeroSlider from '../components/HeroSlider';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
+import ProductImage from '../components/ProductImage';
 import { PRICE_RANGES, SORT_OPTIONS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
@@ -75,7 +76,7 @@ export default function HomePage() {
               {conHang.slice(0, 4).map((p, i) => (
                 <Link key={p.maSanPham} to={`/products/${p.maSanPham}`} className="rank-item">
                   <b className="rank-no">{i + 1}</b>
-                  <img src={p.anhChinh} alt="" />
+                  <ProductImage src={p.anhChinh} alt="" />
                   <span><em>{p.tenMay}</em><strong>{formatPrice(p.giaBan)}</strong></span>
                 </Link>
               ))}

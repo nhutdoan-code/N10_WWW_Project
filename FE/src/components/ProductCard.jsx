@@ -4,6 +4,7 @@ import useCompare from '../hooks/useCompare';
 import useToast from '../hooks/useToast';
 import { errorMessage, formatPrice } from '../utils/format';
 import Icon from './Icon';
+import ProductImage from './ProductImage';
 import StatusBadge from './StatusBadge';
 import { productStatus } from '../utils/stock';
 
@@ -31,7 +32,7 @@ export default function ProductCard({ sp }) {
     <div className="card product-card">
       <Link to={`/products/${sp.maSanPham}`}>
         <span className="thumb-wrap">
-          <img src={sp.anhChinh} alt={sp.tenMay} loading="lazy" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-placeholder.svg'; }} />
+          <ProductImage src={sp.anhChinh} alt={sp.tenMay} loading="lazy" />
           {hetHang && <span className="sold-out"><StatusBadge status={productStatus(sp)} /></span>}
         </span>
         <h3>{sp.tenMay}</h3>

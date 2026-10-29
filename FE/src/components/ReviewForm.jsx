@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ProductImage from './ProductImage';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { errorMessage } from '../utils/format';
@@ -25,7 +26,7 @@ export default function ReviewForm({ maDonHang, sanPham, onDone, onCancel }) {
   return (
     <form className="form" onSubmit={submit}>
       <div className="line-item">
-        <img className="thumb" src={sanPham.anhChinh} alt="" />
+        <ProductImage className="thumb" src={sanPham.anhChinh} alt="" />
         <b>{sanPham.tenMay}</b>
       </div>
       <div className="star-input" role="radiogroup" aria-label="Số sao">

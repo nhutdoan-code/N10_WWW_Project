@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
+import ProductImage from '../components/ProductImage';
 import QuestionSection from '../components/QuestionSection';
 import ReviewSection from '../components/ReviewSection';
 import StatusBadge from '../components/StatusBadge';
@@ -109,11 +110,12 @@ export default function ProductDetailPage() {
     </nav>
     <div className="detail">
       <div>
-        <img className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-placeholder.svg'; }} />
+        <ProductImage className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} />
         <div className="thumbs">
-          {sp.hinhAnhs.map((url) => (
-            <img key={url} src={url} alt="" onClick={() => setImage(url)} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-placeholder.svg'; }} />
-          ))}
+          {sp.hinhAnhs.map((anh) => {
+            const url = anh.duongDan;
+            return <ProductImage key={anh.maHinhAnh || url} src={url} alt="" onClick={() => setImage(url)} />;
+          })}
         </div>
         <section className="desc">
           <h3>Mô tả sản phẩm</h3>
@@ -229,7 +231,7 @@ export default function ProductDetailPage() {
     <div className="sticky-spacer no-print" />
     <div className={showBar ? 'sticky-bar on no-print' : 'sticky-bar no-print'} aria-hidden={!showBar}>
       <div className="container sticky-inner">
-        <img src={sp.anhChinh} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-placeholder.svg'; }} />
+        <ProductImage src={sp.anhChinh} alt="" />
         <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(giaBan)}</span></div>
         <div className="sticky-total">
           <span className="muted">Tạm tính</span>

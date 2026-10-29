@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import ProductImage from '../components/ProductImage';
 import StatusBadge from '../components/StatusBadge';
 import { ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
@@ -66,7 +67,7 @@ export default function OrdersPage() {
           </p>
           {o.chiTiet.slice(0, SHOW_ITEMS).map((d) => (
             <div key={d.maPhienBan || d.maSanPham} className="row between">
-              <span className="row"><img className="thumb" src={d.anhChinh} alt="" />{d.tenMay} × {d.soLuong}</span>
+              <span className="row"><ProductImage className="thumb" src={d.anhChinh} alt="" />{d.tenMay} × {d.soLuong}</span>
               <span>{formatPrice(d.donGia * d.soLuong)}</span>
             </div>
           ))}

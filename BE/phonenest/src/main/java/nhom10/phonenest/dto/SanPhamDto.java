@@ -27,8 +27,19 @@ public record SanPhamDto(
         TrangThaiSanPham trangThai,
         BigDecimal diemDanhGiaTb,
         String anhChinh,
-        List<String> hinhAnhs,
+        List<Anh> hinhAnhs,
         List<PhienBan> phienBans) {
+
+    /**
+     * Ảnh sản phẩm. {@code maHinhAnh} là identity bền vững do DB sinh ra;
+     * khi Admin lưu lại form, id này phải được gửi ngược về để service cập nhật
+     * đúng record thay vì xóa/tạo lại toàn bộ collection.
+     */
+    public record Anh(
+            String maHinhAnh,
+            @NotBlank(message = "Đường dẫn ảnh không được để trống") String duongDan,
+            String gocChup) {
+    }
 
     public record PhienBan(
             String maPhienBan,

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useToast from '../hooks/useToast';
+import ProductImage from '../components/ProductImage';
 import { wishlistService } from '../service/wishlistService';
 import { errorMessage, formatPrice } from '../utils/format';
 
@@ -37,7 +38,7 @@ export default function CartPage() {
         <div className="section">
           {items.map((item) => { const { sanPham: sp, phienBan: pb, soLuong } = item; return (
             <div key={pb.maPhienBan} className="cart-item">
-              <Link to={`/products/${sp.maSanPham}`}><img src={sp.anhChinh} alt="" /></Link>
+              <Link to={`/products/${sp.maSanPham}`}><ProductImage src={sp.anhChinh} alt="" /></Link>
               <div>
                 <h4><Link to={`/products/${sp.maSanPham}`}>{sp.tenMay}</Link></h4>
                 <span className="price">{formatPrice(pb.giaBan)}</span>
