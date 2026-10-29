@@ -1,11 +1,13 @@
 
 package nhom10.phonenest.entity;
 
- java.time.LocalDateTime;import jakarta.persistence.*;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import
+
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "password_reset_otp")
