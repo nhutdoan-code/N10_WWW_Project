@@ -2,6 +2,8 @@ package nhom10.phonenest.service;
 
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.entity.KhuyenMai;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.enums.LoaiKhuyenMai;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.KhuyenMaiRepository;
@@ -9,8 +11,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class KhuyenMaiService {
 
     private final KhuyenMaiRepository khuyenMaiRepository;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     @Transactional(readOnly = true)
     public List<KhuyenMaiDto> list() {
@@ -33,18 +38,23 @@ public class KhuyenMaiService {
         if (khuyenMaiRepository.existsById(ma)) {
             throw new AppException(HttpStatus.CONFLICT, "Mã khuyến mãi đã tồn tại");
         }
-        return luu(new KhuyenMai(), ma, d);
+        return luu(new KhuyenMai(), ma, d, true);
     }
 
     public KhuyenMaiDto sua(String ma, KhuyenMaiDto d) {
-        return luu(tim(ma), ma, d);
+        return luu(tim(ma), ma, d, false);
     }
 
     public void xoa(String ma) {
-        khuyenMaiRepository.delete(tim(ma));
+        KhuyenMai k = tim(ma);
+        Map<String, Object> duLieuTruoc = snapshot(k);
+        khuyenMaiRepository.delete(k);
+        nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_PROMOTION, LoaiDoiTuongAudit.PROMOTION,
+                ma, duLieuTruoc, null);
     }
 
-    private KhuyenMaiDto luu(KhuyenMai k, String ma, KhuyenMaiDto d) {
+    private KhuyenMaiDto luu(KhuyenMai k, String ma, KhuyenMaiDto d, boolean taoMoi) {
+        Map<String, Object> duLieuTruoc = taoMoi ? null : snapshot(k);
         if (d.ngayKetThuc().isBefore(d.ngayBatDau())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Ngày kết thúc phải sau ngày bắt đầu");
         }
@@ -59,12 +69,39 @@ public class KhuyenMaiService {
         k.setSoLuong(d.soLuong());
         k.setChiKhachMoi(d.chiKhachMoi());
         k.setDieuKienApDung(d.dieuKienApDung());
-        return toDto(khuyenMaiRepository.save(k));
+        KhuyenMai daLuu = khuyenMaiRepository.save(k);
+        Map<String, Object> duLieuSau = snapshot(daLuu);
+        if (taoMoi) {
+            nhatKyHoatDongService.ghi(HanhDongAudit.CREATE_PROMOTION, LoaiDoiTuongAudit.PROMOTION,
+                    daLuu.getMaKm(), null, duLieuSau);
+        } else {
+            nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PROMOTION, LoaiDoiTuongAudit.PROMOTION,
+                    daLuu.getMaKm(), duLieuTruoc, duLieuSau);
+        }
+        return toDto(daLuu);
     }
 
     private KhuyenMai tim(String ma) {
         return khuyenMaiRepository.findById(ma)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy khuyến mãi"));
+    }
+
+    private Map<String, Object> snapshot(KhuyenMai k) {
+        Map<String, Object> duLieu = new LinkedHashMap<>();
+        duLieu.put("tenKm", k.getTenKm());
+        duLieu.put("loai", k.getLoai() == null ? null : k.getLoai().name());
+        duLieu.put("phanTramGiam", k.getPhanTramGiam());
+        duLieu.put("soTienGiamToiDa", k.getSoTienGiamToiDa());
+        duLieu.put("donToiThieu", k.getDonToiThieu());
+        duLieu.put("soLuong", k.getSoLuong());
+        duLieu.put("daDung", k.getDaDung());
+        duLieu.put("chiKhachMoi", k.isChiKhachMoi());
+        duLieu.put("gioiHanMoiKhach", k.getGioiHanMoiKhach());
+        duLieu.put("ngayBatDau", k.getNgayBatDau());
+        duLieu.put("ngayKetThuc", k.getNgayKetThuc());
+        duLieu.put("dieuKienApDung", k.getDieuKienApDung());
+        duLieu.put("trangThaiHoatDong", k.isTrangThaiHoatDong());
+        return duLieu;
     }
 
     private KhuyenMaiDto toDto(KhuyenMai k) {

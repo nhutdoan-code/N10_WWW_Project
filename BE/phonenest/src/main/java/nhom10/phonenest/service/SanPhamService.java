@@ -6,6 +6,8 @@ import nhom10.phonenest.entity.HinhAnhSanPham;
 import nhom10.phonenest.entity.LoaiSanPham;
 import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,6 +52,7 @@ public class SanPhamService {
     private final ChiTietDonHangRepository chiTietDonHangRepo;
     private final ChiTietGioHangRepository chiTietGioHangRepo;
     private final BienDongKhoRepository bienDongKhoRepo;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     public List<SanPhamDto> list(
             String q,
@@ -237,10 +241,13 @@ public class SanPhamService {
             SanPhamDto d
     ) {
 
+        boolean taoMoi = (ma == null);
         SanPham s =
-                ma == null
+                taoMoi
                         ? new SanPham()
                         : find(ma);
+
+        Map<String, Object> duLieuTruoc = taoMoi ? null : snapshot(s);
 
         if (ma == null) {
 
@@ -505,6 +512,15 @@ public class SanPhamService {
                 d.anhChinh()
         );
 
+        Map<String, Object> duLieuSau = snapshot(s);
+        if (taoMoi) {
+            nhatKyHoatDongService.ghi(HanhDongAudit.CREATE_PRODUCT, LoaiDoiTuongAudit.PRODUCT,
+                    s.getMaSanPham(), null, duLieuSau);
+        } else {
+            nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PRODUCT, LoaiDoiTuongAudit.PRODUCT,
+                    s.getMaSanPham(), duLieuTruoc, duLieuSau);
+        }
+
         return SanPhamMapper.toDto(s);
     }
 
@@ -532,6 +548,8 @@ public class SanPhamService {
             );
         }
 
+        Map<String, Object> duLieuTruoc = snapshot(s);
+
         anhRepo.deleteAll(s.getHinhAnhs());
         pbRepo.deleteAll(s.getPhienBans());
 
@@ -539,6 +557,71 @@ public class SanPhamService {
         s.getPhienBans().clear();
 
         spRepo.delete(s);
+
+        nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_PRODUCT, LoaiDoiTuongAudit.PRODUCT,
+                ma, duLieuTruoc, null);
+    }
+
+    private Map<String, Object> snapshot(SanPham s) {
+        Map<String, Object> duLieu = new LinkedHashMap<>();
+        duLieu.put("maLoai", s.getLoai() != null ? s.getLoai().getMaLoai() : null);
+        duLieu.put("maThuongHieu", s.getThuongHieu() != null ? s.getThuongHieu().getMaThuongHieu() : null);
+        duLieu.put("tenMay", s.getTenMay());
+        duLieu.put("moTa", s.getMoTa());
+        duLieu.put("trangThai", s.getTrangThai() != null ? s.getTrangThai().name() : null);
+        duLieu.put("thoiHanBaoHanhThang", s.getThoiHanBaoHanhThang());
+
+        Map<String, Object> thongSo = new LinkedHashMap<>();
+        thongSo.put("kichThuocManHinh", s.getKichThuocManHinh());
+        thongSo.put("loaiManHinh", s.getLoaiManHinh());
+        thongSo.put("tanSoQuet", s.getTanSoQuet());
+        thongSo.put("chip", s.getChip());
+        thongSo.put("cameraSau", s.getCameraSau());
+        thongSo.put("cameraTruoc", s.getCameraTruoc());
+        thongSo.put("pin", s.getPin());
+        thongSo.put("congSuatSac", s.getCongSuatSac());
+        thongSo.put("heDieuHanh", s.getHeDieuHanh());
+        thongSo.put("nfc", s.isNfc());
+        thongSo.put("ho5G", s.isHo5G());
+        thongSo.put("trongLuong", s.getTrongLuong());
+        duLieu.put("thongSo", thongSo);
+
+        List<Map<String, Object>> phienBans = new ArrayList<>();
+        if (s.getPhienBans() != null) {
+            List<PhienBanSanPham> dsPb = new ArrayList<>(s.getPhienBans());
+            dsPb.sort(Comparator.comparing(PhienBanSanPham::getMaPhienBan, Comparator.nullsLast(String::compareTo)));
+            for (PhienBanSanPham pb : dsPb) {
+                Map<String, Object> pbMap = new LinkedHashMap<>();
+                pbMap.put("maPhienBan", pb.getMaPhienBan());
+                pbMap.put("sku", pb.getSku());
+                pbMap.put("ram", pb.getRam());
+                pbMap.put("boNho", pb.getBoNho());
+                pbMap.put("mauSac", pb.getMauSac());
+                pbMap.put("giaBan", pb.getGiaBan());
+                pbMap.put("giaNiemYet", pb.getGiaNiemYet());
+                pbMap.put("soLuongTon", pb.getSoLuongTon());
+                pbMap.put("trangThai", pb.getTrangThai() != null ? pb.getTrangThai().name() : null);
+                phienBans.add(pbMap);
+            }
+        }
+        duLieu.put("phienBans", phienBans);
+
+        List<Map<String, Object>> hinhAnhs = new ArrayList<>();
+        if (s.getHinhAnhs() != null) {
+            List<HinhAnhSanPham> dsAnh = new ArrayList<>(s.getHinhAnhs());
+            dsAnh.sort(Comparator.comparing(HinhAnhSanPham::getMaHinhAnh, Comparator.nullsLast(String::compareTo)));
+            for (HinhAnhSanPham ha : dsAnh) {
+                Map<String, Object> haMap = new LinkedHashMap<>();
+                haMap.put("maHinhAnh", ha.getMaHinhAnh());
+                haMap.put("duongDan", ha.getDuongDan());
+                haMap.put("gocChup", ha.getGocChup());
+                haMap.put("anhChinh", ha.isAnhChinh());
+                hinhAnhs.add(haMap);
+            }
+        }
+        duLieu.put("hinhAnhs", hinhAnhs);
+
+        return duLieu;
     }
 
     private SanPham find(String ma) {
