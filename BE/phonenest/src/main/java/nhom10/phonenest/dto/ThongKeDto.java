@@ -6,8 +6,11 @@ import java.util.Map;
 
 public record ThongKeDto(
         BigDecimal doanhThu,
+        BigDecimal giaTriDangXuLy,
         int soDon,
+        int soDonThanhCong,
         int soDonHuy,
+        int soDonDangXuLy,
         int soYeuCauDoiTra,
         int soSapHetHang,
         int soHetHang,
