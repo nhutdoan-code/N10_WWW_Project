@@ -13,6 +13,7 @@ const MENU = [
   { to: 'shipping', label: 'Phí vận chuyển' },
   { to: 'feedback', label: 'Đánh giá & hỏi đáp' },
   { to: 'accounts', label: 'Tài khoản' },
+  { to: 'audit-logs', label: 'Nhật ký hoạt động' },
 ];
 
 export default function AdminLayout() {

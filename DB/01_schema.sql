@@ -356,3 +356,24 @@ CREATE TABLE HuyDonHang (
     CONSTRAINT FK_HuyDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT FK_HuyDonHang_TaiKhoan FOREIGN KEY (nguoiHuy) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE SET NULL
 );
+
+-- Audit log hoat dong quan tri: chi ghi va doc (append-only), khong FK toi TaiKhoan
+-- hay doi tuong nghiep vu de giu lich su khi tai khoan/doi tuong bi xoa.
+CREATE TABLE NhatKyHoatDong (
+    maNhatKy VARCHAR(50) PRIMARY KEY,
+    maTk VARCHAR(50) NOT NULL,
+    tenNguoiThucHien VARCHAR(150) NOT NULL,
+    hanhDong VARCHAR(50) NOT NULL,
+    loaiDoiTuong VARCHAR(50) NOT NULL,
+    maDoiTuong VARCHAR(50),
+    moTa VARCHAR(500),
+    duLieuTruoc LONGTEXT,
+    duLieuSau LONGTEXT,
+    ipAddress VARCHAR(45),
+    requestMethod VARCHAR(10),
+    requestPath VARCHAR(255),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX IDX_NhatKyHoatDong_ThoiGian (thoiGian),
+    INDEX IDX_NhatKyHoatDong_MaTk_ThoiGian (maTk, thoiGian),
+    INDEX IDX_NhatKyHoatDong_LoaiDoiTuong_HanhDong (loaiDoiTuong, hanhDong)
+);

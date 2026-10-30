@@ -45,4 +45,7 @@ export const adminService = {
   stats: (tu, den) => api.get('/admin/stats', { params: { tu: tu || undefined, den: den || undefined } }),
   exportStats: (tu, den) => api.get('/admin/stats/export', { params: { tu: tu || undefined, den: den || undefined }, responseType: 'blob' }),
   search: (q) => api.get('/admin/search', { params: { q } }),
+
+  auditLogs: (params) => api.get('/admin/audit-logs', { params }),
+  auditLogDetail: (ma) => api.get(`/admin/audit-logs/${ma}`),
 };

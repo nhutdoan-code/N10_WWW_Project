@@ -664,3 +664,183 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .variant-option.active { border: 2px solid #111827; padding: 9px 11px; }
 .variant-option:disabled { opacity: .45; cursor: not-allowed; }
 .variant-line { margin-top: 4px; font-size: .9rem; }
+
+/* ---- Audit Log UI ---- */
+.audit-header { margin-bottom: 20px; }
+.audit-header h2 { margin: 0 0 4px; }
+.audit-header p { margin: 0; color: var(--muted); }
+
+.audit-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.audit-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.audit-filter-row > * {
+  min-width: 0;
+}
+.audit-filter-input {
+  flex: 1 1 200px;
+}
+.audit-filter-select {
+  flex: 1 1 180px;
+}
+.audit-date-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.audit-table-wrapper {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.audit-table th, .audit-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.9rem;
+}
+.audit-table th {
+  background: #f6f7fa;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  user-select: none;
+}
+.audit-table th.sortable {
+  cursor: pointer;
+}
+.audit-table th.sortable:hover {
+  background: #eef1f6;
+  color: var(--ink);
+}
+.audit-table tbody tr:hover {
+  background: #fafbfc;
+}
+.audit-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+/* Badges */
+.badge-audit-create { background: #dcf5ea; color: #0b6b4a; }
+.badge-audit-delete { background: #fde7e5; color: #a1241c; }
+.badge-audit-update { background: #eaf0ff; color: #173ea8; }
+.badge-audit-stock { background: #f3e8ff; color: #6b21a8; }
+.badge-audit-warn { background: #fdf0d3; color: #8a5a00; }
+
+/* Detail modal */
+.audit-detail-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.audit-detail-section:first-of-type {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: none;
+}
+.audit-detail-section h4 {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 16px;
+  font-size: 0.9rem;
+}
+.audit-detail-grid dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 2px;
+}
+.audit-detail-grid dd {
+  margin: 0;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.audit-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+.audit-diff-table th, .audit-diff-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.audit-diff-table th {
+  background: #f8f9fb;
+  font-weight: 600;
+  color: var(--muted);
+}
+.audit-diff-table tr.changed {
+  background: #fffdf5;
+}
+.audit-diff-val-old {
+  color: #a1241c;
+  background: #fdf2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+}
+.audit-diff-val-new {
+  color: #0b6b4a;
+  background: #eef9f4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+}
+.json-block {
+  margin: 0;
+  padding: 8px 10px;
+  background: #f6f7fa;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: SFMono-Regular, Consolas, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
