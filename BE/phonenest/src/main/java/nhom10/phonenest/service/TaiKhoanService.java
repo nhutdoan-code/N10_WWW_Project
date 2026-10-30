@@ -108,7 +108,7 @@ public class TaiKhoanService {
         return duLieu;
     }
 
-    private TaiKhoanDto toDto(TaiKhoan tk) {
+    public TaiKhoanDto toDto(TaiKhoan tk) {
         var admin = quanTriVienRepository.findById(tk.getMaTk());
         String hoTen = admin.map(QuanTriVien::getHoTen)
                 .orElseGet(() -> khachHangRepository.findById(tk.getMaTk()).map(KhachHang::getHoTen).orElse(""));
