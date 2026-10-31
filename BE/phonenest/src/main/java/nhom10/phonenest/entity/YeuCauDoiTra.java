@@ -1,29 +1,4 @@
 package nhom10.phonenest.entity;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import lombok.Getter;
-import lombok.Setter;
-import nhom10.phonenest.enums.TrangThaiDoiTra;
-
-@Entity
-@Table(name = "YeuCauDoiTra")
-@Getter
-@Setter
-public class YeuCauDoiTra {
-
-    @Id
-    private String maYeuCau;
-    private String maDonHang;
-    private String lyDo;
-    private String hinhAnhMinhChung;
-    private LocalDate ngayTao;
-
-    @Enumerated(EnumType.STRING)
-    private TrangThaiDoiTra trangThai;
-}
+import jakarta.persistence.*; import lombok.Getter; import lombok.Setter; import nhom10.phonenest.enums.TrangThaiDoiTra; import java.time.LocalDateTime; import java.util.*;
+@Entity @Table(name="YeuCauDoiTra") @Getter @Setter
+public class YeuCauDoiTra { @Id private String maYeuCau; @ManyToOne @JoinColumn(name="maDonHang",nullable=false) private DonHang donHang; @Column(columnDefinition="TEXT") private String lyDoChung; private LocalDateTime ngayTao; @Enumerated(EnumType.STRING) private TrangThaiDoiTra trangThai=TrangThaiDoiTra.CHO_DUYET; private String ghiChuXuLy; @OneToMany(mappedBy="yeuCau",cascade=CascadeType.ALL,orphanRemoval=true) private List<ChiTietDoiTra> chiTiet=new ArrayList<>(); }

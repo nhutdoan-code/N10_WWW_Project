@@ -4,6 +4,7 @@ import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import ReviewForm from '../components/ReviewForm';
 import OrderSteps from '../components/OrderSteps';
+import ProductImage from '../components/ProductImage';
 import StatusBadge from '../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
@@ -19,6 +20,8 @@ export default function OrderDetailPage() {
   const [returnForm, setReturnForm] = useState(null);
   const [cancelForm, setCancelForm] = useState(null);
   const [reviewing, setReviewing] = useState(null);
+  const [confirmReceive, setConfirmReceive] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { data: reviewStates, loading: reviewsLoading, error: reviewsError, reload: reloadReviews } = useFetch(
     () => (o?.trangThai === 'DA_GIAO' ? customerService.orderReviews(ma) : Promise.resolve([])),
     [ma, o?.trangThai]
@@ -44,7 +47,19 @@ export default function OrderDetailPage() {
     await run(() => orderService.cancel(o.maDonHang, cancelForm.lyDo, khac ? cancelForm.khac.trim() : null), 'Hủy đơn hàng thành công');
     setCancelForm(null);
   };
-
+  const submitReceived = async () => {
+    setSubmitting(true);
+    try {
+      await orderService.confirmReceived(o.maDonHang);
+      toast('Xác nhận nhận hàng thành công! Đơn hàng của bạn đã được hoàn tất.');
+      setConfirmReceive(false);
+      reload();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
 
@@ -70,6 +85,10 @@ export default function OrderDetailPage() {
               <>
                 <OrderSteps trangThai={o.trangThai} />
                 <p className="muted">Cập nhật lần cuối: {formatDate(o.ngayCapNhat || o.ngayMua)}</p>
+                {o.trangThai === 'CHO_KHACH_XAC_NHAN' && (
+                    <p>Đơn hàng đã được giao{o.ngayGiao && ` lúc ${formatDate(o.ngayGiao)}`}. Vui lòng xác nhận nếu bạn đã nhận được hàng.</p>
+                )}
+                {o.ngayKhachXacNhan && <p className="muted">Hoàn thành lúc {formatDate(o.ngayKhachXacNhan)}</p>}
               </>
             )}
           </div>
@@ -77,8 +96,8 @@ export default function OrderDetailPage() {
           <div className="section">
             <h3>Sản phẩm</h3>
             {o.chiTiet.map((d) => (
-              <div key={d.maSanPham} className="line-item">
-                <img className="thumb" src={d.anhChinh} alt="" />
+              <div key={d.maPhienBan || d.maSanPham} className="line-item">
+                <ProductImage className="thumb" src={d.anhChinh} alt="" />
                 <div className="grow">
                   <Link to={`/products/${d.maSanPham}`}>{d.tenMay}</Link>
                   <p className="muted">{formatPrice(d.donGia)} × {d.soLuong}</p>
@@ -105,7 +124,7 @@ export default function OrderDetailPage() {
                 const r = reviewStates?.find((x) => x.maSanPham === d.maSanPham);
                 return (
                   <div key={d.maSanPham} className="line-item">
-                    <img className="thumb" src={d.anhChinh} alt="" />
+                    <ProductImage className="thumb" src={d.anhChinh} alt="" />
                     <div className="grow">
                       <Link to={`/products/${d.maSanPham}`}>{d.tenMay}</Link>
                       {r?.danhGia ? (
@@ -164,6 +183,9 @@ export default function OrderDetailPage() {
             <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(o.tongTien)}</b></div>
           </div>
           {o.trangThaiDoiTra && <p>Đổi trả: <StatusBadge status={o.trangThaiDoiTra} /> <Link to="/returns">Xem chi tiết</Link></p>}
+          {o.trangThai === 'CHO_KHACH_XAC_NHAN' && (
+              <button className="btn btn-primary" onClick={() => setConfirmReceive(true)}>Đã nhận được hàng</button>
+          )}
           <button
             className="btn"
             onClick={() => run(async () => { replace(await orderService.reorder(o.maDonHang)); navigate('/cart'); }, 'Đã thêm các sản phẩm vào giỏ hàng')}
@@ -183,6 +205,15 @@ export default function OrderDetailPage() {
             <ReviewForm maDonHang={o.maDonHang} sanPham={reviewing} onCancel={() => setReviewing(null)}
               onDone={() => { setReviewing(null); reloadReviews(); }} />
           </Modal>
+        )}
+        {confirmReceive && (
+            <Modal title="Xác nhận đã nhận hàng" onClose={() => !submitting && setConfirmReceive(false)}>
+              <p>Bạn xác nhận đã nhận đầy đủ sản phẩm của đơn hàng này? Sau khi xác nhận, đơn hàng sẽ được hoàn tất.</p>
+              <div className="row end">
+                <button className="btn" disabled={submitting} onClick={() => setConfirmReceive(false)}>Hủy</button>
+                <button className="btn btn-primary" disabled={submitting} onClick={submitReceived}>{submitting ? 'Đang xử lý...' : 'Xác nhận đã nhận'}</button>
+              </div>
+            </Modal>
         )}
         {cancelForm && (
           <Modal title="Hủy đơn hàng" onClose={() => setCancelForm(null)}>

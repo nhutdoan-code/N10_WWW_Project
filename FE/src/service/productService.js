@@ -7,5 +7,6 @@ export const productService = {
   reviews: (ma) => api.get(`/products/${ma}/reviews`),
   questions: (ma) => api.get(`/products/${ma}/questions`),
   categories: () => api.get('/categories'),
+  brands: () => api.get('/brands'),
   search: (q) => api.get('/search', { params: { q } }),
 };

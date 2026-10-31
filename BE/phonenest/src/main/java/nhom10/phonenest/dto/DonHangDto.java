@@ -28,9 +28,11 @@ public record DonHangDto(
         String tenKhach,
         String trangThaiDoiTra,
         String lyDoHuy,
-        List<Dong> chiTiet) {
+        LocalDateTime ngayKhachXacNhan,
+        String nguoiXacNhan,
+        List<Dong> chiTiet ) {
 
-    public record Dong(String maSanPham, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
+    public record Dong(String maSanPham, String maPhienBan, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
     }
 
     public record Checkout(@NotNull(message = "Vui lòng chọn phương thức thanh toán") PhuongThucTt phuongThucTt,

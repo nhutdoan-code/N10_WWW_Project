@@ -1,46 +1,5 @@
 package nhom10.phonenest.mapper;
-
-import lombok.RequiredArgsConstructor;
-import nhom10.phonenest.dto.DonHangDto;
-import nhom10.phonenest.entity.DonHang;
-import nhom10.phonenest.entity.KhachHang;
-import nhom10.phonenest.repository.HuyDonHangRepository;
-import nhom10.phonenest.repository.KhachHangRepository;
-import nhom10.phonenest.repository.SanPhamRepository;
-import nhom10.phonenest.repository.YeuCauDoiTraRepository;
-import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
-import java.util.List;
-
-@Component
-@RequiredArgsConstructor
-public class DonHangMapper {
-
-    private final SanPhamRepository sanPhamRepository;
-    private final KhachHangRepository khachHangRepository;
-    private final YeuCauDoiTraRepository yeuCauDoiTraRepository;
-    private final HuyDonHangRepository huyDonHangRepository;
-
-    public DonHangDto toDto(DonHang d) {
-        List<DonHangDto.Dong> dong = d.getChiTiet().stream().map(c -> {
-            var sp = sanPhamRepository.findById(c.getMaSanPham()).map(SanPhamMapper::toDto).orElse(null);
-            return new DonHangDto.Dong(c.getMaSanPham(), sp == null ? "" : sp.tenMay(),
-                    sp == null ? null : sp.anhChinh(), c.getSoLuong(), c.getDonGia());
-        }).toList();
-        BigDecimal tamTinh = dong.stream().map(x -> x.donGia().multiply(BigDecimal.valueOf(x.soLuong())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal tong = tamTinh.subtract(d.getGiamGia()).add(d.getPhiVanChuyen()).subtract(d.getGiamPhiVanChuyen());
-        return new DonHangDto(d.getMaDonHang(), d.getMaKh(),
-                d.getKhuyenMai() == null ? null : d.getKhuyenMai().getMaKm(), d.getMaKmVanChuyen(),
-                d.getNgayMua(), d.getPhuongThucTt(), d.getTrangThai(),
-                tamTinh, d.getGiamGia(), d.getPhiVanChuyen(), d.getGiamPhiVanChuyen(), tong,
-                d.getDiaChiGiaoHang(), d.getNgayCapNhat(), d.getNgayGiao(),
-                khachHangRepository.findById(d.getMaKh()).map(KhachHang::getHoTen).orElse(""),
-                yeuCauDoiTraRepository.findByMaDonHang(d.getMaDonHang()).map(y -> y.getTrangThai().name()).orElse(null),
-                huyDonHangRepository.findById(d.getMaDonHang())
-                        .map(h -> h.getGhiChu() == null || h.getGhiChu().isBlank() ? h.getLyDo() : h.getLyDo() + ": " + h.getGhiChu())
-                        .orElse(null),
-                dong);
-    }
+import lombok.RequiredArgsConstructor; import nhom10.phonenest.dto.DonHangDto; import nhom10.phonenest.entity.*; import nhom10.phonenest.repository.*; import org.springframework.stereotype.Component; import java.util.*;
+@Component @RequiredArgsConstructor public class DonHangMapper{ private final ThanhToanRepository thanhToanRepository; private final YeuCauDoiTraRepository doiTraRepository; private final HuyDonHangRepository huyRepository;
+ public DonHangDto toDto(DonHang d){List<DonHangDto.Dong> ds=d.getChiTiet().stream().map(c->new DonHangDto.Dong(c.getPhienBan().getSanPham().getMaSanPham(),c.getPhienBan().getMaPhienBan(),c.getTenSanPham()+" - "+c.getTenPhienBan(),c.getHinhAnh(),c.getSoLuong(),c.getDonGia())).toList(); var pt=thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(d.getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null);String dt=doiTraRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(d.getMaDonHang()).stream().findFirst().map(x->x.getTrangThai().name()).orElse(null);String huy=huyRepository.findById(d.getMaDonHang()).map(h->h.getGhiChu()==null||h.getGhiChu().isBlank()?h.getLyDo():h.getLyDo()+": "+h.getGhiChu()).orElse(null);return new DonHangDto(d.getMaDonHang(),d.getKhachHang().getMaKh(),d.getKhuyenMai()==null?null:d.getKhuyenMai().getMaKm(),d.getKhuyenMaiVanChuyen()==null?null:d.getKhuyenMaiVanChuyen().getMaKm(),d.getNgayMua(),pt,d.getTrangThai(),d.getTamTinh(),d.getGiamGia(),d.getPhiVanChuyen(),d.getGiamPhiVanChuyen(),d.getTongThanhToan(),d.getDiaChiGiaoHang(),d.getNgayCapNhat(),d.getNgayGiao(),d.getKhachHang().getHoTen(),dt,huy,d.getNgayKhachXacNhan(),d.getNgayKhachXacNhan()==null?null:d.getKhachHang().getHoTen(),ds);}
 }

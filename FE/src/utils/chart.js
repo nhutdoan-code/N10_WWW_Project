@@ -22,8 +22,15 @@ const key = (d) => d.toISOString().slice(0, 10);
 export const fillDays = (rows) => {
   if (rows.length === 0) return [];
   const map = Object.fromEntries(rows.map((r) => [r.ngay, r]));
+  const start = new Date(rows[0].ngay);
+  const end = new Date(rows[rows.length - 1].ngay);
+  const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+  // Only zero-fill if range is reasonably bounded (<= 62 days) to avoid generating huge arrays
+  if (diffDays > 62 || diffDays < 0) {
+    return rows;
+  }
   const out = [];
-  for (let d = new Date(rows[0].ngay); key(d) <= rows[rows.length - 1].ngay; d.setUTCDate(d.getUTCDate() + 1)) {
+  for (let d = new Date(start); key(d) <= rows[rows.length - 1].ngay; d.setUTCDate(d.getUTCDate() + 1)) {
     const k = key(d);
     out.push(map[k] || { ngay: k, doanhThu: 0, soDon: 0 });
   }

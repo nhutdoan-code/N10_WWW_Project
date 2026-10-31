@@ -1,21 +1,4 @@
 package nhom10.phonenest.entity;
-
-import jakarta.persistence.Embeddable;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-import java.math.BigDecimal;
-
-@Embeddable
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class ChiTietDonHang {
-
-    private String maSanPham;
-    private int soLuong;
-    private BigDecimal donGia;
-}
+import jakarta.persistence.*; import lombok.Getter; import lombok.Setter; import java.math.BigDecimal;
+@Entity @Table(name="ChiTietDonHang",uniqueConstraints=@UniqueConstraint(columnNames={"maDonHang","maPhienBan"})) @Getter @Setter
+public class ChiTietDonHang { @Id private String maChiTiet; @ManyToOne @JoinColumn(name="maDonHang",nullable=false) private DonHang donHang; @ManyToOne @JoinColumn(name="maPhienBan",nullable=false) private PhienBanSanPham phienBan; private String tenSanPham; private String tenPhienBan; private String sku; private String hinhAnh; private int soLuong; private BigDecimal donGia; private int baoHanhThang=12; }

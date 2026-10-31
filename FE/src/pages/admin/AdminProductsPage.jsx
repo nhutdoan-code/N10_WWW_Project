@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../components/Modal';
 import ProductForm from '../../components/ProductForm';
+import ProductImage from '../../components/ProductImage';
 import StatusBadge from '../../components/StatusBadge';
 import useDebounce from '../../hooks/useDebounce';
 import useFetch from '../../hooks/useFetch';
@@ -17,6 +18,7 @@ export default function AdminProductsPage() {
   const toast = useToast();
   const { data: products, reload } = useFetch(() => adminService.products(debounced), [debounced]);
   const { data: categories } = useFetch(productService.categories);
+  const { data: brands } = useFetch(productService.brands);
 
   const run = async (action, message) => {
     try {
@@ -44,9 +46,9 @@ export default function AdminProductsPage() {
           {products?.map((p) => (
             <tr key={p.maSanPham}>
               <td>{p.maSanPham}</td>
-              <td><img className="thumb" src={p.anhChinh} alt="" /></td>
+              <td><ProductImage className="thumb" src={p.anhChinh} alt="" /></td>
               <td>{p.tenMay}</td>
-              <td>{p.tenLoai}</td>
+              <td>{p.tenThuongHieu || p.tenLoai}</td>
               <td>{formatPrice(p.giaBan)}</td>
               <td>{p.soLuongTon}</td>
               <td><StatusBadge status={productStatus(p)} /></td>
@@ -64,10 +66,12 @@ export default function AdminProductsPage() {
         </tbody>
       </table>
       {editing && categories && (
-        <Modal title={editing.maSanPham ? 'Sửa sản phẩm' : 'Thêm sản phẩm'} onClose={() => setEditing(null)}>
+        <Modal title={editing.maSanPham ? 'Sửa sản phẩm' : 'Thêm sản phẩm'} onClose={() => setEditing(null)} wide>
           <ProductForm
+            key={editing.maSanPham || 'new'}
             product={editing}
             categories={categories}
+            brands={brands || []}
             onCancel={() => setEditing(null)}
             onSubmit={(data) => run(() => adminService.saveProduct(editing.maSanPham, data), 'Đã lưu sản phẩm')}
           />

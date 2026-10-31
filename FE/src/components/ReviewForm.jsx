@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ProductImage from './ProductImage';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { errorMessage } from '../utils/format';
@@ -61,7 +62,7 @@ export default function ReviewForm({ maDonHang, sanPham, onDone, onCancel }) {
   return (
     <form className="form" onSubmit={submit}>
       <div className="line-item">
-        <img className="thumb" src={sanPham.anhChinh} alt="" />
+        <ProductImage className="thumb" src={sanPham.anhChinh} alt="" />
         <b>{sanPham.tenMay}</b>
       </div>
       <div className="star-input" role="radiogroup" aria-label="Số sao">
@@ -83,7 +84,7 @@ export default function ReviewForm({ maDonHang, sanPham, onDone, onCancel }) {
       </label>
       {imagePreview && (
         <div className="line-item">
-          <img className="thumb" src={imagePreview} alt="Ảnh đánh giá đã chọn" />
+          <ProductImage className="thumb" src={imagePreview} alt="Ảnh đánh giá đã chọn" />
           <span className="muted">{imageFile.name}</span>
           <button type="button" className="btn" onClick={() => setImageFile(null)} disabled={submitting}>Bỏ ảnh</button>
         </div>

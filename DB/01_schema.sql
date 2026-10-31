@@ -6,14 +6,20 @@ COLLATE utf8mb4_unicode_ci;
 
 USE BanDienThoai;
 
+-- PhoneNest Database FINAL V2
+-- Chốt nghiệp vụ: Product -> ProductVariant (SKU); stock theo variant; payment tách order;
+-- return theo order item; lịch sử trạng thái và biến động kho có audit.
+-- Quy tắc nghiệp vụ động (giới hạn voucher/khách, tổng số lượng đổi trả, chuyển trạng thái,
+-- đồng bộ tồn kho, một giao dịch thanh toán thành công...) được kiểm soát ở Service layer.
+
 CREATE TABLE TaiKhoan (
     maTk VARCHAR(50) PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
+    soDienThoai VARCHAR(20) UNIQUE,
     matKhau VARCHAR(255) NOT NULL,
-    ngayTao DATE NOT NULL,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE,
-    loaiDangNhap VARCHAR(50),
-    soDienThoai VARCHAR(20)
+    loaiDangNhap VARCHAR(50) NOT NULL DEFAULT 'LOCAL'
 );
 
 CREATE TABLE KhachHang (
@@ -24,57 +30,34 @@ CREATE TABLE KhachHang (
     diemTichLuy INT NOT NULL DEFAULT 0,
     hangThanhVien VARCHAR(50),
     maGioiThieu VARCHAR(50),
-
-    CONSTRAINT FK_KhachHang_TaiKhoan
-        FOREIGN KEY (maKh)
-        REFERENCES TaiKhoan(maTk)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_KhachHang_TaiKhoan FOREIGN KEY (maKh) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE QuanTriVien (
     maQtv VARCHAR(50) PRIMARY KEY,
     hoTen VARCHAR(100) NOT NULL,
-    vaiTro VARCHAR(100),
+    vaiTro VARCHAR(100) NOT NULL DEFAULT 'ADMIN',
     chucVu VARCHAR(100),
-
-    CONSTRAINT FK_QuanTriVien_TaiKhoan
-        FOREIGN KEY (maQtv)
-        REFERENCES TaiKhoan(maTk)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_QuanTriVien_TaiKhoan FOREIGN KEY (maQtv) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE ThongBao (
     maThongBao VARCHAR(50) PRIMARY KEY,
     maTk VARCHAR(50) NOT NULL,
+    tieuDe VARCHAR(200),
     noiDung TEXT NOT NULL,
+    loai VARCHAR(50),
     daDoc BOOLEAN NOT NULL DEFAULT FALSE,
     ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT FK_ThongBao_TaiKhoan
-        FOREIGN KEY (maTk)
-        REFERENCES TaiKhoan(maTk)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_ThongBao_TaiKhoan FOREIGN KEY (maTk) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE TinhThanh (
-    maTinh VARCHAR(10) PRIMARY KEY,
-    tenTinh VARCHAR(100) NOT NULL
-);
-
+CREATE TABLE TinhThanh (maTinh VARCHAR(10) PRIMARY KEY, tenTinh VARCHAR(100) NOT NULL);
 CREATE TABLE PhuongXa (
     maPhuong VARCHAR(10) PRIMARY KEY,
     tenPhuong VARCHAR(100) NOT NULL,
     maTinh VARCHAR(10) NOT NULL,
-
-    CONSTRAINT FK_PhuongXa_TinhThanh
-        FOREIGN KEY (maTinh)
-        REFERENCES TinhThanh(maTinh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
+    CONSTRAINT FK_PhuongXa_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE CASCADE,
     INDEX IDX_PhuongXa_maTinh (maTinh)
 );
 
@@ -87,347 +70,318 @@ CREATE TABLE DiaChi (
     maTinh VARCHAR(10) NOT NULL,
     maPhuong VARCHAR(10) NOT NULL,
     macDinh BOOLEAN NOT NULL DEFAULT FALSE,
-
-    CONSTRAINT FK_DiaChi_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_DiaChi_TinhThanh
-        FOREIGN KEY (maTinh)
-        REFERENCES TinhThanh(maTinh)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-
-    CONSTRAINT FK_DiaChi_PhuongXa
-        FOREIGN KEY (maPhuong)
-        REFERENCES PhuongXa(maPhuong)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
+    CONSTRAINT FK_DiaChi_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DiaChi_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_DiaChi_PhuongXa FOREIGN KEY (maPhuong) REFERENCES PhuongXa(maPhuong) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 CREATE TABLE LoaiSanPham (
     maLoai VARCHAR(50) PRIMARY KEY,
     tenLoai VARCHAR(100) NOT NULL,
     moTa TEXT,
-    maLoaiCha VARCHAR(50) NULL,
+    maLoaiCha VARCHAR(50),
+    CONSTRAINT FK_LoaiSanPham_LoaiCha FOREIGN KEY (maLoaiCha) REFERENCES LoaiSanPham(maLoai) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
-    CONSTRAINT FK_LoaiSanPham_LoaiCha
-        FOREIGN KEY (maLoaiCha)
-        REFERENCES LoaiSanPham(maLoai)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
+CREATE TABLE ThuongHieu (
+    maThuongHieu VARCHAR(50) PRIMARY KEY,
+    tenThuongHieu VARCHAR(100) NOT NULL UNIQUE,
+    moTa TEXT,
+    logo VARCHAR(500),
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE SanPham (
     maSanPham VARCHAR(50) PRIMARY KEY,
     maLoai VARCHAR(50) NOT NULL,
+    maThuongHieu VARCHAR(50) NOT NULL,
     tenMay VARCHAR(150) NOT NULL,
-    giaBan DECIMAL(15,2) NOT NULL,
     moTa TEXT,
-    kichThuocManHinh DECIMAL(3,2),
-    loaiManHinh VARCHAR(50),
+    kichThuocManHinh DECIMAL(4,2),
+    loaiManHinh VARCHAR(100),
     tanSoQuet INT,
     chip VARCHAR(100),
-    ram INT,
-    boNho INT,
     cameraSau VARCHAR(150),
-    cameraTruoc INT,
+    cameraTruoc VARCHAR(100),
     pin INT,
     congSuatSac INT,
-    heDieuHanh VARCHAR(50),
+    heDieuHanh VARCHAR(100),
     nfc BOOLEAN NOT NULL DEFAULT FALSE,
     ho5G BOOLEAN NOT NULL DEFAULT FALSE,
     trongLuong INT,
+    thoiHanBaoHanhThang INT NOT NULL DEFAULT 12,
+    trangThai ENUM('DANG_KINH_DOANH','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'DANG_KINH_DOANH',
+    diemDanhGiaTb DECIMAL(3,2) NOT NULL DEFAULT 0,
+    CONSTRAINT FK_SanPham_LoaiSanPham FOREIGN KEY (maLoai) REFERENCES LoaiSanPham(maLoai) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_SanPham_ThuongHieu FOREIGN KEY (maThuongHieu) REFERENCES ThuongHieu(maThuongHieu) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE PhienBanSanPham (
+    maPhienBan VARCHAR(50) PRIMARY KEY,
+    maSanPham VARCHAR(50) NOT NULL,
+    sku VARCHAR(100) NOT NULL UNIQUE,
+    ram INT NOT NULL,
+    boNho INT NOT NULL,
+    mauSac VARCHAR(100) NOT NULL,
+    giaBan DECIMAL(15,2) NOT NULL,
+    giaNiemYet DECIMAL(15,2),
     soLuongTon INT NOT NULL DEFAULT 0,
-
-    trangThai ENUM(
-        'CON_HANG',
-        'HET_HANG',
-        'NGUNG_KINH_DOANH'
-    ) NOT NULL DEFAULT 'CON_HANG',
-
-    diemDanhGiaTb DECIMAL(3,2) DEFAULT 0,
-
-    CONSTRAINT FK_SanPham_LoaiSanPham
-        FOREIGN KEY (maLoai)
-        REFERENCES LoaiSanPham(maLoai)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
+    trangThai ENUM('DANG_KINH_DOANH','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'DANG_KINH_DOANH',
+    CONSTRAINT FK_PhienBanSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_PhienBan_CauHinh UNIQUE (maSanPham, ram, boNho, mauSac),
+    INDEX IDX_PhienBan_SanPham (maSanPham),
+    INDEX IDX_PhienBan_TrangThai_Ton (trangThai, soLuongTon)
 );
 
 CREATE TABLE HinhAnhSanPham (
     maHinhAnh VARCHAR(50) PRIMARY KEY,
     maSanPham VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50),
     duongDan VARCHAR(500) NOT NULL,
     gocChup VARCHAR(100),
+    mauSac VARCHAR(100) NULL,
     anhChinh BOOLEAN NOT NULL DEFAULT FALSE,
-
-    CONSTRAINT FK_HinhAnhSanPham_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_HinhAnhSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HinhAnhSanPham_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
 CREATE TABLE GioHang (
     maGioHang VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL UNIQUE,
-    ngayTao DATE NOT NULL,
-
-    CONSTRAINT FK_GioHang_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_GioHang_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE ChiTietGioHang (
     maGioHang VARCHAR(50) NOT NULL,
-    maSanPham VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50) NOT NULL,
     soLuong INT NOT NULL DEFAULT 1,
-
-    PRIMARY KEY (maGioHang, maSanPham),
-
-    CONSTRAINT FK_ChiTietGioHang_GioHang
-        FOREIGN KEY (maGioHang)
-        REFERENCES GioHang(maGioHang)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_ChiTietGioHang_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-
-    CONSTRAINT CK_ChiTietGioHang_SoLuong
-        CHECK (soLuong > 0)
+    PRIMARY KEY (maGioHang, maPhienBan),
+    CONSTRAINT FK_ChiTietGioHang_GioHang FOREIGN KEY (maGioHang) REFERENCES GioHang(maGioHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietGioHang_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 CREATE TABLE KhuyenMai (
     maKm VARCHAR(50) PRIMARY KEY,
     tenKm VARCHAR(150) NOT NULL,
+    loai ENUM('DON_HANG','VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
     phanTramGiam DECIMAL(5,2) NOT NULL,
     soTienGiamToiDa DECIMAL(15,2),
-    ngayBatDau DATE NOT NULL,
-    ngayKetThuc DATE NOT NULL,
-    dieuKienApDung TEXT,
-    loai ENUM('DON_HANG', 'VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
     donToiThieu DECIMAL(15,2) NOT NULL DEFAULT 0,
-    soLuong INT NULL,
+    soLuong INT,
     daDung INT NOT NULL DEFAULT 0,
-    chiKhachMoi BOOLEAN NOT NULL DEFAULT FALSE
+    chiKhachMoi BOOLEAN NOT NULL DEFAULT FALSE,
+    gioiHanMoiKhach INT NOT NULL DEFAULT 1,
+    ngayBatDau DATETIME NOT NULL,
+    ngayKetThuc DATETIME NOT NULL,
+    dieuKienApDung TEXT,
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE SuDungKhuyenMai (
+    maSuDung VARCHAR(50) PRIMARY KEY,
+    maKm VARCHAR(50) NOT NULL,
+    maKh VARCHAR(50) NOT NULL,
+    maDonHang VARCHAR(50),
+    ngaySuDung DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_SuDungKhuyenMai_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_SuDungKhuyenMai_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_SuDungKhuyenMai_DonHang UNIQUE (maKm, maDonHang),
+    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm)
 );
 
 CREATE TABLE PhiVanChuyen (
     maPhi VARCHAR(50) PRIMARY KEY,
-    maTinh VARCHAR(10) NULL UNIQUE,
+    maTinh VARCHAR(10) UNIQUE,
     phiCoBan DECIMAL(15,2) NOT NULL,
-    mienPhiTu DECIMAL(15,2) NULL,
+    mienPhiTu DECIMAL(15,2),
     thoiGianGiao VARCHAR(50),
-
-    CONSTRAINT FK_PhiVanChuyen_TinhThanh
-        FOREIGN KEY (maTinh)
-        REFERENCES TinhThanh(maTinh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_PhiVanChuyen_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE DonHang (
     maDonHang VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL,
     maKm VARCHAR(50),
-    diaChiGiaoHang VARCHAR(500),
-    ngayCapNhat DATETIME NULL,
-    ngayGiao DATETIME NULL,
-    maKmVanChuyen VARCHAR(50) NULL,
+    maKmVanChuyen VARCHAR(50),
+    tenNguoiNhan VARCHAR(100) NOT NULL,
+    soDienThoaiNhan VARCHAR(20) NOT NULL,
+    diaChiGiaoHang VARCHAR(500) NOT NULL,
+    tamTinh DECIMAL(15,2) NOT NULL DEFAULT 0,
     giamGia DECIMAL(15,2) NOT NULL DEFAULT 0,
     phiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
     giamPhiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
-
+    tongThanhToan DECIMAL(15,2) NOT NULL DEFAULT 0,
     ngayMua DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    phuongThucTt ENUM(
-        'COD',
-        'CHUYEN_KHOAN',
-        'VI_DIEN_TU'
-    ) NOT NULL,
-
-    trangThai ENUM(
-        'CHO_XAC_NHAN',
-        'DANG_XU_LY',
-        'DANG_GIAO',
-        'DA_GIAO',
-        'DA_HUY'
-    ) NOT NULL DEFAULT 'CHO_XAC_NHAN',
-
-    CONSTRAINT FK_DonHang_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-
-    CONSTRAINT FK_DonHang_KhuyenMai
-        FOREIGN KEY (maKm)
-        REFERENCES KhuyenMai(maKm)
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-
-    CONSTRAINT FK_DonHang_KhuyenMaiVanChuyen
-        FOREIGN KEY (maKmVanChuyen)
-        REFERENCES KhuyenMai(maKm)
-        ON UPDATE CASCADE
-        ON DELETE SET NULL
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayGiao DATETIME,
+    ngayKhachXacNhan DATETIME NULL,
+    nguoiXacNhan VARCHAR(50) NULL,
+    trangThai ENUM('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
+    ghiChu VARCHAR(500),
+    CONSTRAINT FK_DonHang_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_DonHang_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT FK_DonHang_KhuyenMaiVanChuyen FOREIGN KEY (maKmVanChuyen) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT FK_DonHang_NguoiXacNhan
+        FOREIGN KEY (nguoiXacNhan)
+            REFERENCES TaiKhoan(maTk)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL,
+    INDEX IDX_DonHang_KhachHang_NgayMua (maKh, ngayMua),
+    INDEX IDX_DonHang_TrangThai (trangThai)
 );
 
+ALTER TABLE SuDungKhuyenMai ADD CONSTRAINT FK_SuDungKhuyenMai_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE SET NULL;
+
 CREATE TABLE ChiTietDonHang (
+    maChiTiet VARCHAR(50) PRIMARY KEY,
     maDonHang VARCHAR(50) NOT NULL,
-    maSanPham VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50) NOT NULL,
+    tenSanPham VARCHAR(150) NOT NULL,
+    tenPhienBan VARCHAR(150) NOT NULL,
+    sku VARCHAR(100) NOT NULL,
+    hinhAnh VARCHAR(500),
     soLuong INT NOT NULL,
     donGia DECIMAL(15,2) NOT NULL,
+    baoHanhThang INT NOT NULL DEFAULT 12,
+    CONSTRAINT FK_ChiTietDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietDonHang_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_ChiTietDonHang_PhienBan UNIQUE (maDonHang, maPhienBan),
+    INDEX IDX_ChiTietDonHang_PhienBan (maPhienBan)
+);
 
-    PRIMARY KEY (maDonHang, maSanPham),
+CREATE TABLE LichSuTrangThaiDonHang (
+    maLichSu VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    trangThai ENUM('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL,
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ghiChu VARCHAR(500),
+    nguoiCapNhat VARCHAR(50),
+    CONSTRAINT FK_LichSuTrangThai_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_LichSuTrangThai_TaiKhoan FOREIGN KEY (nguoiCapNhat) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX IDX_LichSuTrangThai_DonHang_ThoiGian (maDonHang, thoiGian)
+);
 
-    CONSTRAINT FK_ChiTietDonHang_DonHang
-        FOREIGN KEY (maDonHang)
-        REFERENCES DonHang(maDonHang)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
+CREATE TABLE ThanhToan (
+    maThanhToan VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    phuongThuc ENUM('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
+    soTien DECIMAL(15,2) NOT NULL,
+    trangThai ENUM('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY') NOT NULL DEFAULT 'CHO_THANH_TOAN',
+    maGiaoDich VARCHAR(150) UNIQUE,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayThanhToan DATETIME,
+    CONSTRAINT FK_ThanhToan_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX IDX_ThanhToan_maDonHang (maDonHang)
+);
 
-    CONSTRAINT FK_ChiTietDonHang_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-
-    CONSTRAINT CK_ChiTietDonHang_SoLuong
-        CHECK (soLuong > 0),
-
-    CONSTRAINT CK_ChiTietDonHang_DonGia
-        CHECK (donGia >= 0)
+CREATE TABLE BienDongKho (
+    maBienDong VARCHAR(50) PRIMARY KEY,
+    maPhienBan VARCHAR(50) NOT NULL,
+    loaiBienDong ENUM('NHAP_KHO','BAN_HANG','HOAN_HUY_DON','DOI_TRA','DIEU_CHINH') NOT NULL,
+    soLuong INT NOT NULL,
+    tonTruoc INT NOT NULL,
+    tonSau INT NOT NULL,
+    maDonHang VARCHAR(50),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ghiChu VARCHAR(500),
+    CONSTRAINT FK_BienDongKho_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_BienDongKho_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX IDX_BienDongKho_PhienBan_ThoiGian (maPhienBan, thoiGian)
 );
 
 CREATE TABLE YeuCauDoiTra (
     maYeuCau VARCHAR(50) PRIMARY KEY,
-    maDonHang VARCHAR(50) NOT NULL UNIQUE,
-    lyDo TEXT,
+    maDonHang VARCHAR(50) NOT NULL,
+    lyDoChung TEXT,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trangThai ENUM('CHO_DUYET','DA_DUYET','TU_CHOI','DANG_XU_LY','HOAN_TAT') NOT NULL DEFAULT 'CHO_DUYET',
+    ghiChuXuLy VARCHAR(500),
+    CONSTRAINT FK_YeuCauDoiTra_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE ChiTietDoiTra (
+    maChiTietDoiTra VARCHAR(50) PRIMARY KEY,
+    maYeuCau VARCHAR(50) NOT NULL,
+    maChiTietDonHang VARCHAR(50) NOT NULL,
+    soLuong INT NOT NULL,
+    loaiYeuCau ENUM('DOI_HANG','TRA_HANG_HOAN_TIEN') NOT NULL,
+    lyDo TEXT NOT NULL,
     hinhAnhMinhChung VARCHAR(500),
-    ngayTao DATE NOT NULL,
-
-    trangThai ENUM(
-        'CHO_DUYET',
-        'DA_DUYET',
-        'TU_CHOI',
-        'DA_HOAN_TIEN'
-    ) NOT NULL DEFAULT 'CHO_DUYET',
-
-    CONSTRAINT FK_YeuCauDoiTra_DonHang
-        FOREIGN KEY (maDonHang)
-        REFERENCES DonHang(maDonHang)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    soTienHoan DECIMAL(15,2),
+    CONSTRAINT FK_ChiTietDoiTra_YeuCau FOREIGN KEY (maYeuCau) REFERENCES YeuCauDoiTra(maYeuCau) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietDoiTra_ChiTietDonHang FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_ChiTietDoiTra UNIQUE (maYeuCau, maChiTietDonHang)
 );
 
 CREATE TABLE DanhGia (
     maDanhGia VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL,
-    maDonHang VARCHAR(50) NOT NULL,
+    maChiTietDonHang VARCHAR(50) NOT NULL UNIQUE,
     maSanPham VARCHAR(50) NOT NULL,
-
     diemSao INT NOT NULL,
     noiDungBinhLuan TEXT,
     hinhAnhThucTe VARCHAR(500),
-    ngayDanhGia DATE NOT NULL,
-
-    CONSTRAINT FK_DanhGia_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_DanhGia_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_DanhGia_ChiTietDonHang
-        FOREIGN KEY (maDonHang, maSanPham)
-        REFERENCES ChiTietDonHang(maDonHang, maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT UQ_DanhGia_DonHang_SanPham
-        UNIQUE (maDonHang, maSanPham),
-
-    CONSTRAINT CK_DanhGia_DiemSao
-        CHECK (diemSao BETWEEN 1 AND 5)
+    ngayDanhGia DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_DanhGia_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DanhGia_ChiTietDonHang FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DanhGia_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE HoiDap (
     maCauHoi VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL,
     maSanPham VARCHAR(50) NOT NULL,
-
     noiDungCauHoi TEXT NOT NULL,
     noiDungTraLoi TEXT,
-    ngayHoi DATE NOT NULL,
-    ngayTraLoi DATE,
-
-    CONSTRAINT FK_HoiDap_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_HoiDap_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    ngayHoi DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayTraLoi DATETIME,
+    CONSTRAINT FK_HoiDap_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HoiDap_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE Wishlist (
     maDanhSach VARCHAR(50) PRIMARY KEY,
     maKh VARCHAR(50) NOT NULL UNIQUE,
-
-    CONSTRAINT FK_Wishlist_KhachHang
-        FOREIGN KEY (maKh)
-        REFERENCES KhachHang(maKh)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_Wishlist_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE WishlistSanPham (
     maDanhSach VARCHAR(50) NOT NULL,
     maSanPham VARCHAR(50) NOT NULL,
-
     PRIMARY KEY (maDanhSach, maSanPham),
-
-    CONSTRAINT FK_WishlistSanPham_Wishlist
-        FOREIGN KEY (maDanhSach)
-        REFERENCES Wishlist(maDanhSach)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT FK_WishlistSanPham_SanPham
-        FOREIGN KEY (maSanPham)
-        REFERENCES SanPham(maSanPham)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT FK_WishlistSanPham_Wishlist FOREIGN KEY (maDanhSach) REFERENCES Wishlist(maDanhSach) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_WishlistSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE HuyDonHang (
     maDonHang VARCHAR(50) PRIMARY KEY,
-    lyDo VARCHAR(100) NOT NULL,
-    ghiChu VARCHAR(255) NULL,
+    lyDo VARCHAR(200) NOT NULL,
+    ghiChu VARCHAR(500),
     ngayHuy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    nguoiHuy VARCHAR(50),
+    CONSTRAINT FK_HuyDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HuyDonHang_TaiKhoan FOREIGN KEY (nguoiHuy) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE SET NULL
+);
 
-    CONSTRAINT FK_HuyDonHang_DonHang
-        FOREIGN KEY (maDonHang)
-        REFERENCES DonHang(maDonHang)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+-- Audit log hoat dong quan tri: chi ghi va doc (append-only), khong FK toi TaiKhoan
+-- hay doi tuong nghiep vu de giu lich su khi tai khoan/doi tuong bi xoa.
+CREATE TABLE NhatKyHoatDong (
+    maNhatKy VARCHAR(50) PRIMARY KEY,
+    maTk VARCHAR(50) NOT NULL,
+    tenNguoiThucHien VARCHAR(150) NOT NULL,
+    hanhDong VARCHAR(50) NOT NULL,
+    loaiDoiTuong VARCHAR(50) NOT NULL,
+    maDoiTuong VARCHAR(50),
+    moTa VARCHAR(500),
+    duLieuTruoc LONGTEXT,
+    duLieuSau LONGTEXT,
+    ipAddress VARCHAR(45),
+    requestMethod VARCHAR(10),
+    requestPath VARCHAR(255),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX IDX_NhatKyHoatDong_ThoiGian (thoiGian),
+    INDEX IDX_NhatKyHoatDong_MaTk_ThoiGian (maTk, thoiGian),
+    INDEX IDX_NhatKyHoatDong_LoaiDoiTuong_HanhDong (loaiDoiTuong, hanhDong)
 );

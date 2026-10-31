@@ -19,6 +19,7 @@ import nhom10.phonenest.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -84,8 +85,9 @@ public class AuthService {
 
         GioHang gh = new GioHang();
         gh.setMaGioHang(IdGenerator.next("GH"));
-        gh.setMaKh(ma);
-        gh.setNgayTao(LocalDate.now());
+        gh.setKhachHang(kh);
+        gh.setNgayTao(LocalDateTime.now());
+        gh.setNgayCapNhat(LocalDateTime.now());
         gioHangRepository.save(gh);
 
         Wishlist wl = new Wishlist();

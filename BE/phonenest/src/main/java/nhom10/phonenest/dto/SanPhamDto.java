@@ -17,15 +17,43 @@ public record SanPhamDto(
         String maSanPham,
         @NotBlank(message = "Vui lòng chọn loại sản phẩm") String maLoai,
         String tenLoai,
+        @NotBlank(message = "Vui lòng chọn thương hiệu") String maThuongHieu,
+        String tenThuongHieu,
         @NotBlank(message = "Vui lòng nhập tên máy") String tenMay,
-        @NotNull(message = "Vui lòng nhập giá bán") @Positive(message = "Giá bán phải lớn hơn 0") BigDecimal giaBan,
+        @NotNull(message = "Vui lòng nhập giá bán") @Min(value = 0, message = "Giá bán không được âm") BigDecimal giaBan,
         String moTa,
         @Valid ThongSo thongSo,
         @Min(value = 0, message = "Số lượng tồn không được âm") int soLuongTon,
         TrangThaiSanPham trangThai,
         BigDecimal diemDanhGiaTb,
         String anhChinh,
-        List<String> hinhAnhs) {
+        List<Anh> hinhAnhs,
+        List<PhienBan> phienBans) {
+
+    /**
+     * Ảnh sản phẩm. {@code maHinhAnh} là identity bền vững do DB sinh ra;
+     * khi Admin lưu lại form, id này phải được gửi ngược về để service cập nhật
+     * đúng record thay vì xóa/tạo lại toàn bộ collection.
+     */
+    public record Anh(
+            String maHinhAnh,
+            @NotBlank(message = "Đường dẫn ảnh không được để trống") String duongDan,
+            String gocChup,
+            String mauSac,
+            String maPhienBan) {
+    }
+
+    public record PhienBan(
+            String maPhienBan,
+            String sku,
+            int ram,
+            int boNho,
+            String mauSac,
+            BigDecimal giaBan,
+            BigDecimal giaNiemYet,
+            int soLuongTon,
+            TrangThaiSanPham trangThai) {
+    }
 
     public record ThongSo(
             @Positive(message = "Kích thước màn hình phải lớn hơn 0") BigDecimal kichThuocManHinh,

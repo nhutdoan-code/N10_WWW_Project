@@ -13,7 +13,7 @@ import { productService } from '../service/productService';
 
 export default function MainLayout() {
   const { user, logout, isAdmin, isCustomer } = useAuth();
-  const { count } = useCart();
+  const { count, reset: resetCart } = useCart();
   const { ids } = useCompare();
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ export default function MainLayout() {
   const unread = notices?.filter((n) => !n.daDoc).length || 0;
 
   const handleLogout = () => {
+    resetCart();
     logout();
     navigate('/');
   };

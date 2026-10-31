@@ -5,10 +5,12 @@ import nhom10.phonenest.dto.DanhGiaDto;
 import nhom10.phonenest.dto.HoiDapDto;
 import nhom10.phonenest.dto.LoaiSanPhamDto;
 import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.dto.ThuongHieuDto;
 import nhom10.phonenest.service.DanhGiaService;
 import nhom10.phonenest.service.HoiDapService;
 import nhom10.phonenest.service.LoaiSanPhamService;
 import nhom10.phonenest.service.SanPhamService;
+import nhom10.phonenest.service.ThuongHieuService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,16 +27,22 @@ public class SanPhamController {
 
     private final SanPhamService sanPhamService;
     private final LoaiSanPhamService loaiSanPhamService;
+    private final ThuongHieuService thuongHieuService;
     private final DanhGiaService danhGiaService;
     private final HoiDapService hoiDapService;
 
     @GetMapping("/products")
     public List<SanPhamDto> list(@RequestParam(required = false) String q,
                                  @RequestParam(required = false) String maLoai,
+                                 @RequestParam(required = false) String maThuongHieu,
                                  @RequestParam(required = false) BigDecimal min,
                                  @RequestParam(required = false) BigDecimal max,
+                                 @RequestParam(required = false) Integer ram,
+                                 @RequestParam(required = false) Integer boNho,
+                                 @RequestParam(required = false) Boolean conHang,
+                                 @RequestParam(required = false) BigDecimal minRating,
                                  @RequestParam(required = false) String sort) {
-        return sanPhamService.list(q, maLoai, min, max, sort, false);
+        return sanPhamService.timKiem(q, maLoai, maThuongHieu, min, max, ram, boNho, conHang, minRating, sort, false);
     }
 
     @GetMapping("/products/{ma}")
@@ -60,5 +68,10 @@ public class SanPhamController {
     @GetMapping("/categories")
     public List<LoaiSanPhamDto> categories() {
         return loaiSanPhamService.list();
+    }
+
+    @GetMapping("/brands")
+    public List<ThuongHieuDto> brands() {
+        return thuongHieuService.list();
     }
 }

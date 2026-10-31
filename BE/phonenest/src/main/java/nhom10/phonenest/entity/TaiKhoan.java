@@ -1,5 +1,6 @@
 package nhom10.phonenest.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -17,6 +18,7 @@ public class TaiKhoan {
     @Id
     private String maTk;
     private String email;
+    @JsonIgnore
     private String matKhau;
     private LocalDate ngayTao;
     private boolean trangThaiHoatDong;

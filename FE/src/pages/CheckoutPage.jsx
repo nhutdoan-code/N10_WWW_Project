@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import AddressForm from '../components/AddressForm';
 import Modal from '../components/Modal';
 import VoucherCard from '../components/VoucherCard';
@@ -20,8 +20,10 @@ export default function CheckoutPage() {
   const [chon, setChon] = useState({ dh: undefined, vc: undefined });
   const [xemHet, setXemHet] = useState({ DON_HANG: false, VAN_CHUYEN: false });
   const [params] = useSearchParams();
-  const mua = params.get('mua');
-  const sl = Number(params.get('sl')) || 1;
+  const location = useLocation();
+  // Buy Now mới truyền variant qua location.state; query chỉ giữ để tương thích link cũ.
+  const mua = location.state?.mua || params.get('mua');
+  const sl = Number(location.state?.sl || params.get('sl')) || 1;
   const toast = useToast();
   const navigate = useNavigate();
   const { data: pv, loading: dangTinh, error: loiPv, reload } = useFetch(
@@ -42,7 +44,7 @@ export default function CheckoutPage() {
   const vDh = hieuLuc(ds('DON_HANG'), chon.dh);
   const vVc = hieuLuc(ds('VAN_CHUYEN'), chon.vc);
 
-  const dong = mua ? pv?.items || [] : items.map((i) => ({ maSanPham: i.sanPham.maSanPham, tenMay: i.sanPham.tenMay, soLuong: i.soLuong, donGia: i.sanPham.giaBan }));
+  const dong = mua ? pv?.items || [] : items.map((i) => ({ maSanPham: i.phienBan.maPhienBan, tenMay: `${i.sanPham.tenMay} - ${i.phienBan.mauSac} ${i.phienBan.boNho}GB`, soLuong: i.soLuong, donGia: i.phienBan.giaBan }));
   const tamTinh = pv ? Number(pv.tamTinh) : total;
   const phi = pv ? Number(pv.phiVanChuyen) : 0;
   const giamDh = vDh ? Number(vDh.soTienGiam) : 0;
@@ -138,7 +140,7 @@ export default function CheckoutPage() {
           <div className="summary">
             <h3 style={{ margin: 0 }}>Đơn hàng của bạn</h3>
             {dong.map((d) => (
-              <div key={d.maSanPham} className="row between" style={{ flexWrap: 'nowrap' }}>
+              <div key={d.maPhienBan || d.maSanPham} className="row between" style={{ flexWrap: 'nowrap' }}>
                 <span>{d.tenMay} × {d.soLuong}</span>
                 <span>{formatPrice(d.donGia * d.soLuong)}</span>
               </div>

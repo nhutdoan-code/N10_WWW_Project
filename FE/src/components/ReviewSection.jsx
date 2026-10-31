@@ -5,6 +5,7 @@ import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
 import { formatDay } from '../utils/format';
 import Modal from './Modal';
+import ProductImage from './ProductImage';
 
 const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
@@ -31,7 +32,7 @@ export default function ReviewSection({ ma }) {
           {r.hinhAnhThucTe && (
             <button type="button" className="review-image-button" onClick={() => setSelectedImage(r.hinhAnhThucTe)}
               aria-label={`Phóng to ảnh đánh giá của ${r.tenKhach}`}>
-              <img className="review-image" src={r.hinhAnhThucTe} alt={`Ảnh đánh giá sản phẩm của ${r.tenKhach}`} />
+              <ProductImage className="review-image" src={r.hinhAnhThucTe} alt={`Ảnh đánh giá sản phẩm của ${r.tenKhach}`} />
             </button>
           )}
           <small className="muted">{formatDay(r.ngayDanhGia)} · Đã mua hàng</small>
@@ -43,7 +44,7 @@ export default function ReviewSection({ ma }) {
       </p>
       {selectedImage && (
         <Modal title="Ảnh đánh giá" onClose={() => setSelectedImage(null)}>
-          <img className="review-image-full" src={selectedImage} alt="Ảnh đánh giá được phóng to" />
+          <ProductImage className="review-image-full" src={selectedImage} alt="Ảnh đánh giá được phóng to" />
         </Modal>
       )}
     </section>

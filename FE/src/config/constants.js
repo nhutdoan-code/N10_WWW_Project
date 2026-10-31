@@ -15,6 +15,13 @@ export const PRICE_RANGES = [
   { label: '10 - 20 triệu', min: 10000000, max: 20000000 },
   { label: 'Trên 20 triệu', min: 20000000 },
 ];
+export const RAM_OPTIONS = [4, 6, 8, 12, 16];
+export const STORAGE_OPTIONS = [64, 128, 256, 512, 1024];
+export const RATING_OPTIONS = [
+  { value: '4', label: 'Từ 4 sao' },
+  { value: '3', label: 'Từ 3 sao' },
+  { value: '2', label: 'Từ 2 sao' },
+];
 
 export const PAYMENT_METHODS = [
   { value: 'COD', label: 'Thanh toán khi nhận hàng (COD)' },
@@ -24,10 +31,13 @@ export const PAYMENT_METHODS = [
 
 export const ORDER_STATUS = {
   CHO_XAC_NHAN: 'Chờ xác nhận',
-  DANG_XU_LY: 'Đang xử lý',
+  DA_XAC_NHAN: 'Đã xác nhận',
+  DANG_CHUAN_BI: 'Đang chuẩn bị',
   DANG_GIAO: 'Đang giao',
-  DA_GIAO: 'Đã giao',
+  CHO_KHACH_XAC_NHAN: 'Chờ khách xác nhận',
+  DA_GIAO: 'Hoàn thành',
   DA_HUY: 'Đã hủy',
+  DANG_XU_LY: 'Đang xử lý',
 };
 
 export const CANCEL_REASONS = [
@@ -54,5 +64,5 @@ export const RETURN_STATUS = {
   DA_HOAN_TIEN: 'Đã hoàn tiền',
 };
 
-export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DANG_XU_LY', 'DANG_GIAO', 'DA_GIAO'];
+export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO', 'CHO_KHACH_XAC_NHAN', 'DA_GIAO'];
 
