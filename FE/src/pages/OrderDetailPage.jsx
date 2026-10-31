@@ -22,7 +22,7 @@ export default function OrderDetailPage() {
   const [reviewing, setReviewing] = useState(null);
   const [confirmReceive, setConfirmReceive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { data: reviewStates, reload: reloadReviews } = useFetch(
+  const { data: reviewStates, loading: reviewsLoading, error: reviewsError, reload: reloadReviews } = useFetch(
     () => (o?.trangThai === 'DA_GIAO' ? customerService.orderReviews(ma) : Promise.resolve([])),
     [ma, o?.trangThai]
   );
@@ -56,8 +56,9 @@ export default function OrderDetailPage() {
       reload();
     } catch (e) {
       toast(errorMessage(e), 'error');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
@@ -103,24 +104,56 @@ export default function OrderDetailPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <b>{formatPrice(d.donGia * d.soLuong)}</b>
-                  {o.trangThai === 'DA_GIAO' && (() => {
-                    const r = reviewStates?.find((x) => x.maSanPham === d.maSanPham);
-                    if (!r) return null;
-                    if (r.danhGia) return <div className="muted"><span className="stars">{'★'.repeat(r.danhGia.diemSao)}</span> Đã đánh giá</div>;
-                    if (r.duocDanhGia) return <button className="btn" onClick={() => setReviewing(d)}>Đánh giá</button>;
-                    return <small className="muted">{r.lyDo}</small>;
-                  })()}
                 </div>
               </div>
             ))}
           </div>
+
+          {o.trangThai === 'DA_GIAO' && (
+            <section className="section order-reviews" id="danh-gia-don-hang">
+              <h3>Đánh giá sản phẩm đã mua</h3>
+              <p className="muted">Chia sẻ trải nghiệm của bạn với từng sản phẩm trong đơn hàng.</p>
+              {reviewsLoading && <p className="muted" role="status">Đang kiểm tra trạng thái đánh giá...</p>}
+              {reviewsError && (
+                <div className="error" role="alert">
+                  <p>Không tải được trạng thái đánh giá: {reviewsError}</p>
+                  <button type="button" className="btn" onClick={reloadReviews}>Thử tải lại</button>
+                </div>
+              )}
+              {!reviewsLoading && !reviewsError && o.chiTiet.map((d) => {
+                const r = reviewStates?.find((x) => x.maSanPham === d.maSanPham);
+                return (
+                  <div key={d.maSanPham} className="line-item">
+                    <ProductImage className="thumb" src={d.anhChinh} alt="" />
+                    <div className="grow">
+                      <Link to={`/products/${d.maSanPham}`}>{d.tenMay}</Link>
+                      {r?.danhGia ? (
+                        <p className="muted"><span className="stars">{'★'.repeat(r.danhGia.diemSao)}</span> Đã đánh giá</p>
+                      ) : r?.duocDanhGia ? (
+                        <p className="muted">Bạn có thể đánh giá sản phẩm này.</p>
+                      ) : (
+                        <p className="muted">{r?.lyDo || 'Không tìm thấy trạng thái đánh giá cho sản phẩm này.'}</p>
+                      )}
+                    </div>
+                    {r?.duocDanhGia && !r.danhGia && (
+                      <button type="button" className="btn btn-primary" onClick={() => setReviewing(d)}>Đánh giá</button>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          )}
 
           {returnForm && (
             <form
               className="form section"
               onSubmit={(e) => {
                 e.preventDefault();
-                run(async () => { await customerService.requestReturn({ maDonHang: o.maDonHang, ...returnForm }); setReturnForm(null); }, 'Đã gửi yêu cầu đổi trả');
+                run(async () => {
+                  await customerService.requestReturn({ maDonHang: o.maDonHang, ...returnForm });
+                  setReturnForm(null);
+                  reloadReviews();
+                }, 'Đã gửi yêu cầu đổi trả');
               }}
             >
               <h3>Yêu cầu đổi trả / hoàn tiền</h3>
