@@ -51,7 +51,8 @@ public final class SanPhamMapper {
 
         List<SanPhamDto.Anh> anhs = anh.stream()
                 .map(x -> new SanPhamDto.Anh(
-                        x.getMaHinhAnh(), x.getDuongDan(), x.getGocChup()))
+                        x.getMaHinhAnh(), x.getDuongDan(), x.getGocChup(), x.getMauSac(),
+                        x.getPhienBan() == null ? null : x.getPhienBan().getMaPhienBan()))
                 .toList();
 
         return new SanPhamDto(
@@ -61,7 +62,60 @@ public final class SanPhamMapper {
                 s.getTenMay(), gia, s.getMoTa(), ts, ton, s.getTrangThai(), s.getDiemDanhGiaTb(),
                 chinh, anhs, pbs);
     }
+    /**
+     * Chọn ảnh đại diện theo màu: ưu tiên ảnh gán cho màu đó,
+     * nếu màu chưa có ảnh riêng thì dùng ảnh chính của sản phẩm.
+     */
+    /**
+     * Ảnh đại diện của một phiên bản: ảnh riêng phiên bản > ảnh theo màu > ảnh chung > ảnh chính.
+     */
+    public static String anhTheoMau(SanPham s, PhienBanSanPham pb) {
+        List<HinhAnhSanPham> ds = s.getHinhAnhs();
+        if (ds == null || ds.isEmpty()) {
+            return null;
+        }
 
+        String chinh = ds.stream()
+                .filter(HinhAnhSanPham::isAnhChinh)
+                .map(HinhAnhSanPham::getDuongDan)
+                .findFirst()
+                .orElse(ds.get(0).getDuongDan());
+
+        List<HinhAnhSanPham> ung = List.of();
+
+        if (pb != null) {
+            String ma = pb.getMaPhienBan();
+            ung = ds.stream()
+                    .filter(a -> a.getPhienBan() != null && ma.equals(a.getPhienBan().getMaPhienBan()))
+                    .toList();
+
+            if (ung.isEmpty() && pb.getMauSac() != null && !pb.getMauSac().isBlank()) {
+                String m = pb.getMauSac().trim();
+                ung = ds.stream()
+                        .filter(a -> a.getPhienBan() == null
+                                && a.getMauSac() != null
+                                && a.getMauSac().trim().equalsIgnoreCase(m))
+                        .toList();
+            }
+        }
+
+        if (ung.isEmpty()) {
+            ung = ds.stream()
+                    .filter(a -> a.getPhienBan() == null
+                            && (a.getMauSac() == null || a.getMauSac().isBlank()))
+                    .toList();
+        }
+
+        if (ung.isEmpty()) {
+            return chinh;
+        }
+
+        return ung.stream()
+                .map(HinhAnhSanPham::getDuongDan)
+                .filter(chinh::equals)
+                .findFirst()
+                .orElse(ung.get(0).getDuongDan());
+    }
     /**
      * DB lưu camera trước dạng chuỗi (ví dụ "12 MP" hoặc "12"); DTO trả về số MP
      * để FE hiển thị thống nhất.

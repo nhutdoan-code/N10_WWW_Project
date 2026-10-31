@@ -753,6 +753,8 @@ public class SanPhamService {
                 haMap.put("maHinhAnh", ha.getMaHinhAnh());
                 haMap.put("duongDan", ha.getDuongDan());
                 haMap.put("gocChup", ha.getGocChup());
+                haMap.put("mauSac", ha.getMauSac());
+                haMap.put("maPhienBan", ha.getPhienBan() == null ? null : ha.getPhienBan().getMaPhienBan());
                 haMap.put("anhChinh", ha.isAnhChinh());
                 hinhAnhs.add(haMap);
             }
@@ -879,6 +881,19 @@ public class SanPhamService {
             if (dto.gocChup() != null) {
                 anh.setGocChup(dto.gocChup());
             }
+            // Phạm vi áp dụng (loại trừ nhau): theo phiên bản > theo màu > ảnh chung
+            PhienBanSanPham pbAnh = null;
+            if (dto.maPhienBan() != null && !dto.maPhienBan().isBlank()) {
+                pbAnh = s.getPhienBans().stream()
+                        .filter(p -> dto.maPhienBan().equals(p.getMaPhienBan()))
+                        .findFirst()
+                        .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
+                                "Ảnh đang gán cho phiên bản không còn tồn tại, vui lòng chọn lại phạm vi áp dụng"));
+            }
+            anh.setPhienBan(pbAnh);
+            anh.setMauSac(pbAnh != null || dto.mauSac() == null || dto.mauSac().isBlank()
+                    ? null
+                    : dto.mauSac().trim());
 
             anh.setAnhChinh(false);
 

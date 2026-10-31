@@ -23,3 +23,36 @@ export function getProductImageUrl(value) {
   if (!url.startsWith('/')) url = `/${url}`;
   return url;
 }
+
+
+const chuanMau = (v) => (v || '').trim().toLowerCase();
+
+/** Danh sách ảnh áp dụng cho một phiên bản: theo phiên bản > theo màu > ảnh chung > ảnh chính. */
+export function danhSachAnhTheoPhienBan(sp, phienBan) {
+  const ds = sp?.hinhAnhs || [];
+  if (!ds.length) return [];
+
+  const ma = phienBan?.maPhienBan;
+  if (ma) {
+    const theoPb = ds.filter((a) => a.maPhienBan === ma);
+    if (theoPb.length) return theoPb;
+  }
+
+  const m = chuanMau(phienBan?.mauSac);
+  if (m) {
+    const theoMau = ds.filter((a) => !a.maPhienBan && chuanMau(a.mauSac) === m);
+    if (theoMau.length) return theoMau;
+  }
+
+  const chung = ds.filter((a) => !a.maPhienBan && !chuanMau(a.mauSac));
+  if (chung.length) return chung;
+
+  const chinh = ds.filter((a) => a.duongDan === sp.anhChinh);
+  return chinh.length ? chinh : [ds[0]];
+}
+
+/** Ảnh đại diện của một phiên bản (giỏ hàng, thanh toán...). */
+export function anhTheoPhienBan(sp, phienBan) {
+  const ds = danhSachAnhTheoPhienBan(sp, phienBan);
+  return (ds.find((a) => a.duongDan === sp?.anhChinh) || ds[0])?.duongDan || sp?.anhChinh;
+}

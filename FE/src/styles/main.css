@@ -975,3 +975,4 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .badge-DA_XAC_NHAN { background: #e0f2fe; color: #0369a1; }
 .badge-DANG_CHUAN_BI { background: #ede9fe; color: #5b21b6; }
 .badge-DANG_GIAO { background: #ffedd5; color: #c2410c; }
+.img-item select { width: 100%; margin-top: 6px; font-size: 13px; }
