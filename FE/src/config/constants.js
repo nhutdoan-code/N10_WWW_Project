@@ -15,6 +15,13 @@ export const PRICE_RANGES = [
   { label: '10 - 20 triệu', min: 10000000, max: 20000000 },
   { label: 'Trên 20 triệu', min: 20000000 },
 ];
+export const RAM_OPTIONS = [4, 6, 8, 12, 16];
+export const STORAGE_OPTIONS = [64, 128, 256, 512, 1024];
+export const RATING_OPTIONS = [
+  { value: '4', label: 'Từ 4 sao' },
+  { value: '3', label: 'Từ 3 sao' },
+  { value: '2', label: 'Từ 2 sao' },
+];
 
 export const PAYMENT_METHODS = [
   { value: 'COD', label: 'Thanh toán khi nhận hàng (COD)' },

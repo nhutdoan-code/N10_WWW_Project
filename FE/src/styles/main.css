@@ -196,6 +196,12 @@ select { padding-right: 28px; cursor: pointer; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; font: inherit; }
 .chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.filters { display: grid; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-strong); }
+.filters h3 { margin: 0; }
+.filter-group { display: grid; gap: 4px; font-size: 14px; }
+.filter-group span { color: var(--muted); }
+.filter-group select { width: 100%; }
+.filter-check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
 
 /* ---- Thẻ & lưới sản phẩm ---- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }

@@ -34,10 +34,15 @@ public class SanPhamController {
     @GetMapping("/products")
     public List<SanPhamDto> list(@RequestParam(required = false) String q,
                                  @RequestParam(required = false) String maLoai,
+                                 @RequestParam(required = false) String maThuongHieu,
                                  @RequestParam(required = false) BigDecimal min,
                                  @RequestParam(required = false) BigDecimal max,
+                                 @RequestParam(required = false) Integer ram,
+                                 @RequestParam(required = false) Integer boNho,
+                                 @RequestParam(required = false) Boolean conHang,
+                                 @RequestParam(required = false) BigDecimal minRating,
                                  @RequestParam(required = false) String sort) {
-        return sanPhamService.list(q, maLoai, min, max, sort, false);
+        return sanPhamService.timKiem(q, maLoai, maThuongHieu, min, max, ram, boNho, conHang, minRating, sort, false);
     }
 
     @GetMapping("/products/{ma}")

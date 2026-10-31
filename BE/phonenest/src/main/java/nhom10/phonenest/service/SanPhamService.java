@@ -198,6 +198,144 @@ public class SanPhamService {
                 .sorted(comparator)
                 .toList();
     }
+    /**
+     * Tìm kiếm + lọc nâng cao cho khách hàng.
+     * RAM / bộ nhớ / giá / còn hàng được kiểm tra trên CÙNG MỘT phiên bản:
+     * sản phẩm hiện ra khi có ít nhất 1 phiên bản đang kinh doanh thỏa tất cả điều kiện.
+     */
+    public List<SanPhamDto> timKiem(
+            String q,
+            String maLoai,
+            String maThuongHieu,
+            BigDecimal min,
+            BigDecimal max,
+            Integer ram,
+            Integer boNho,
+            Boolean conHang,
+            BigDecimal minRating,
+            String sort,
+            boolean admin
+    ) {
+
+        String qq = q == null ? "" : q.trim().toLowerCase();
+
+        Set<String> loais = (maLoai == null || maLoai.isBlank())
+                ? null
+                : nhomLoai(maLoai);
+
+        boolean locBienThe = min != null || max != null
+                || ram != null || boNho != null
+                || Boolean.TRUE.equals(conHang);
+
+        List<SanPhamDto> dtos = new ArrayList<>();
+
+        for (SanPham s : spRepo.findAll()) {
+
+            if (!admin && s.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+                continue;
+            }
+
+            if (!qq.isEmpty()) {
+                boolean khopTen = s.getTenMay() != null
+                        && s.getTenMay().toLowerCase().contains(qq);
+                boolean khopMa = s.getMaSanPham() != null
+                        && s.getMaSanPham().toLowerCase().contains(qq);
+                if (!khopTen && !khopMa) {
+                    continue;
+                }
+            }
+
+            if (loais != null
+                    && (s.getLoai() == null || !loais.contains(s.getLoai().getMaLoai()))) {
+                continue;
+            }
+
+            if (maThuongHieu != null && !maThuongHieu.isBlank()
+                    && (s.getThuongHieu() == null
+                    || !maThuongHieu.equals(s.getThuongHieu().getMaThuongHieu()))) {
+                continue;
+            }
+
+            if (minRating != null
+                    && (s.getDiemDanhGiaTb() == null
+                    || s.getDiemDanhGiaTb().compareTo(minRating) < 0)) {
+                continue;
+            }
+
+            if (locBienThe && s.getPhienBans().stream()
+                    .noneMatch(p -> phienBanKhop(p, min, max, ram, boNho, conHang))) {
+                continue;
+            }
+
+            dtos.add(SanPhamMapper.toDto(s));
+        }
+
+        // Sort ổn định: xếp "mới nhất" trước, rồi sort theo tiêu chí chọn (tie-break = mới nhất)
+        dtos.sort(Comparator.comparing(
+                SanPhamDto::maSanPham,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+
+        String kieu = sort == null ? "" : sort;
+
+        if ("gia_asc".equals(kieu)) {
+            dtos.sort(Comparator.comparing(
+                    SanPhamDto::giaBan,
+                    Comparator.nullsLast(Comparator.naturalOrder())));
+        } else if ("gia_desc".equals(kieu)) {
+            dtos.sort(Comparator.comparing(
+                    SanPhamDto::giaBan,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+        } else if ("danh_gia".equals(kieu)) {
+            dtos.sort(Comparator.comparing(
+                    SanPhamDto::diemDanhGiaTb,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+        } else if ("ban_chay".equals(kieu)) {
+            Map<String, Long> daBan = daBanTheoSanPham();
+            dtos.sort(Comparator
+                    .comparing((SanPhamDto d) -> daBan.getOrDefault(d.maSanPham(), 0L))
+                    .reversed());
+        }
+        // "moi" hoặc rỗng: giữ thứ tự mới nhất ở trên
+
+        return dtos;
+    }
+
+    private boolean phienBanKhop(
+            PhienBanSanPham p,
+            BigDecimal min,
+            BigDecimal max,
+            Integer ram,
+            Integer boNho,
+            Boolean conHang
+    ) {
+        if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+            return false;
+        }
+        if (ram != null && p.getRam() != ram.intValue()) {
+            return false;
+        }
+        if (boNho != null && p.getBoNho() != boNho.intValue()) {
+            return false;
+        }
+        if (min != null && (p.getGiaBan() == null || p.getGiaBan().compareTo(min) < 0)) {
+            return false;
+        }
+        if (max != null && (p.getGiaBan() == null || p.getGiaBan().compareTo(max) > 0)) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(conHang) && p.getSoLuongTon() <= 0) {
+            return false;
+        }
+        return true;
+    }
+
+    private Map<String, Long> daBanTheoSanPham() {
+        Map<String, Long> kq = new HashMap<>();
+        for (Object[] r : chiTietDonHangRepo.tongDaBanTheoSanPham()) {
+            kq.put((String) r[0], ((Number) r[1]).longValue());
+        }
+        return kq;
+    }
 
     public SanPhamDto get(String ma, boolean admin) {
 

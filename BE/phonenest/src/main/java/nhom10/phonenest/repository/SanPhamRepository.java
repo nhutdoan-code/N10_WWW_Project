@@ -15,6 +15,6 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
     @Query("SELECT s FROM SanPham s " +
            "WHERE LOWER(s.tenMay) LIKE LOWER(:pattern) ESCAPE '\\' " +
            "   OR LOWER(s.maSanPham) LIKE LOWER(:pattern) ESCAPE '\\' " +
-           "ORDER BY s.ngayTao DESC")
+           "ORDER BY s.maSanPham DESC")
     List<SanPham> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
 }
