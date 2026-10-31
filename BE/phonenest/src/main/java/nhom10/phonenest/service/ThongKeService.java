@@ -38,7 +38,8 @@ public class ThongKeService {
             TrangThaiDonHang.CHO_XAC_NHAN,
             TrangThaiDonHang.DA_XAC_NHAN,
             TrangThaiDonHang.DANG_CHUAN_BI,
-            TrangThaiDonHang.DANG_GIAO
+            TrangThaiDonHang.DANG_GIAO,
+            TrangThaiDonHang.CHO_KHACH_XAC_NHAN
     );
 
     private final DonHangRepository donHangRepository;

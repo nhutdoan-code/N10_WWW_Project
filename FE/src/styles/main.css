@@ -228,6 +228,7 @@ select { padding-right: 28px; cursor: pointer; }
 .badge-CON_HANG, .badge-DA_GIAO, .badge-DA_DUYET, .badge-DA_HOAN_TIEN { background: #dcf5ea; color: #0b6b4a; }
 .badge-HET_HANG, .badge-DA_HUY, .badge-NGUNG_KINH_DOANH, .badge-TU_CHOI { background: #fde7e5; color: #a1241c; }
 .badge-CHO_XAC_NHAN, .badge-DANG_XU_LY, .badge-DANG_GIAO, .badge-CHO_DUYET { background: #fdf0d3; color: #8a5a00; }
+.badge-CHO_KHACH_XAC_NHAN { background: #e1ecff; color: #1e4fd8; }
 
 /* ---- Chi tiết sản phẩm ---- */
 .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; background: #fff; padding: 28px; border-radius: 18px; border: 1px solid var(--line); margin-bottom: 24px; }
@@ -976,3 +977,95 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .badge-DANG_CHUAN_BI { background: #ede9fe; color: #5b21b6; }
 .badge-DANG_GIAO { background: #ffedd5; color: #c2410c; }
 .img-item select { width: 100%; margin-top: 6px; font-size: 13px; }
+/* Dropdown cập nhật trạng thái đơn hàng Admin */
+.table .admin-order-status-select {
+  display: block;
+  width: 100%;
+  min-width: 190px;
+  height: 48px;
+  min-height: 48px;
+  padding: 10px 36px 10px 14px;
+
+  box-sizing: border-box;
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 500;
+
+  color: #0b1736;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.table td:has(.admin-order-status-select) {
+  min-width: 220px;
+  vertical-align: middle;
+}
+
+/* Dropdown trạng thái đơn hàng - dùng cho bảng và Modal */
+.admin-order-status-select {
+  display: block;
+  width: 100%;
+  min-width: 200px;
+  height: 48px;
+  min-height: 48px;
+
+  padding: 10px 36px 10px 14px;
+
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 500;
+
+  color: #0b1736;
+  background: #ffffff;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+/* Dropdown trong bảng quản lý đơn hàng */
+.table td:has(.admin-order-status-select) {
+  min-width: 230px;
+  vertical-align: middle;
+}
+
+/* Dropdown trong Modal chi tiết đơn */
+.modal .admin-order-status-select {
+  width: 100%;
+  min-width: 220px;
+  height: 48px;
+}
+
+/* Không để select bị co khi đặt cạnh nút */
+.admin-order-status-select {
+  flex-shrink: 0;
+}
+
+/* Khi click vào dropdown */
+.admin-order-status-select:focus {
+  outline: 2px solid #2454e6;
+  outline-offset: 2px;
+}
+.admin-order-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-order-status-actions .admin-order-status-select {
+  width: 220px;
+  min-width: 220px;
+  height: 48px;
+  min-height: 48px;
+  flex-shrink: 0;
+}
+
+.admin-order-status-actions .btn {
+  min-height: 44px;
+  white-space: normal;
+}

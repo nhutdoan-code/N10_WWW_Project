@@ -34,7 +34,8 @@ export const ORDER_STATUS = {
   DA_XAC_NHAN: 'Đã xác nhận',
   DANG_CHUAN_BI: 'Đang chuẩn bị',
   DANG_GIAO: 'Đang giao',
-  DA_GIAO: 'Đã giao',
+  CHO_KHACH_XAC_NHAN: 'Chờ khách xác nhận',
+  DA_GIAO: 'Hoàn thành',
   DA_HUY: 'Đã hủy',
   DANG_XU_LY: 'Đang xử lý',
 };
@@ -63,5 +64,5 @@ export const RETURN_STATUS = {
   DA_HOAN_TIEN: 'Đã hoàn tiền',
 };
 
-export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO', 'DA_GIAO'];
+export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO', 'CHO_KHACH_XAC_NHAN', 'DA_GIAO'];
 

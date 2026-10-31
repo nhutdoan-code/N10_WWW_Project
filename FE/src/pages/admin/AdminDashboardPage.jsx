@@ -35,6 +35,7 @@ const STATUS_COLORS = {
   DA_XAC_NHAN: '#2a78d6',
   DANG_CHUAN_BI: '#6250d6',
   DANG_GIAO: '#eb6834',
+  CHO_KHACH_XAC_NHAN: '#2a9d8f',
   DA_GIAO: '#1baf7a',
   DA_HUY: '#e34948',
 };
@@ -44,7 +45,8 @@ const STATUS_LABELS = {
   DA_XAC_NHAN: 'Đã xác nhận',
   DANG_CHUAN_BI: 'Đang chuẩn bị',
   DANG_GIAO: 'Đang giao',
-  DA_GIAO: 'Đã giao',
+  CHO_KHACH_XAC_NHAN: 'Chờ khách xác nhận',
+  DA_GIAO: 'Hoàn thành',
   DA_HUY: 'Đã hủy',
 };
 

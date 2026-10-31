@@ -16,6 +16,7 @@ export const adminService = {
 
   orders: () => api.get('/admin/orders'),
   updateOrderStatus: (ma, trangThai) => api.put(`/admin/orders/${ma}/status`, null, { params: { trangThai } }),
+  markDelivered: (ma) => api.put(`/admin/orders/${ma}/mark-delivered`),
   updateOrderLine: (ma, maSanPham, soLuong) => api.put(`/admin/orders/${ma}/items/${maSanPham}`, { soLuong }),
 
   accounts: () => api.get('/admin/accounts'),
