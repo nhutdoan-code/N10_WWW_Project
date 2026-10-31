@@ -97,7 +97,6 @@ export default function MainLayout() {
           ))}
           <Link to="/?gia=1">Dưới 5 triệu</Link>
           <Link to="/?gia=4">Trên 20 triệu</Link>
-          <Link to="/compare">So sánh</Link>
         </div>
       </nav>
       <main className="container main">
