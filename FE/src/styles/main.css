@@ -1069,3 +1069,96 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
   min-height: 44px;
   white-space: normal;
 }
+
+/* ===== TÍNH NĂNG 17: BỘ LỌC ADMIN ORDERS ===== */
+
+.admin-order-filter {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  align-items: end;
+}
+
+.admin-order-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #50607b;
+}
+
+.admin-order-filter input,
+.admin-order-filter select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.admin-order-filter button {
+  min-height: 46px;
+}
+
+/* Dropdown trạng thái, cả bảng và Modal */
+
+.admin-order-table td:has(
+  .admin-order-status-actions
+) {
+  min-width: 225px;
+}
+
+.admin-order-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-order-status-actions
+.admin-order-status-select {
+  display: block;
+  flex: 0 0 210px;
+  width: 210px;
+  min-height: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 10px 34px 10px 12px;
+  line-height: 24px;
+  font-size: 15px;
+}
+
+.admin-order-status-actions .btn {
+  min-height: 44px;
+  white-space: normal;
+}
+
+/* Phân trang */
+
+.admin-order-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin: 18px 0;
+}
+.admin-order-customer-info {
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-order-customer-info p {
+  margin: 6px 0;
+  line-height: 1.6;
+}
+
+.admin-order-customer-info strong {
+  color: #334155;
+}

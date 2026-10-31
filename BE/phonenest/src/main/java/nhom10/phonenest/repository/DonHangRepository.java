@@ -4,6 +4,7 @@ import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,7 +16,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 import java.util.Optional;
 
-public interface DonHangRepository extends JpaRepository<DonHang, String> {
+public interface DonHangRepository extends JpaRepository<DonHang, String>  , JpaSpecificationExecutor<DonHang> {
 
     List<DonHang> findByKhachHangMaKhOrderByNgayMuaDesc(String maKh);
 
