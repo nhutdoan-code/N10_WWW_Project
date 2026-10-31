@@ -5,9 +5,11 @@ import HeroSlider from '../components/HeroSlider';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
 import ProductImage from '../components/ProductImage';
+import ProductFilters from '../components/ProductFilters';
 import { PRICE_RANGES, SORT_OPTIONS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
+import { productStatus } from '../utils/stock';
 import { formatPrice } from '../utils/format';
 
 const SERVICES = [
@@ -32,10 +34,16 @@ export default function HomePage() {
   const q = params.get('q') || '';
   const maLoai = params.get('loai') || '';
   const price = Number(params.get('gia')) || 0;
-  const [sort, setSort] = useState('');
+  const maTh = params.get('hang') || '';
+  const ram = params.get('ram') || '';
+  const boNho = params.get('bonho') || '';
+  const chiConHang = params.get('conhang') === '1';
+  const rating = params.get('sao') || '';
+  const sort = params.get('sort') || '';
   const { data: categories } = useFetch(productService.categories);
+  const { data: brands } = useFetch(productService.brands);
   const range = PRICE_RANGES[price];
-  const macDinh = !q && !maLoai && !price && !sort;
+  const macDinh = !q && !maLoai && !price && !sort && !maTh && !ram && !boNho && !chiConHang && !rating;
 
   const setFilter = (key, value) => {
     const next = new URLSearchParams(params);
@@ -43,14 +51,29 @@ export default function HomePage() {
     else next.delete(key);
     setParams(next);
   };
-
+  const xoaLoc = () => {
+    const next = new URLSearchParams(params);
+    ['hang', 'ram', 'bonho', 'conhang', 'sao', 'gia'].forEach((k) => next.delete(k));
+    setParams(next);
+  };
   const { data: products, loading, error } = useFetch(
-    () => productService.list({ q, maLoai, min: range.min, max: range.max, sort }),
-    [q, maLoai, price, sort]
+      () => productService.list({
+        q: q || undefined,
+        maLoai: maLoai || undefined,
+        maThuongHieu: maTh || undefined,
+        min: range.min,
+        max: range.max,
+        ram: ram || undefined,
+        boNho: boNho || undefined,
+        conHang: chiConHang || undefined,
+        minRating: rating || undefined,
+        sort: sort || undefined,
+      }),
+      [q, maLoai, maTh, price, ram, boNho, chiConHang, rating, sort]
   );
   const { data: banChay } = useFetch(() => (macDinh ? productService.list({ sort: 'ban_chay' }) : Promise.resolve(null)), [macDinh]);
 
-  const conHang = (banChay || []).filter((p) => p.trangThai === 'CON_HANG');
+  const conHang = (banChay || []).filter((p) => ['CON_HANG', 'SAP_HET'].includes(productStatus(p)));
   const danhGia = [...conHang].sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const giaTot = [...conHang].filter((p) => p.giaBan < 10000000).sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const hang = categories?.filter((c) => !c.maLoaiCha) || [];
@@ -119,21 +142,32 @@ export default function HomePage() {
         </div>
         <div className="shop">
           {categories && (
-            <aside className="card">
-              <h3>Danh mục</h3>
-              <CategoryTree categories={categories} value={maLoai} onChange={(v) => setFilter('loai', v)} />
-            </aside>
+              <aside className="card">
+                {categories && (
+                    <>
+                      <h3>Danh mục</h3>
+                      <CategoryTree categories={categories} value={maLoai} onChange={(v) => setFilter('loai', v)}/>
+                    </>
+                )}
+                <ProductFilters
+                    brands={brands || []}
+                    values={{hang: maTh, ram, bonho: boNho, conhang: chiConHang, sao: rating}}
+                    onChange={setFilter}
+                    onReset={xoaLoc}
+                />
+              </aside>
           )}
           <div>
             <div className="toolbar">
               <div className="chips">
                 {PRICE_RANGES.map((r, i) => (
-                  <button key={r.label} className={price === i ? 'chip active' : 'chip'} onClick={() => setFilter('gia', i || '')}>{r.label}</button>
+                    <button key={r.label} className={price === i ? 'chip active' : 'chip'}
+                            onClick={() => setFilter('gia', i || '')}>{r.label}</button>
                 ))}
               </div>
-              <select aria-label="Sắp xếp" value={sort} onChange={(e) => setSort(e.target.value)}>
+              <select aria-label="Sắp xếp" value={sort} onChange={(e) => setFilter('sort', e.target.value)}>
                 {SORT_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </div>

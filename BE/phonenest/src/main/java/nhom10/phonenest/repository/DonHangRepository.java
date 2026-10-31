@@ -4,6 +4,7 @@ import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,12 +12,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import java.util.Optional;
 
-public interface DonHangRepository extends JpaRepository<DonHang, String> {
+public interface DonHangRepository extends JpaRepository<DonHang, String>  , JpaSpecificationExecutor<DonHang> {
 
     List<DonHang> findByKhachHangMaKhOrderByNgayMuaDesc(String maKh);
 
     List<DonHang> findAllByOrderByNgayMuaDesc();
+    // Khóa dòng đơn hàng khi đổi trạng thái để hai request đồng thời không cùng thành công
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from DonHang d where d.maDonHang = :ma")
+    Optional<DonHang> findByIdForUpdate(@Param("ma") String ma);
 
     boolean existsByKhachHangMaKh(String maKh);
 

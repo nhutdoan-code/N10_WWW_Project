@@ -15,7 +15,12 @@ export const adminService = {
   deleteCategory: (ma) => api.delete(`/admin/categories/${ma}`),
 
   orders: () => api.get('/admin/orders'),
+
+  filterOrders: (params) =>
+      api.get('/admin/orders/filter', { params }),
+
   updateOrderStatus: (ma, trangThai) => api.put(`/admin/orders/${ma}/status`, null, { params: { trangThai } }),
+  markDelivered: (ma) => api.put(`/admin/orders/${ma}/mark-delivered`),
   updateOrderLine: (ma, maSanPham, soLuong) => api.put(`/admin/orders/${ma}/items/${maSanPham}`, { soLuong }),
 
   accounts: () => api.get('/admin/accounts'),

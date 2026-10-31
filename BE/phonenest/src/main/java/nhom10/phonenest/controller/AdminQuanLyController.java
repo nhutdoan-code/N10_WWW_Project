@@ -38,6 +38,10 @@ public class AdminQuanLyController {
     public DonHangDto capNhatTrangThai(@PathVariable String ma, @RequestParam TrangThaiDonHang trangThai) {
         return donHangService.capNhatTrangThai(ma, trangThai);
     }
+    @PutMapping("/orders/{ma}/mark-delivered")
+    public DonHangDto danhDauDaGiao(@PathVariable String ma) {
+        return donHangService.danhDauDaGiao(ma);
+    }
 
     @GetMapping("/orders/{ma}")
     public DonHangDto order(@PathVariable String ma) {

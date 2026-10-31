@@ -38,7 +38,9 @@ public record SanPhamDto(
     public record Anh(
             String maHinhAnh,
             @NotBlank(message = "Đường dẫn ảnh không được để trống") String duongDan,
-            String gocChup) {
+            String gocChup,
+            String mauSac,
+            String maPhienBan) {
     }
 
     public record PhienBan(
