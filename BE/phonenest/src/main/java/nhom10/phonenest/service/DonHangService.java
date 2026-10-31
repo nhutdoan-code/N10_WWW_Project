@@ -1,19 +1,441 @@
 package nhom10.phonenest.service;
-import lombok.RequiredArgsConstructor; import nhom10.phonenest.dto.*; import nhom10.phonenest.entity.*; import nhom10.phonenest.enums.*; import nhom10.phonenest.exception.AppException; import nhom10.phonenest.mapper.DonHangMapper; import nhom10.phonenest.repository.*; import nhom10.phonenest.util.*; import org.springframework.http.HttpStatus; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.math.BigDecimal; import java.time.*; import java.util.*;
-@Service @RequiredArgsConstructor @Transactional public class DonHangService{
- private static final int DIEM_MOI_VND=10000; private static final String LY_DO_KHAC="Lý do khác"; private static final List<String> LY_DO_HUY=List.of("Muốn thay đổi địa chỉ giao hàng","Muốn nhập / thay đổi mã khuyến mãi","Muốn thay đổi sản phẩm trong đơn (màu sắc, dung lượng, số lượng...)","Thủ tục thanh toán quá rắc rối","Tìm thấy giá tốt hơn ở nơi khác","Đổi ý, không muốn mua nữa",LY_DO_KHAC);
- private final DonHangRepository donHangRepository; private final GioHangRepository gioHangRepository; private final PhienBanSanPhamRepository phienBanRepository; private final KhuyenMaiRepository khuyenMaiRepository; private final HuyDonHangRepository huyRepository; private final ThanhToanRepository thanhToanRepository; private final LichSuTrangThaiDonHangRepository lichSuRepository; private final BienDongKhoRepository bienDongRepository; private final KhuyenMaiService khuyenMaiService; private final DiaChiService diaChiService; private final PhiVanChuyenService phiVanChuyenService; private final ThanhToanService thanhToanService; private final KhachHangRepository khachHangRepository; private final TaiKhoanRepository taiKhoanRepository; private final DiaChiRepository diaChiRepository; private final DonHangMapper mapper; private final GioHangService gioHangService; private final ThongBaoService thongBaoService; private final EmailService emailService;
- public DonHangDto datHang(String maKh,DonHangDto.Checkout req){KhachHang kh=khachHangRepository.findById(maKh).orElseThrow();boolean muaNgay=req.maSanPham()!=null&&!req.maSanPham().isBlank();Map<String,Integer> muc=thanhToanService.mucMua(maKh,req.maSanPham(),req.soLuong());DiaChi dc=diaChiRepository.findById(req.maDiaChi()).filter(x->x.getMaKh().equals(maKh)).orElseThrow(()->new AppException(HttpStatus.BAD_REQUEST,"Địa chỉ giao hàng không hợp lệ"));DonHang d=new DonHang();d.setMaDonHang(IdGenerator.next("DH"));d.setKhachHang(kh);d.setNgayMua(LocalDateTime.now());d.setNgayCapNhat(d.getNgayMua());d.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);d.setTenNguoiNhan(dc.getTenNguoiNhan());d.setSoDienThoaiNhan(dc.getSoDienThoaiNhan());d.setDiaChiGiaoHang(diaChiService.diaChiDayDu(dc));BigDecimal tam=BigDecimal.ZERO;for(var e:muc.entrySet()){PhienBanSanPham p=phienBanRepository.findById(e.getKey()).orElseThrow();if(p.getTrangThai()!=TrangThaiSanPham.CON_HANG||e.getValue()>p.getSoLuongTon())throw new AppException(HttpStatus.BAD_REQUEST,p.getSanPham().getTenMay()+" không đủ hàng");ChiTietDonHang c=new ChiTietDonHang();c.setMaChiTiet(IdGenerator.next("CTDH"));c.setDonHang(d);c.setPhienBan(p);c.setTenSanPham(p.getSanPham().getTenMay());c.setTenPhienBan(p.getRam()+"GB/"+p.getBoNho()+"GB/"+p.getMauSac());c.setSku(p.getSku());c.setHinhAnh(p.getSanPham().getHinhAnhs().stream().filter(HinhAnhSanPham::isAnhChinh).map(HinhAnhSanPham::getDuongDan).findFirst().orElse(null));c.setSoLuong(e.getValue());c.setDonGia(p.getGiaBan());c.setBaoHanhThang(p.getSanPham().getThoiHanBaoHanhThang());d.getChiTiet().add(c);tam=tam.add(p.getGiaBan().multiply(BigDecimal.valueOf(e.getValue())));}d.setTamTinh(tam);BigDecimal phi=phiVanChuyenService.tinhPhi(phiVanChuyenService.theoDiaChi(dc.getMaTinh()),tam);d.setPhiVanChuyen(phi);boolean moi=!donHangRepository.existsByKhachHangMaKhAndTrangThaiNot(maKh,TrangThaiDonHang.DA_HUY);if(coMa(req.maKm())){KhuyenMai k=dungVoucher(req.maKm(),LoaiKhuyenMai.DON_HANG,tam,moi);d.setKhuyenMai(k);d.setGiamGia(khuyenMaiService.tinhGiam(k,tam));}if(coMa(req.maKmVanChuyen())){KhuyenMai k=dungVoucher(req.maKmVanChuyen(),LoaiKhuyenMai.VAN_CHUYEN,tam,moi);d.setKhuyenMaiVanChuyen(k);d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k,phi));}d.setTongThanhToan(tam.subtract(d.getGiamGia()).add(phi).subtract(d.getGiamPhiVanChuyen()));DonHang luu=donHangRepository.save(d);doiTon(luu,-1,LoaiBienDongKho.BAN_HANG);taoThanhToan(luu,req.phuongThucTt());ghiTrangThai(luu,TrangThaiDonHang.CHO_XAC_NHAN,"Khách hàng đặt đơn");if(!muaNgay)gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(g->g.getChiTiet().clear());DonHangDto dto=mapper.toDto(luu);thongBaoService.gui(maKh,"Đặt hàng thành công, đơn "+luu.getMaDonHang()+" đang chờ xác nhận");taiKhoanRepository.findById(maKh).ifPresent(tk->emailService.gui(tk.getEmail(),"Xác nhận đơn hàng "+luu.getMaDonHang(),"Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: "+dto.tongTien().toBigInteger()+" VND."));return dto;}
- public List<DonHangDto> lichSu(String maKh){return donHangRepository.findByKhachHangMaKhOrderByNgayMuaDesc(maKh).stream().map(mapper::toDto).toList();} public DonHangDto chiTiet(String maKh,String ma){return mapper.toDto(donCuaToi(maKh,ma));} public List<DonHangDto> tatCa(){return donHangRepository.findAllByOrderByNgayMuaDesc().stream().map(mapper::toDto).toList();} public DonHangDto chiTietQuanTri(String ma){return mapper.toDto(tim(ma));}
- public DonHangDto huy(String maKh,String ma,DonHangDto.HuyRequest req){DonHang d=donCuaToi(maKh,ma);if(d.getTrangThai()!=TrangThaiDonHang.CHO_XAC_NHAN&&d.getTrangThai()!=TrangThaiDonHang.DA_XAC_NHAN&&d.getTrangThai()!=TrangThaiDonHang.DANG_CHUAN_BI)throw new AppException(HttpStatus.BAD_REQUEST,"Đơn hàng đã bàn giao vận chuyển, không thể hủy");if(!LY_DO_HUY.contains(req.lyDo()))throw new AppException(HttpStatus.BAD_REQUEST,"Lý do hủy đơn không hợp lệ");if(LY_DO_KHAC.equals(req.lyDo())&&(req.ghiChu()==null||req.ghiChu().isBlank()))throw new AppException(HttpStatus.BAD_REQUEST,"Vui lòng nhập lý do hủy khác");doiTon(d,1,LoaiBienDongKho.HOAN_HUY_DON);d.setTrangThai(TrangThaiDonHang.DA_HUY);d.setNgayCapNhat(LocalDateTime.now());HuyDonHang h=new HuyDonHang();h.setMaDonHang(ma);h.setLyDo(req.lyDo());h.setGhiChu(req.ghiChu());h.setNgayHuy(LocalDateTime.now());huyRepository.save(h);ghiTrangThai(d,TrangThaiDonHang.DA_HUY,req.lyDo());return mapper.toDto(d);}
- public DonHangDto capNhatTrangThai(String ma,TrangThaiDonHang moi){DonHang d=tim(ma);if(d.getTrangThai()==TrangThaiDonHang.DA_GIAO||d.getTrangThai()==TrangThaiDonHang.DA_HUY)throw new AppException(HttpStatus.BAD_REQUEST,"Đơn hàng đã kết thúc");if(moi==TrangThaiDonHang.DA_HUY)doiTon(d,1,LoaiBienDongKho.HOAN_HUY_DON);d.setTrangThai(moi);d.setNgayCapNhat(LocalDateTime.now());if(moi==TrangThaiDonHang.DA_GIAO){d.setNgayGiao(d.getNgayCapNhat());congDiem(d);}ghiTrangThai(d,moi,"Quản trị cập nhật trạng thái");thongBaoService.gui(d.getKhachHang().getMaKh(),"Đơn hàng "+ma+" chuyển sang trạng thái: "+moi.name());return mapper.toDto(d);}
- public GioHangDto muaLai(String maKh,String ma){List<GioHangDto.Request> ds=donCuaToi(maKh,ma).getChiTiet().stream().map(c->new GioHangDto.Request(c.getPhienBan().getMaPhienBan(),c.getSoLuong())).toList();return gioHangService.sync(maKh,ds);}
- public DonHangDto suaDong(String ma,String id,int sl){DonHang d=tim(ma);if(d.getTrangThai()!=TrangThaiDonHang.CHO_XAC_NHAN)throw new AppException(HttpStatus.BAD_REQUEST,"Chỉ sửa khi chờ xác nhận");ChiTietDonHang c=d.getChiTiet().stream().filter(x->x.getPhienBan().getMaPhienBan().equals(id)).findFirst().orElseThrow(()->new AppException(HttpStatus.NOT_FOUND,"Phiên bản không có trong đơn"));int delta=sl-c.getSoLuong();if(sl<=0){if(d.getChiTiet().size()==1)throw new AppException(HttpStatus.BAD_REQUEST,"Đơn phải còn ít nhất một sản phẩm");capTon(c.getPhienBan(),c.getSoLuong(),d,LoaiBienDongKho.DIEU_CHINH);d.getChiTiet().remove(c);}else{if(delta>c.getPhienBan().getSoLuongTon())throw new AppException(HttpStatus.BAD_REQUEST,"Không đủ tồn kho");capTon(c.getPhienBan(),-delta,d,LoaiBienDongKho.DIEU_CHINH);c.setSoLuong(sl);}recalc(d);return mapper.toDto(d);}
- private void recalc(DonHang d){BigDecimal tam=d.getChiTiet().stream().map(c->c.getDonGia().multiply(BigDecimal.valueOf(c.getSoLuong()))).reduce(BigDecimal.ZERO,BigDecimal::add);d.setTamTinh(tam);if(d.getKhuyenMai()!=null)d.setGiamGia(khuyenMaiService.tinhGiam(d.getKhuyenMai(),tam));d.setTongThanhToan(tam.subtract(d.getGiamGia()).add(d.getPhiVanChuyen()).subtract(d.getGiamPhiVanChuyen()));d.setNgayCapNhat(LocalDateTime.now());}
- private void taoThanhToan(DonHang d,PhuongThucTt pt){ThanhToan t=new ThanhToan();t.setMaThanhToan(IdGenerator.next("TT"));t.setDonHang(d);t.setPhuongThuc(pt);t.setSoTien(d.getTongThanhToan());t.setTrangThai(pt==PhuongThucTt.COD?TrangThaiThanhToan.CHO_THANH_TOAN:TrangThaiThanhToan.CHO_THANH_TOAN);t.setNgayTao(LocalDateTime.now());thanhToanRepository.save(t);}
- private void doiTon(DonHang d,int dau,LoaiBienDongKho loai){d.getChiTiet().forEach(c->capTon(c.getPhienBan(),dau*c.getSoLuong(),d,loai));} private void capTon(PhienBanSanPham p,int delta,DonHang d,LoaiBienDongKho loai){int truoc=p.getSoLuongTon(),sau=Math.max(0,truoc+delta);p.setSoLuongTon(sau);BienDongKho b=new BienDongKho();b.setMaBienDong(IdGenerator.next("BDK"));b.setPhienBan(p);b.setLoaiBienDong(loai);b.setSoLuong(delta);b.setTonTruoc(truoc);b.setTonSau(sau);b.setDonHang(d);b.setThoiGian(LocalDateTime.now());bienDongRepository.save(b);}
- private void ghiTrangThai(DonHang d,TrangThaiDonHang t,String gc){LichSuTrangThaiDonHang l=new LichSuTrangThaiDonHang();l.setMaLichSu(IdGenerator.next("LSTT"));l.setDonHang(d);l.setTrangThai(t);l.setThoiGian(LocalDateTime.now());l.setGhiChu(gc);lichSuRepository.save(l);}
- private void congDiem(DonHang d){KhachHang k=d.getKhachHang();k.setDiemTichLuy(k.getDiemTichLuy()+d.getTamTinh().subtract(d.getGiamGia()).intValue()/DIEM_MOI_VND);k.setHangThanhVien(HangThanhVien.of(k.getDiemTichLuy()));}
- private DonHang tim(String ma){return donHangRepository.findById(ma).orElseThrow(()->new AppException(HttpStatus.NOT_FOUND,"Không tìm thấy đơn hàng"));} private DonHang donCuaToi(String maKh,String ma){return donHangRepository.findById(ma).filter(d->d.getKhachHang().getMaKh().equals(maKh)).orElseThrow(()->new AppException(HttpStatus.NOT_FOUND,"Không tìm thấy đơn hàng"));} private boolean coMa(String x){return x!=null&&!x.isBlank();}
- private KhuyenMai dungVoucher(String ma,LoaiKhuyenMai loai,BigDecimal tam,boolean moi){KhuyenMai k=khuyenMaiRepository.findById(ma.trim()).filter(x->x.getLoai()==loai).orElseThrow(()->new AppException(HttpStatus.BAD_REQUEST,"Mã khuyến mãi không hợp lệ"));String ly=khuyenMaiService.lyDoKhongDung(k,tam,moi);if(ly!=null)throw new AppException(HttpStatus.BAD_REQUEST,k.getMaKm()+": "+ly);k.setDaDung(k.getDaDung()+1);return k;}
+
+import lombok.RequiredArgsConstructor;
+import nhom10.phonenest.dto.*;
+import nhom10.phonenest.entity.*;
+import nhom10.phonenest.enums.*;
+import nhom10.phonenest.exception.AppException;
+import nhom10.phonenest.mapper.DonHangMapper;
+import nhom10.phonenest.repository.*;
+import nhom10.phonenest.util.*;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class DonHangService {
+
+ private static final int DIEM_MOI_VND = 10000;
+ private static final String LY_DO_KHAC = "Lý do khác";
+ private final ChiTietGioHangRepository chiTietGioHangRepository;
+
+ private static final List<String> LY_DO_HUY = List.of(
+         "Muốn thay đổi địa chỉ giao hàng",
+         "Muốn nhập / thay đổi mã khuyến mãi",
+         "Muốn thay đổi sản phẩm trong đơn (màu sắc, dung lượng, số lượng...)",
+         "Thủ tục thanh toán quá rắc rối",
+         "Tìm thấy giá tốt hơn ở nơi khác",
+         "Đổi ý, không muốn mua nữa",
+         LY_DO_KHAC
+ );
+
+ private final DonHangRepository donHangRepository;
+ private final GioHangRepository gioHangRepository;
+ private final PhienBanSanPhamRepository phienBanRepository;
+ private final KhuyenMaiRepository khuyenMaiRepository;
+ private final HuyDonHangRepository huyRepository;
+ private final ThanhToanRepository thanhToanRepository;
+ private final LichSuTrangThaiDonHangRepository lichSuRepository;
+ private final BienDongKhoRepository bienDongRepository;
+
+ private final KhuyenMaiService khuyenMaiService;
+ private final DiaChiService diaChiService;
+ private final PhiVanChuyenService phiVanChuyenService;
+ private final ThanhToanService thanhToanService;
+
+ private final KhachHangRepository khachHangRepository;
+ private final TaiKhoanRepository taiKhoanRepository;
+ private final DiaChiRepository diaChiRepository;
+
+ private final DonHangMapper mapper;
+ private final GioHangService gioHangService;
+ private final ThongBaoService thongBaoService;
+ private final EmailService emailService;
+
+ // Đặt hàng
+ public DonHangDto datHang(String maKh, DonHangDto.Checkout req) {
+  KhachHang kh = khachHangRepository.findById(maKh).orElseThrow();
+
+  boolean muaNgay = req.maSanPham() != null && !req.maSanPham().isBlank();
+
+  Map<String, Integer> muc = thanhToanService.mucMua(
+          maKh, req.maSanPham(), req.soLuong()
+  );
+
+  DiaChi dc = diaChiRepository.findById(req.maDiaChi())
+          .filter(x -> x.getMaKh().equals(maKh))
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.BAD_REQUEST, "Địa chỉ giao hàng không hợp lệ"
+          ));
+
+  DonHang d = new DonHang();
+  d.setMaDonHang(IdGenerator.next("DH"));
+  d.setKhachHang(kh);
+  d.setNgayMua(LocalDateTime.now());
+  d.setNgayCapNhat(d.getNgayMua());
+  d.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
+  d.setTenNguoiNhan(dc.getTenNguoiNhan());
+  d.setSoDienThoaiNhan(dc.getSoDienThoaiNhan());
+  d.setDiaChiGiaoHang(diaChiService.diaChiDayDu(dc));
+
+  BigDecimal tam = BigDecimal.ZERO;
+
+  for (var e : muc.entrySet()) {
+   PhienBanSanPham p = phienBanRepository.findById(e.getKey()).orElseThrow();
+
+   if (p.getTrangThai() != TrangThaiSanPham.CON_HANG
+           || e.getValue() > p.getSoLuongTon()) {
+    throw new AppException(
+            HttpStatus.BAD_REQUEST,
+            p.getSanPham().getTenMay() + " không đủ hàng"
+    );
+   }
+
+   ChiTietDonHang c = new ChiTietDonHang();
+   c.setMaChiTiet(IdGenerator.next("CTDH"));
+   c.setDonHang(d);
+   c.setPhienBan(p);
+   c.setMaSanPham(p.getSanPham().getMaSanPham());
+   c.setTenSanPham(p.getSanPham().getTenMay());
+   c.setTenPhienBan(p.getRam() + "GB/" + p.getBoNho() + "GB/" + p.getMauSac());
+   c.setSku(p.getSku());
+   c.setHinhAnh(
+           p.getSanPham().getHinhAnhs().stream()
+                   .filter(HinhAnhSanPham::isAnhChinh)
+                   .map(HinhAnhSanPham::getDuongDan)
+                   .findFirst().orElse(null)
+   );
+   c.setSoLuong(e.getValue());
+   c.setDonGia(p.getGiaBan());
+   c.setBaoHanhThang(p.getSanPham().getThoiHanBaoHanhThang());
+
+   d.getChiTiet().add(c);
+
+   tam = tam.add(p.getGiaBan().multiply(BigDecimal.valueOf(e.getValue())));
+  }
+
+  d.setTamTinh(tam);
+
+  BigDecimal phi = phiVanChuyenService.tinhPhi(
+          phiVanChuyenService.theoDiaChi(dc.getMaTinh()), tam
+  );
+  d.setPhiVanChuyen(phi);
+
+  boolean moi = !donHangRepository.existsByKhachHangMaKhAndTrangThaiNot(
+          maKh, TrangThaiDonHang.DA_HUY
+  );
+
+  if (coMa(req.maKm())) {
+   KhuyenMai k = dungVoucher(req.maKm(), LoaiKhuyenMai.DON_HANG, tam, moi);
+   d.setKhuyenMai(k);
+   d.setGiamGia(khuyenMaiService.tinhGiam(k, tam));
+  }
+
+  if (coMa(req.maKmVanChuyen())) {
+   KhuyenMai k = dungVoucher(req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi);
+   d.setKhuyenMaiVanChuyen(k);
+   d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
+  }
+
+  d.setTongThanhToan(
+          tam.subtract(d.getGiamGia()).add(phi).subtract(d.getGiamPhiVanChuyen())
+  );
+
+  DonHang luu = donHangRepository.save(d);
+
+  doiTon(luu, -1, LoaiBienDongKho.BAN_HANG);
+  taoThanhToan(luu, req.phuongThucTt());
+  ghiTrangThai(luu, TrangThaiDonHang.CHO_XAC_NHAN, "Khách hàng đặt đơn");
+
+  if (!muaNgay) {
+   gioHangRepository.findByKhachHangMaKh(maKh)
+           .ifPresent(g -> chiTietGioHangRepository
+                   .xoaTheoMaGioHang(g.getMaGioHang()));
+  }
+  DonHangDto dto = mapper.toDto(luu);
+
+  thongBaoService.gui(
+          maKh, "Đặt hàng thành công, đơn " + luu.getMaDonHang() + " đang chờ xác nhận"
+  );
+
+  taiKhoanRepository.findById(maKh).ifPresent(tk ->
+          emailService.gui(
+                  tk.getEmail(),
+                  "Xác nhận đơn hàng " + luu.getMaDonHang(),
+                  "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: "
+                          + dto.tongTien().toBigInteger() + " VND."
+          )
+  );
+
+  return dto;
+ }
+
+ // Lịch sử và chi tiết đơn hàng
+ public List<DonHangDto> lichSu(String maKh) {
+  return donHangRepository.findByKhachHangMaKhOrderByNgayMuaDesc(maKh)
+          .stream().map(mapper::toDto).toList();
+ }
+
+ public DonHangDto chiTiet(String maKh, String ma) {
+  return mapper.toDto(donCuaToi(maKh, ma));
+ }
+
+ public List<DonHangDto> tatCa() {
+  return donHangRepository.findAllByOrderByNgayMuaDesc()
+          .stream().map(mapper::toDto).toList();
+ }
+
+ public DonHangDto chiTietQuanTri(String ma) {
+  return mapper.toDto(tim(ma));
+ }
+
+ // Hủy đơn hàng
+ public DonHangDto huy(String maKh, String ma, DonHangDto.HuyRequest req) {
+  DonHang d = donCuaToi(maKh, ma);
+
+  if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN
+          && d.getTrangThai() != TrangThaiDonHang.DA_XAC_NHAN
+          && d.getTrangThai() != TrangThaiDonHang.DANG_CHUAN_BI) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST, "Đơn hàng đã bàn giao vận chuyển, không thể hủy"
+   );
+  }
+
+  if (!LY_DO_HUY.contains(req.lyDo())) {
+   throw new AppException(HttpStatus.BAD_REQUEST, "Lý do hủy đơn không hợp lệ");
+  }
+
+  if (LY_DO_KHAC.equals(req.lyDo())
+          && (req.ghiChu() == null || req.ghiChu().isBlank())) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác"
+   );
+  }
+
+  doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
+
+  d.setTrangThai(TrangThaiDonHang.DA_HUY);
+  d.setNgayCapNhat(LocalDateTime.now());
+
+  HuyDonHang h = new HuyDonHang();
+  h.setMaDonHang(ma);
+  h.setLyDo(req.lyDo());
+  h.setGhiChu(req.ghiChu());
+  h.setNgayHuy(LocalDateTime.now());
+  huyRepository.save(h);
+
+  ghiTrangThai(d, TrangThaiDonHang.DA_HUY, req.lyDo());
+
+  return mapper.toDto(d);
+ }
+
+ // Cập nhật trạng thái
+ public DonHangDto capNhatTrangThai(String ma, TrangThaiDonHang moi) {
+  DonHang d = tim(ma);
+
+  if (d.getTrangThai() == TrangThaiDonHang.DA_GIAO
+          || d.getTrangThai() == TrangThaiDonHang.DA_HUY) {
+   throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã kết thúc");
+  }
+
+  if (moi == TrangThaiDonHang.DA_HUY) {
+   doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
+  }
+
+  d.setTrangThai(moi);
+  d.setNgayCapNhat(LocalDateTime.now());
+
+  if (moi == TrangThaiDonHang.DA_GIAO) {
+   d.setNgayGiao(d.getNgayCapNhat());
+   congDiem(d);
+  }
+
+  ghiTrangThai(d, moi, "Quản trị cập nhật trạng thái");
+  thongBaoService.gui(
+          d.getKhachHang().getMaKh(),
+          "Đơn hàng " + ma + " chuyển sang trạng thái: " + moi.name()
+  );
+
+  return mapper.toDto(d);
+ }
+
+ // Mua lại
+ public GioHangDto muaLai(String maKh, String ma) {
+  List<GioHangDto.Request> ds = donCuaToi(maKh, ma).getChiTiet()
+          .stream()
+          .map(c -> new GioHangDto.Request(
+                  c.getPhienBan().getMaPhienBan(), c.getSoLuong()
+          ))
+          .toList();
+
+  return gioHangService.sync(maKh, ds);
+ }
+
+ // Sửa chi tiết đơn hàng
+ public DonHangDto suaDong(String ma, String id, int sl) {
+  DonHang d = tim(ma);
+
+  if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
+   throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ sửa khi chờ xác nhận");
+  }
+
+  ChiTietDonHang c = d.getChiTiet().stream()
+          .filter(x -> x.getPhienBan().getMaPhienBan().equals(id))
+          .findFirst()
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND, "Phiên bản không có trong đơn"
+          ));
+
+  int delta = sl - c.getSoLuong();
+
+  if (sl <= 0) {
+   if (d.getChiTiet().size() == 1) {
+    throw new AppException(HttpStatus.BAD_REQUEST, "Đơn phải còn ít nhất một sản phẩm");
+   }
+
+   capTon(c.getPhienBan(), c.getSoLuong(), d, LoaiBienDongKho.DIEU_CHINH);
+   d.getChiTiet().remove(c);
+  } else {
+   if (delta > c.getPhienBan().getSoLuongTon()) {
+    throw new AppException(HttpStatus.BAD_REQUEST, "Không đủ tồn kho");
+   }
+
+   capTon(c.getPhienBan(), -delta, d, LoaiBienDongKho.DIEU_CHINH);
+   c.setSoLuong(sl);
+  }
+
+  recalc(d);
+  return mapper.toDto(d);
+ }
+
+ // Tính lại tổng tiền
+ private void recalc(DonHang d) {
+  BigDecimal tam = d.getChiTiet().stream()
+          .map(c -> c.getDonGia().multiply(BigDecimal.valueOf(c.getSoLuong())))
+          .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+  d.setTamTinh(tam);
+
+  if (d.getKhuyenMai() != null) {
+   d.setGiamGia(khuyenMaiService.tinhGiam(d.getKhuyenMai(), tam));
+  }
+
+  d.setTongThanhToan(
+          tam.subtract(d.getGiamGia())
+                  .add(d.getPhiVanChuyen())
+                  .subtract(d.getGiamPhiVanChuyen())
+  );
+
+  d.setNgayCapNhat(LocalDateTime.now());
+ }
+
+ // Tạo thanh toán
+ private void taoThanhToan(DonHang d, PhuongThucTt pt) {
+  ThanhToan t = new ThanhToan();
+  t.setMaThanhToan(IdGenerator.next("TT"));
+  t.setDonHang(d);
+  t.setPhuongThuc(pt);
+  t.setSoTien(d.getTongThanhToan());
+  t.setTrangThai(TrangThaiThanhToan.CHO_THANH_TOAN);
+  t.setNgayTao(LocalDateTime.now());
+
+  thanhToanRepository.save(t);
+ }
+
+ // Cập nhật tồn kho
+ private void doiTon(DonHang d, int dau, LoaiBienDongKho loai) {
+  d.getChiTiet().forEach(c ->
+          capTon(c.getPhienBan(), dau * c.getSoLuong(), d, loai)
+  );
+ }
+
+ private void capTon(PhienBanSanPham p, int delta, DonHang d, LoaiBienDongKho loai) {
+  int truoc = p.getSoLuongTon();
+  int sau = Math.max(0, truoc + delta);
+  p.setSoLuongTon(sau);
+
+  BienDongKho b = new BienDongKho();
+  b.setMaBienDong(IdGenerator.next("BDK"));
+  b.setPhienBan(p);
+  b.setLoaiBienDong(loai);
+  b.setSoLuong(delta);
+  b.setTonTruoc(truoc);
+  b.setTonSau(sau);
+  b.setDonHang(d);
+  b.setThoiGian(LocalDateTime.now());
+
+  bienDongRepository.save(b);
+ }
+
+ // Ghi lịch sử trạng thái
+ private void ghiTrangThai(DonHang d, TrangThaiDonHang t, String gc) {
+  LichSuTrangThaiDonHang l = new LichSuTrangThaiDonHang();
+  l.setMaLichSu(IdGenerator.next("LSTT"));
+  l.setDonHang(d);
+  l.setTrangThai(t);
+  l.setThoiGian(LocalDateTime.now());
+  l.setGhiChu(gc);
+
+  lichSuRepository.save(l);
+ }
+
+ // Cộng điểm tích lũy
+ private void congDiem(DonHang d) {
+  KhachHang k = d.getKhachHang();
+
+  int diemCong = d.getTamTinh().subtract(d.getGiamGia())
+          .divideToIntegralValue(BigDecimal.valueOf(DIEM_MOI_VND))
+          .intValue();
+
+  k.setDiemTichLuy(k.getDiemTichLuy() + diemCong);
+  k.setHangThanhVien(HangThanhVien.of(k.getDiemTichLuy()));
+ }
+
+ // Hàm hỗ trợ
+ private DonHang tim(String ma) {
+  return donHangRepository.findById(ma)
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"
+          ));
+ }
+
+ private DonHang donCuaToi(String maKh, String ma) {
+  return donHangRepository.findById(ma)
+          .filter(d -> d.getKhachHang().getMaKh().equals(maKh))
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"
+          ));
+ }
+
+ private boolean coMa(String x) {
+  return x != null && !x.isBlank();
+ }
+
+ // Kiểm tra voucher
+ private KhuyenMai dungVoucher(String ma, LoaiKhuyenMai loai, BigDecimal tam, boolean moi) {
+  KhuyenMai k = khuyenMaiRepository.findById(ma.trim())
+          .filter(x -> x.getLoai() == loai)
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.BAD_REQUEST, "Mã khuyến mãi không hợp lệ"
+          ));
+
+  String ly = khuyenMaiService.lyDoKhongDung(k, tam, moi);
+
+  if (ly != null) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST, k.getMaKm() + ": " + ly
+   );
+  }
+
+  k.setDaDung(k.getDaDung() + 1);
+  return k;
+ }
 }

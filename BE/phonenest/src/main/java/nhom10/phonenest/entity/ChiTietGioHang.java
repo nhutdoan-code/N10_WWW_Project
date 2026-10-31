@@ -2,7 +2,6 @@ package nhom10.phonenest.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.io.Serializable;
 
 @Entity
@@ -17,13 +16,13 @@ public class ChiTietGioHang {
 
  @ManyToOne
  @MapsId("maGioHang")
- @JoinColumn(name = "maGioHang")
+ @JoinColumn(name = "maGioHang", nullable = false)
  private GioHang gioHang;
 
  @ManyToOne
- @MapsId("maSanPham")
- @JoinColumn(name = "maSanPham")
- private SanPham sanPham;
+ @MapsId("maPhienBan")
+ @JoinColumn(name = "maPhienBan", nullable = false)
+ private PhienBanSanPham phienBan;
 
  @Column(name = "soLuong", nullable = false)
  private int soLuong = 1;
@@ -35,8 +34,7 @@ public class ChiTietGioHang {
  @AllArgsConstructor
  @EqualsAndHashCode
  public static class Id implements Serializable {
-
   private String maGioHang;
-  private String maSanPham;
+  private String maPhienBan;
  }
 }

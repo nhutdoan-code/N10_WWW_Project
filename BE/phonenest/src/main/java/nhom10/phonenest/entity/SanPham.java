@@ -77,4 +77,7 @@ public class SanPham {
  private List<HinhAnhSanPham> hinhAnhs =
          new ArrayList<>();
 
+ @OneToMany(mappedBy = "sanPham", fetch = FetchType.LAZY)
+ private List<PhienBanSanPham> phienBans = new ArrayList<>();
+
 }

@@ -33,7 +33,7 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     giaBan: '',
     soLuongTon: 0,
     moTa: '',
-    trangThai: 'DANG_KINH_DOANH',
+    trangThai: 'CON_HANG',
     hinhAnhs: [],
     anhChinh: null,
     ...product,
@@ -135,9 +135,9 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
 
     const phienBans = flattenConfigurations(configurations);
 
-    if ((form.trangThai || 'DANG_KINH_DOANH') === 'DANG_KINH_DOANH'
-      && !phienBans.some((p) => p.trangThai === 'DANG_KINH_DOANH')) {
-      return toast('Sản phẩm đang kinh doanh phải có ít nhất một phiên bản đang kinh doanh', 'error');
+    if (form.trangThai !== 'NGUNG_KINH_DOANH'
+        && !phienBans.some((p) => p.trangThai !== 'NGUNG_KINH_DOANH')) {
+      return toast('Sản phẩm phải có ít nhất một phiên bản còn kinh doanh', 'error');
     }
 
     const thongSo = { ...form.thongSo };
@@ -149,12 +149,14 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     // Trường giá/tồn cấp sản phẩm chỉ để thoả DTO; backend luôn tính lại từ phiên bản.
     // Ưu tiên giá thấp nhất của phiên bản đang kinh doanh, không lấy variant ngừng bán.
     const activePrices = phienBans
-      .filter((p) => p.trangThai === 'DANG_KINH_DOANH' && Number.isFinite(Number(p.giaBan)))
-      .map((p) => Number(p.giaBan));
+        .filter((p) => p.trangThai !== 'NGUNG_KINH_DOANH' && Number.isFinite(Number(p.giaBan)))
+        .map((p) => Number(p.giaBan));
+
     const giaBanMin = activePrices.length ? Math.min(...activePrices) : 0;
+
     const tonActive = phienBans
-      .filter((p) => p.trangThai === 'DANG_KINH_DOANH')
-      .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
+        .filter((p) => p.trangThai !== 'NGUNG_KINH_DOANH')
+        .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
 
     // Chỉ gửi identity + metadata ảnh; backend reconcile theo maHinhAnh.
     const hinhAnhs = (form.hinhAnhs || []).map((anh) => ({
@@ -294,7 +296,10 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
         <input
           type="checkbox"
           checked={form.trangThai === 'NGUNG_KINH_DOANH'}
-          onChange={(e) => setForm({ ...form, trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'DANG_KINH_DOANH' })}
+          onChange={(e) => setForm({
+            ...form,
+            trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'CON_HANG'
+          })}
         />
         Ngừng kinh doanh
       </label>

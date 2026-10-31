@@ -1,14 +1,21 @@
-
 package nhom10.phonenest.service;
 
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.GioHangDto;
-import nhom10.phonenest.entity.*;
+import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.entity.ChiTietGioHang;
+import nhom10.phonenest.entity.GioHang;
+import nhom10.phonenest.entity.KhachHang;
+import nhom10.phonenest.entity.PhienBanSanPham;
+import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
+import nhom10.phonenest.repository.ChiTietGioHangRepository;
 import nhom10.phonenest.repository.GioHangRepository;
-import nhom10.phonenest.repository.SanPhamRepository;
+import nhom10.phonenest.repository.KhachHangRepository;
+import nhom10.phonenest.repository.PhienBanSanPhamRepository;
+import nhom10.phonenest.util.IdGenerator;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -23,192 +31,320 @@ import java.util.List;
 @Transactional
 public class GioHangService {
 
- private final GioHangRepository gioHangRepository;
- private final SanPhamRepository sanPhamRepository;
+ private final GioHangRepository gioHangRepo;
+ private final ChiTietGioHangRepository chiTietGioHangRepo;
+ private final KhachHangRepository khachHangRepo;
+ private final PhienBanSanPhamRepository phienBanRepo;
 
- // Lấy giỏ hàng
- public GioHangDto get(String maKh) {
-  return toDto(gioHang(maKh));
+ // ==================== LẤY GIỎ HÀNG ====================
+
+ public GioHangDto get(String maKhachHang) {
+  GioHang gioHang = getOrCreate(maKhachHang);
+  return toDto(gioHang);
  }
 
- // Thêm sản phẩm vào giỏ
- public GioHangDto add(String maKh, String ma, int sl) {
-  GioHang g = gioHang(maKh);
-  SanPham p = resolve(ma);
+ // ==================== THÊM VÀO GIỎ HÀNG ====================
 
-  ChiTietGioHang c = find(g, p.getMaSanPham());
-  int soLuongMoi = (c == null ? 0 : c.getSoLuong()) + sl;
-
-  return set(g, p, soLuongMoi);
- }
-
- // Cập nhật số lượng
- public GioHangDto update(String maKh, String ma, int sl) {
-  GioHang g = gioHang(maKh);
-  SanPham p = resolve(ma);
-  ChiTietGioHang c = find(g, p.getMaSanPham());
-
-  if (c == null) {
-   if (sl <= 0) {
-    return toDto(g);
-   }
-   return set(g, p, sl);
-  }
-
-  if (sl <= 0) {
-   g.getChiTiet().remove(c);
-  } else {
-   validate(p, sl);
-   c.setSoLuong(sl);
-  }
-
-  touch(g);
-  return toDto(g);
- }
-
- // Xóa một sản phẩm
- public GioHangDto remove(String maKh, String ma) {
-  GioHang g = gioHang(maKh);
-  String maSanPham = resolve(ma).getMaSanPham();
-
-  g.getChiTiet().removeIf(c ->
-          c.getSanPham().getMaSanPham().equals(maSanPham)
-  );
-
-  touch(g);
-  return toDto(g);
- }
-
- // Xóa toàn bộ giỏ hàng
- public GioHangDto clear(String maKh) {
-  GioHang g = gioHang(maKh);
-  g.getChiTiet().clear();
-  touch(g);
-  return toDto(g);
- }
-
- // Đồng bộ danh sách sản phẩm từ frontend
- public GioHangDto sync(String maKh, List<GioHangDto.Request> ds) {
-  GioHang g = gioHang(maKh);
-
-  for (GioHangDto.Request r : ds) {
-   try {
-    SanPham p = resolve(r.maSanPham());
-    ChiTietGioHang c = find(g, p.getMaSanPham());
-
-    int soLuongMoi =
-            (c == null ? 0 : c.getSoLuong()) + r.soLuong();
-
-    validate(p, soLuongMoi);
-
-    if (c == null) {
-     addLine(g, p, soLuongMoi);
-    } else {
-     c.setSoLuong(soLuongMoi);
-    }
-   } catch (AppException ignored) {
-    // Giữ hành vi cũ: bỏ qua sản phẩm không hợp lệ
-   }
-  }
-
-  touch(g);
-  return toDto(g);
- }
-
- // Thêm hoặc cập nhật một dòng giỏ hàng
- private GioHangDto set(GioHang g, SanPham p, int sl) {
-  validate(p, sl);
-
-  ChiTietGioHang c = find(g, p.getMaSanPham());
-
-  if (c == null) {
-   addLine(g, p, sl);
-  } else {
-   c.setSoLuong(sl);
-  }
-
-  touch(g);
-  return toDto(g);
- }
-
- // Tạo dòng chi tiết giỏ hàng
- private void addLine(GioHang g, SanPham p, int sl) {
-  ChiTietGioHang c = new ChiTietGioHang();
-
-  c.setId(new ChiTietGioHang.Id(
-          g.getMaGioHang(),
-          p.getMaSanPham()
-  ));
-
-  c.setGioHang(g);
-  c.setSanPham(p);
-  c.setSoLuong(sl);
-
-  g.getChiTiet().add(c);
- }
-
- // Kiểm tra số lượng và trạng thái sản phẩm
- private void validate(SanPham p, int sl) {
-  if (p.getTrangThai() != TrangThaiSanPham.CON_HANG
-          || sl < 1
-          || sl > p.getSoLuongTon()) {
-
+ public GioHangDto add(
+         String maKhachHang,
+         String maPhienBan,
+         int soLuong
+ ) {
+  if (soLuong < 1) {
    throw new AppException(
            HttpStatus.BAD_REQUEST,
-           "Số lượng không hợp lệ (còn "
-                   + p.getSoLuongTon() + " sản phẩm)"
+           "Số lượng phải lớn hơn 0"
+   );
+  }
+
+  GioHang gioHang = getOrCreate(maKhachHang);
+  PhienBanSanPham phienBan = findPhienBan(maPhienBan);
+
+  ChiTietGioHang.Id id = new ChiTietGioHang.Id(
+          gioHang.getMaGioHang(),
+          maPhienBan
+  );
+
+  ChiTietGioHang chiTiet = chiTietGioHangRepo.findById(id)
+          .orElse(null);
+
+  int soLuongHienTai = chiTiet == null
+          ? 0
+          : chiTiet.getSoLuong();
+
+  int soLuongMoi = soLuongHienTai + soLuong;
+
+  validateSoLuong(phienBan, soLuongMoi);
+
+  if (chiTiet == null) {
+   chiTiet = new ChiTietGioHang();
+
+   chiTiet.setId(id);
+   chiTiet.setGioHang(gioHang);
+   chiTiet.setPhienBan(phienBan);
+  }
+
+  chiTiet.setSoLuong(soLuongMoi);
+
+  chiTietGioHangRepo.save(chiTiet);
+
+  return toDto(gioHang);
+ }
+
+ // ==================== CẬP NHẬT SỐ LƯỢNG ====================
+
+ public GioHangDto update(
+         String maKhachHang,
+         String maPhienBan,
+         int soLuong
+ ) {
+  GioHang gioHang = getOrCreate(maKhachHang);
+
+  ChiTietGioHang chiTiet = findChiTiet(
+          gioHang.getMaGioHang(),
+          maPhienBan
+  );
+
+  // Nếu số lượng <= 0 thì xóa khỏi giỏ hàng.
+  if (soLuong <= 0) {
+   chiTietGioHangRepo.delete(chiTiet);
+   return toDto(gioHang);
+  }
+
+  validateSoLuong(chiTiet.getPhienBan(), soLuong);
+
+  chiTiet.setSoLuong(soLuong);
+
+  chiTietGioHangRepo.save(chiTiet);
+
+  return toDto(gioHang);
+ }
+
+ // ==================== XÓA MỘT SẢN PHẨM ====================
+
+ public GioHangDto remove(
+         String maKhachHang,
+         String maPhienBan
+ ) {
+  GioHang gioHang = getOrCreate(maKhachHang);
+
+  ChiTietGioHang.Id id = new ChiTietGioHang.Id(
+          gioHang.getMaGioHang(),
+          maPhienBan
+  );
+
+  chiTietGioHangRepo.deleteById(id);
+
+  return toDto(gioHang);
+ }
+
+ // ==================== XÓA TOÀN BỘ GIỎ HÀNG ====================
+
+ public GioHangDto clear(String maKhachHang) {
+  GioHang gioHang = getOrCreate(maKhachHang);
+
+  chiTietGioHangRepo.xoaTheoMaGioHang(
+          gioHang.getMaGioHang()
+  );
+
+  return toDto(gioHang);
+ }
+
+ // ==================== ĐỒNG BỘ GIỎ HÀNG ====================
+
+ public GioHangDto sync(
+         String maKhachHang,
+         List<GioHangDto.Request> requests
+ ) {
+  GioHang gioHang = getOrCreate(maKhachHang);
+
+  if (requests == null || requests.isEmpty()) {
+   return toDto(gioHang);
+  }
+
+  for (GioHangDto.Request request : requests) {
+
+   if (request == null
+           || request.maPhienBan() == null
+           || request.maPhienBan().isBlank()
+           || request.soLuong() < 1) {
+    throw new AppException(
+            HttpStatus.BAD_REQUEST,
+            "Thông tin sản phẩm trong giỏ hàng không hợp lệ"
+    );
+   }
+
+   String maPhienBan = request.maPhienBan();
+
+   PhienBanSanPham phienBan = findPhienBan(maPhienBan);
+
+   ChiTietGioHang.Id id = new ChiTietGioHang.Id(
+           gioHang.getMaGioHang(),
+           maPhienBan
+   );
+
+   ChiTietGioHang chiTiet = chiTietGioHangRepo.findById(id)
+           .orElse(null);
+
+   int soLuongHienTai = chiTiet == null
+           ? 0
+           : chiTiet.getSoLuong();
+
+   int soLuongMoi = soLuongHienTai + request.soLuong();
+
+   validateSoLuong(phienBan, soLuongMoi);
+
+   if (chiTiet == null) {
+    chiTiet = new ChiTietGioHang();
+
+    chiTiet.setId(id);
+    chiTiet.setGioHang(gioHang);
+    chiTiet.setPhienBan(phienBan);
+   }
+
+   chiTiet.setSoLuong(soLuongMoi);
+
+   chiTietGioHangRepo.save(chiTiet);
+  }
+
+  return toDto(gioHang);
+ }
+
+ // ==================== TÌM PHIÊN BẢN ====================
+
+ private PhienBanSanPham findPhienBan(String maPhienBan) {
+  return phienBanRepo.findById(maPhienBan)
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND,
+                  "Không tìm thấy phiên bản sản phẩm"
+          ));
+ }
+
+ // ==================== TÌM CHI TIẾT GIỎ HÀNG ====================
+
+ private ChiTietGioHang findChiTiet(
+         String maGioHang,
+         String maPhienBan
+ ) {
+  ChiTietGioHang.Id id = new ChiTietGioHang.Id(
+          maGioHang,
+          maPhienBan
+  );
+
+  return chiTietGioHangRepo.findById(id)
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND,
+                  "Sản phẩm không có trong giỏ hàng"
+          ));
+ }
+
+ // ==================== KIỂM TRA TỒN KHO ====================
+
+ private void validateSoLuong(
+         PhienBanSanPham phienBan,
+         int soLuong
+ ) {
+  SanPham sanPham = phienBan.getSanPham();
+
+  if (sanPham.getTrangThai()
+          == TrangThaiSanPham.NGUNG_KINH_DOANH) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Sản phẩm đã ngừng kinh doanh"
+   );
+  }
+
+  if (phienBan.getTrangThai()
+          != TrangThaiSanPham.CON_HANG) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Phiên bản sản phẩm hiện không còn kinh doanh"
+   );
+  }
+
+  if (soLuong < 1) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Số lượng phải lớn hơn 0"
+   );
+  }
+
+  if (soLuong > phienBan.getSoLuongTon()) {
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Số lượng vượt quá tồn kho của phiên bản"
    );
   }
  }
 
- // Tìm sản phẩm theo mã sản phẩm
- private SanPham resolve(String ma) {
-  return sanPhamRepository.findById(ma)
-          .orElseThrow(() -> new AppException(
-                  HttpStatus.NOT_FOUND,
-                  "Sản phẩm không tồn tại"
-          ));
+ // ==================== TÌM HOẶC TẠO GIỎ HÀNG ====================
+
+ private GioHang getOrCreate(String maKhachHang) {
+  return gioHangRepo.findByKhachHangMaKh(maKhachHang)
+          .orElseGet(() -> {
+           KhachHang khachHang = khachHangRepo.findById(maKhachHang)
+                   .orElseThrow(() -> new AppException(
+                           HttpStatus.NOT_FOUND,
+                           "Không tìm thấy khách hàng"
+                   ));
+
+           GioHang gioHang = new GioHang();
+           gioHang.setMaGioHang(IdGenerator.next("GH"));
+           gioHang.setKhachHang(khachHang);
+           gioHang.setNgayTao(LocalDateTime.now());
+           gioHang.setNgayCapNhat(LocalDateTime.now());
+
+           return gioHangRepo.save(gioHang);
+          });
  }
+ // ==================== CHUYỂN SANG DTO ====================
 
- // Tìm sản phẩm đã có trong giỏ
- private ChiTietGioHang find(GioHang g, String maSanPham) {
-  return g.getChiTiet().stream()
-          .filter(c -> c.getSanPham() != null
-                  && c.getSanPham().getMaSanPham().equals(maSanPham))
-          .findFirst()
-          .orElse(null);
- }
+ private GioHangDto toDto(GioHang gioHang) {
 
- // Lấy giỏ hàng của khách
- private GioHang gioHang(String maKh) {
-  return gioHangRepository.findByKhachHangMaKh(maKh)
-          .orElseThrow(() -> new AppException(
-                  HttpStatus.NOT_FOUND,
-                  "Không tìm thấy giỏ hàng"
-          ));
- }
+  List<ChiTietGioHang> chiTietList =
+          chiTietGioHangRepo.findByGioHangMaGioHang(
+                  gioHang.getMaGioHang()
+          );
 
- // Cập nhật thời gian
- private void touch(GioHang g) {
-  g.setNgayCapNhat(LocalDateTime.now());
- }
+  List<GioHangDto.Item> items = new ArrayList<>();
 
- // Chuyển giỏ hàng thành DTO
-// Chuyển giỏ hàng thành DTO
- private GioHangDto toDto(GioHang g) {
-  List<GioHangDto.Item> items = g.getChiTiet().stream()
-          .map(c -> new GioHangDto.Item(
-                  SanPhamMapper.toDto(c.getSanPham()),
-                  null, // Tạm thời chưa có dữ liệu phiên bản
-                  c.getSoLuong()
-          ))
-          .toList();
+  BigDecimal tongTien = BigDecimal.ZERO;
 
-  BigDecimal tong = g.getChiTiet().stream()
-          .map(c -> c.getSanPham().getGiaBan()
-                  .multiply(BigDecimal.valueOf(c.getSoLuong())))
-          .reduce(BigDecimal.ZERO, BigDecimal::add);
+  for (ChiTietGioHang chiTiet : chiTietList) {
 
-  return new GioHangDto(items, tong);
+   PhienBanSanPham phienBan = chiTiet.getPhienBan();
+
+   SanPham sanPham = phienBan.getSanPham();
+
+   SanPhamDto sanPhamDto = SanPhamMapper.toDto(sanPham);
+
+   SanPhamDto.PhienBan phienBanDto =
+           new SanPhamDto.PhienBan(
+                   phienBan.getMaPhienBan(),
+                   phienBan.getSku(),
+                   phienBan.getRam(),
+                   phienBan.getBoNho(),
+                   phienBan.getMauSac(),
+                   phienBan.getGiaBan(),
+                   phienBan.getGiaNiemYet(),
+                   phienBan.getSoLuongTon(),
+                   phienBan.getTrangThai()
+           );
+
+   items.add(
+           new GioHangDto.Item(
+                   sanPhamDto,
+                   phienBanDto,
+                   chiTiet.getSoLuong()
+           )
+   );
+
+   BigDecimal thanhTien = phienBan.getGiaBan()
+           .multiply(BigDecimal.valueOf(chiTiet.getSoLuong()));
+
+   tongTien = tongTien.add(thanhTien);
+  }
+
+  return new GioHangDto(items, tongTien);
  }
 }
