@@ -8,8 +8,10 @@ INSERT INTO TaiKhoan
 VALUES
 ('TK001', 'admin@phonenest.com', '0900000001', '$2a$10$Nbn8/QR7ux8nGgghO9zidejt47a021r4wVcq5NqIsIM6/RMkIEOqy', TRUE, 'LOCAL'),
 ('TK002', 'an@phonenest.com',    '0900000002', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL'),
-('TK003', 'binh@phonenest.com',  '0900000003', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL');
+('TK003', 'binh@phonenest.com',  '0900000003', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL'),
+('TK004', 'hoang@phonenest.com', '0900000004', '$2y$10$8IJfBgj3GZ19coGUGISj0.q2OO5nRN2LvQ29O4MENuHwKfuw2s/UG', TRUE, 'LOCAL');
 INSERT INTO QuanTriVien (maQtv,hoTen,vaiTro,chucVu) VALUES ('TK001','Quản trị viên PhoneNest','ADMIN','Quản trị hệ thống');
+INSERT INTO QuanTriVien (maQtv,hoTen,vaiTro,chucVu) VALUES ('TK004','Quản trị viên PhoneNest','ADMIN','Quản trị hệ thống');
 INSERT INTO KhachHang (maKh,hoTen,diemTichLuy,hangThanhVien) VALUES
 ('TK002','Nguyễn Văn An',0,'THUONG'),('TK003','Trần Thị Bình',0,'THUONG');
 
