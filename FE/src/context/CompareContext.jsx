@@ -4,7 +4,7 @@ import { storage } from '../utils/storage';
 
 export const CompareContext = createContext(null);
 
-const MAX = 3;
+export const MAX_COMPARE_PRODUCTS = 3;
 
 export function CompareProvider({ children }) {
   const [ids, setIds] = useState(() => storage.get(STORAGE_KEYS.compare) || []);
@@ -16,7 +16,7 @@ export function CompareProvider({ children }) {
 
   const toggle = (ma) => {
     if (ids.includes(ma)) return save(ids.filter((i) => i !== ma));
-    if (ids.length >= MAX) throw new Error(`Chỉ so sánh tối đa ${MAX} sản phẩm`);
+    if (ids.length >= MAX_COMPARE_PRODUCTS) throw new Error(`Chỉ so sánh tối đa ${MAX_COMPARE_PRODUCTS} sản phẩm`);
     save([...ids, ma]);
   };
 
