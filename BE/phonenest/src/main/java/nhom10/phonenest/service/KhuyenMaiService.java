@@ -65,6 +65,66 @@ public class KhuyenMaiService {
         nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_PROMOTION, LoaiDoiTuongAudit.PROMOTION,
                 k.getMaKm(), duLieuTruoc, null);
     }
+public Map<String, Object> getImpact(String ma) {
+    KhuyenMai k = tim(chuanHoaMa(ma));
+    long ordersCount = donHangRepository.countOrdersByKhuyenMai(k.getMaKm());
+
+    Map<String, Object> res = new LinkedHashMap<>();
+    res.put("maKm", k.getMaKm());
+    res.put("tenKm", k.getTenKm());
+    res.put("daDung", k.getDaDung());
+    res.put("soDonHangDaDung", ordersCount);
+    res.put("trangThaiHoatDong", k.isTrangThaiHoatDong());
+    res.put("coDonHangLienQuan", ordersCount > 0 || k.getDaDung() > 0);
+
+    return res;
+}
+
+public KhuyenMaiDto archive(String ma) {
+    KhuyenMai k = tim(chuanHoaMa(ma));
+
+    if (!k.isTrangThaiHoatDong()) {
+        return toDto(k);
+    }
+
+    Map<String, Object> duLieuTruoc = snapshot(k);
+
+    k.setTrangThaiHoatDong(false);
+    KhuyenMai saved = khuyenMaiRepository.save(k);
+
+    nhatKyHoatDongService.ghi(
+            HanhDongAudit.UPDATE_PROMOTION,
+            LoaiDoiTuongAudit.PROMOTION,
+            saved.getMaKm(),
+            duLieuTruoc,
+            snapshot(saved)
+    );
+
+    return toDto(saved);
+}
+
+public KhuyenMaiDto restore(String ma) {
+    KhuyenMai k = tim(chuanHoaMa(ma));
+
+    if (k.isTrangThaiHoatDong()) {
+        return toDto(k);
+    }
+
+    Map<String, Object> duLieuTruoc = snapshot(k);
+
+    k.setTrangThaiHoatDong(true);
+    KhuyenMai saved = khuyenMaiRepository.save(k);
+
+    nhatKyHoatDongService.ghi(
+            HanhDongAudit.UPDATE_PROMOTION,
+            LoaiDoiTuongAudit.PROMOTION,
+            saved.getMaKm(),
+            duLieuTruoc,
+            snapshot(saved)
+    );
+
+    return toDto(saved);
+}
 
     private KhuyenMaiDto luu(KhuyenMai k, String ma, KhuyenMaiDto d, boolean taoMoi) {
         Map<String, Object> duLieuTruoc = taoMoi ? null : snapshot(k);
@@ -73,7 +133,10 @@ public class KhuyenMaiService {
         }
         if (d.phanTramGiam() == null || d.phanTramGiam().compareTo(BigDecimal.ZERO) <= 0
                 || d.phanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Phần trăm giảm phải lớn hơn 0 và không quá 100");
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Phần trăm giảm phải trong khoảng (0, 100]"
+            );
         }
         LoaiKhuyenMai loai = d.loai() == null ? LoaiKhuyenMai.DON_HANG : d.loai();
         if (!taoMoi && k.getLoai() != loai) {
@@ -153,10 +216,22 @@ public class KhuyenMaiService {
     }
 
     private KhuyenMaiDto toDto(KhuyenMai k) {
-        return new KhuyenMaiDto(k.getMaKm(), k.getTenKm(), k.getLoai(), k.getPhanTramGiam(),
-                k.getSoTienGiamToiDa(), k.getDonToiThieu(), k.getSoLuong(), k.getDaDung(),
-                k.isChiKhachMoi(), k.getGioiHanMoiKhach(), k.getNgayBatDau(), k.getNgayKetThuc(),
-                k.getDieuKienApDung());
+    	return new KhuyenMaiDto(
+            k.getMaKm(),
+            k.getTenKm(),
+            k.getLoai(),
+            k.getPhanTramGiam(),
+            k.getSoTienGiamToiDa(),
+            k.getDonToiThieu(),
+            k.getSoLuong(),
+            k.getDaDung(),
+            k.isChiKhachMoi(),
+            k.getGioiHanMoiKhach(),
+            k.getNgayBatDau(),
+            k.getNgayKetThuc(),
+            k.getDieuKienApDung(),
+            k.isTrangThaiHoatDong()
+    	);
     }
 
     public String lyDoKhongDung(KhuyenMai k, BigDecimal tamTinh, boolean khachMoi, String maKh) {

@@ -2,6 +2,7 @@ package nhom10.phonenest.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.dto.ThongKeDto;
 import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.entity.LoaiSanPham;
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import nhom10.phonenest.util.SecurityUtil;
 
 @Service
 @RequiredArgsConstructor
@@ -192,17 +194,77 @@ public class ThongKeService {
         LocalDateTime end = den != null ? den.plusDays(1).atStartOfDay() : null;
         List<DonHang> dons = donHangRepository.findCreatedInRange(start, end);
 
-        StringBuilder sb = new StringBuilder("﻿Mã đơn,Ngày mua,Khách hàng,Trạng thái,Thanh toán,Tạm tính,Giảm giá,Phí vận chuyển,Tổng tiền\n");
-        dons.stream().map(donHangMapper::toDto).forEach(d -> sb
-                .append(d.maDonHang()).append(',')
-                .append(d.ngayMua() != null ? d.ngayMua().toLocalDate() : "").append(',')
-                .append('"').append(d.tenKhach() != null ? d.tenKhach().replace("\"", "\"\"") : "").append('"').append(',')
-                .append(d.trangThai()).append(',')
-                .append(d.phuongThucTt()).append(',')
-                .append(d.tamTinh() != null ? d.tamTinh().toBigInteger() : 0).append(',')
-                .append(d.giamGia() != null ? d.giamGia().toBigInteger() : 0).append(',')
-                .append(d.phiVanChuyen() != null && d.giamPhiVanChuyen() != null ? d.phiVanChuyen().subtract(d.giamPhiVanChuyen()).toBigInteger() : 0).append(',')
-                .append(d.tongTien() != null ? d.tongTien().toBigInteger() : 0).append('\n'));
+        BigDecimal revenueDelivered = BigDecimal.ZERO;
+        BigDecimal pipelineGmv = BigDecimal.ZERO;
+        int deliveredCount = 0;
+        int activeCount = 0;
+        int cancelledCount = 0;
+
+        for (DonHang d : dons) {
+            BigDecimal total = d.getTongThanhToan() != null ? d.getTongThanhToan() : BigDecimal.ZERO;
+            if (d.getTrangThai() == TrangThaiDonHang.DA_GIAO) {
+                revenueDelivered = revenueDelivered.add(total);
+                deliveredCount++;
+            } else if (d.getTrangThai() == TrangThaiDonHang.DA_HUY) {
+                cancelledCount++;
+            } else {
+                pipelineGmv = pipelineGmv.add(total);
+                activeCount++;
+            }
+        }
+
+        String exporter = SecurityUtil.currentUserId();
+        String period = (tu != null || den != null)
+                ? "Từ " + (tu != null ? tu.toString() : "bắt đầu") + " đến " + (den != null ? den.toString() : "hiện tại")
+                : "Toàn bộ thời gian";
+        String exportedAt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").format(LocalDateTime.now());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append('\uFEFF');
+        sb.append("# BÁO CÁO DOANH THU & ĐƠN HÀNG PHONENEST\n");
+        sb.append("# Thời gian xuất,").append(exportedAt).append('\n');
+        sb.append("# Người xuất,").append(exporter != null ? exporter : "Quản trị viên").append('\n');
+        sb.append("# Kỳ báo cáo,").append(period).append('\n');
+        sb.append("#\n");
+        sb.append("# TỔNG KẾT CHỈ SỐ KINH DOANH (KPI)\n");
+        sb.append("Chỉ số,Giá trị (VND / Số lượng)\n");
+        sb.append("Doanh thu thực nhận (Đã giao),").append(revenueDelivered.toBigInteger()).append('\n');
+        sb.append("Doanh thu tiềm năng (Pipeline GMV),").append(pipelineGmv.toBigInteger()).append('\n');
+        sb.append("Tổng số đơn hàng,").append(dons.size()).append('\n');
+        sb.append("Đơn giao thành công,").append(deliveredCount).append('\n');
+        sb.append("Đơn đang xử lý,").append(activeCount).append('\n');
+        sb.append("Đơn đã hủy,").append(cancelledCount).append('\n');
+        sb.append('\n');
+        sb.append("# DANH SÁCH CHI TIẾT ĐƠN HÀNG\n");
+        sb.append("Mã đơn,Ngày mua,Khách hàng,Số điện thoại,Trạng thái,Thanh toán,Tạm tính,Giảm giá,Phí vận chuyển,Tổng tiền\n");
+
+        for (DonHang d : dons) {
+            DonHangDto dto = donHangMapper.toDto(d);
+            sb.append(dto.maDonHang()).append(',')
+                    .append(dto.ngayMua() != null ? dto.ngayMua().toLocalDate() : "").append(',')
+                    .append('"').append(dto.tenKhach() != null ? dto.tenKhach().replace("\"", "\"\"") : "").append('"').append(',')
+                    .append('"').append(d.getSoDienThoaiNhan() != null ? d.getSoDienThoaiNhan() : "").append('"').append(',')
+                    .append('"').append(tenTrangThai(d.getTrangThai())).append('"').append(',')
+                    .append(dto.phuongThucTt() != null ? dto.phuongThucTt().name() : "").append(',')
+                    .append(dto.tamTinh() != null ? dto.tamTinh().toBigInteger() : 0).append(',')
+                    .append(dto.giamGia() != null ? dto.giamGia().toBigInteger() : 0).append(',')
+                    .append(dto.phiVanChuyen() != null && dto.giamPhiVanChuyen() != null ? dto.phiVanChuyen().subtract(dto.giamPhiVanChuyen()).toBigInteger() : 0).append(',')
+                    .append(dto.tongTien() != null ? dto.tongTien().toBigInteger() : 0).append('\n');
+        }
         return sb.toString();
+    }
+
+    private String tenTrangThai(TrangThaiDonHang t) {
+        if (t == null) return "—";
+
+        return switch (t) {
+            case CHO_XAC_NHAN -> "Chờ xác nhận";
+            case DA_XAC_NHAN -> "Đã xác nhận";
+            case DANG_CHUAN_BI -> "Đang chuẩn bị hàng";
+            case DANG_GIAO -> "Đang giao hàng";
+            case CHO_KHACH_XAC_NHAN -> "Chờ khách xác nhận";
+            case DA_GIAO -> "Đã giao thành công";
+            case DA_HUY -> "Đã hủy";
+        };
     }
 }

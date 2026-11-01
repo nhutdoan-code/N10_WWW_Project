@@ -3,6 +3,7 @@ package nhom10.phonenest.service;
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.ChatDto;
 import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.dto.SemanticSearchResultDto;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.entity.PhiVanChuyen;
 import nhom10.phonenest.enums.TrangThaiSanPham;
@@ -11,6 +12,7 @@ import nhom10.phonenest.repository.KhuyenMaiRepository;
 import nhom10.phonenest.repository.PhiVanChuyenRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.repository.TinhThanhRepository;
+import nhom10.phonenest.service.ai.SemanticSearchService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -61,6 +63,7 @@ public class ChatService {
     private final PhiVanChuyenRepository phiVanChuyenRepository;
     private final TinhThanhRepository tinhThanhRepository;
     private final ChatClient chatClient;
+    private final SemanticSearchService semanticSearchService;
 
     @Value("${spring.ai.openai.api-key:}")
     private String apiKey;
@@ -78,7 +81,7 @@ public class ChatService {
                         .entity(ChatDto.AiReply.class);
                 return new ChatDto.Response(kq.reply(), sanPhamGoiY(kq.maSanPham()));
             } catch (Exception e) {
-                // chuyển sang trả lời theo từ khóa
+                // chuyển sang trả lời theo semantic search
             }
         }
         return traLoiTheoTuKhoa(cauHoi);
@@ -125,6 +128,29 @@ public class ChatService {
             return new ChatDto.Response("Hiện cửa hàng có các voucher:\n" + voucherText()
                     + "\nVoucher tốt nhất sẽ được chọn sẵn ở bước thanh toán.", List.of());
         }
+
+        // Semantic Vector AI Search
+        List<SemanticSearchResultDto> semanticResults = semanticSearchService.search(cauHoi, 3);
+        if (!semanticResults.isEmpty()) {
+            StringBuilder reply = new StringBuilder();
+            BigDecimal toiDa = nganSach(k);
+            if (toiDa != null) {
+                reply.append("Với ngân sách khoảng ").append(tien(toiDa)).append(", PhoneNest gợi ý cho bạn:\n");
+            } else {
+                reply.append("Dựa trên nhu cầu của bạn, PhoneNest gợi ý các mẫu máy phù hợp:\n");
+            }
+            for (var r : semanticResults) {
+                reply.append("• ").append(r.sanPham().tenMay())
+                        .append(" (").append(tien(r.sanPham().giaBan())).append("): ")
+                        .append(r.lyDoPhuHop()).append("\n");
+            }
+            String mode = semanticResults.get(0).retrievalMode() != null
+                    ? semanticResults.get(0).retrievalMode()
+                    : "VECTOR_SEMANTIC";
+            return new ChatDto.Response(reply.toString().trim(),
+                    semanticResults.stream().map(SemanticSearchResultDto::sanPham).toList(), mode);
+        }
+
         BigDecimal toiDa = nganSach(k);
         List<SanPhamDto> kq = sanPhamService.list(null, null, null, toiDa, "ban_chay", false).stream()
                 .filter(s -> s.trangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
@@ -144,7 +170,7 @@ public class ChatService {
     }
 
     private boolean khop(SanPhamDto s, String k) {
-        String noiDung = (s.tenMay() + " " + s.tenLoai() + " " + s.thongSo().tomTat()).toLowerCase();
+        String noiDung = (s.tenMay() + " " + s.tenLoai() + " " + (s.thongSo() != null ? s.thongSo().tomTat() : "")).toLowerCase();
         return List.of(k.split("[^\\p{L}\\p{N}]+")).stream()
                 .filter(t -> t.length() >= 3 && !t.matches("\\d+"))
                 .anyMatch(noiDung::contains);
@@ -159,7 +185,7 @@ public class ChatService {
         return sanPhamService.list(null, null, null, null, null, false).stream()
                 .map(s -> "%s | %s | %s | %s VND | %s | %s".formatted(s.maSanPham(), s.tenMay(), s.tenLoai(),
                         s.giaBan().toBigInteger(), s.trangThai() == TrangThaiSanPham.DANG_KINH_DOANH ? "còn hàng" : "hết hàng",
-                        s.thongSo().tomTat()))
+                        s.thongSo() != null ? s.thongSo().tomTat() : ""))
                 .collect(Collectors.joining("\n"));
     }
 

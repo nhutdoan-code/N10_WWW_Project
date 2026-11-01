@@ -53,6 +53,7 @@ public class SanPhamService {
     private final ChiTietGioHangRepository chiTietGioHangRepo;
     private final BienDongKhoRepository bienDongKhoRepo;
     private final NhatKyHoatDongService nhatKyHoatDongService;
+    private final nhom10.phonenest.service.ai.SemanticSearchService semanticSearchService;
 
     public List<SanPhamDto> list(
             String q,
@@ -659,6 +660,10 @@ public class SanPhamService {
                     s.getMaSanPham(), duLieuTruoc, duLieuSau);
         }
 
+        if (semanticSearchService != null) {
+            semanticSearchService.indexProduct(s);
+        }
+
         return SanPhamMapper.toDto(s);
     }
 
@@ -698,6 +703,74 @@ public class SanPhamService {
 
         nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_PRODUCT, LoaiDoiTuongAudit.PRODUCT,
                 ma, duLieuTruoc, null);
+        if (semanticSearchService != null) {
+            semanticSearchService.removeProduct(ma);
+        }
+    }
+
+    public Map<String, Object> getImpact(String ma) {
+        SanPham s = find(ma);
+        long activeOrders = donRepo.countActiveOrdersBySanPham(ma);
+        long allOrders = donRepo.countAllOrdersBySanPham(ma);
+        int variantCount = s.getPhienBans() != null ? s.getPhienBans().size() : 0;
+        int totalStock = s.getSoLuongTon();
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("maSanPham", s.getMaSanPham());
+        res.put("tenMay", s.getTenMay());
+        res.put("trangThai", s.getTrangThai().name());
+        res.put("soPhienBan", variantCount);
+        res.put("bienTheCount", variantCount);
+        res.put("tongTonKho", totalStock);
+        res.put("soLuongTon", totalStock);
+        res.put("soDonHangDangXuLy", activeOrders);
+        res.put("activeOrdersCount", activeOrders);
+        res.put("soDonHangLichSu", allOrders);
+        res.put("totalOrdersCount", allOrders);
+        res.put("coDonHangDangXuLy", activeOrders > 0);
+        return res;
+    }
+
+    public SanPhamDto archive(String ma) {
+        SanPham s = find(ma);
+        if (s.getTrangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH) {
+            return SanPhamMapper.toDto(s);
+        }
+        Map<String, Object> duLieuTruoc = snapshot(s);
+        s.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
+        if (s.getPhienBans() != null) {
+            for (PhienBanSanPham pb : s.getPhienBans()) {
+                pb.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
+            }
+        }
+        SanPham saved = spRepo.save(s);
+        Map<String, Object> duLieuSau = snapshot(saved);
+        nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PRODUCT, LoaiDoiTuongAudit.PRODUCT, ma, duLieuTruoc, duLieuSau);
+        if (semanticSearchService != null) {
+            semanticSearchService.removeProduct(ma);
+        }
+        return SanPhamMapper.toDto(saved);
+    }
+
+    public SanPhamDto restore(String ma) {
+        SanPham s = find(ma);
+        if (s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH) {
+            return SanPhamMapper.toDto(s);
+        }
+        Map<String, Object> duLieuTruoc = snapshot(s);
+        s.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
+        if (s.getPhienBans() != null) {
+            for (PhienBanSanPham pb : s.getPhienBans()) {
+                pb.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
+            }
+        }
+        SanPham saved = spRepo.save(s);
+        Map<String, Object> duLieuSau = snapshot(saved);
+        nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PRODUCT, LoaiDoiTuongAudit.PRODUCT, ma, duLieuTruoc, duLieuSau);
+        if (semanticSearchService != null) {
+            semanticSearchService.indexProduct(saved);
+        }
+        return SanPhamMapper.toDto(saved);
     }
 
     private Map<String, Object> snapshot(SanPham s) {

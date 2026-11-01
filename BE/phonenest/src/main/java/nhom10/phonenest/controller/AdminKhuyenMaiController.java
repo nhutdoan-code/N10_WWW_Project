@@ -1,13 +1,14 @@
 package nhom10.phonenest.controller;
 
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.service.KhuyenMaiService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import lombok.RequiredArgsConstructor;
-import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/promotions")
@@ -21,6 +22,11 @@ public class AdminKhuyenMaiController {
         return khuyenMaiService.list();
     }
 
+    @GetMapping("/{ma}/impact")
+    public Map<String, Object> impact(@PathVariable String ma) {
+        return khuyenMaiService.getImpact(ma);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public KhuyenMaiDto tao(@Valid @RequestBody KhuyenMaiDto d) {
@@ -30,6 +36,16 @@ public class AdminKhuyenMaiController {
     @PutMapping("/{ma}")
     public KhuyenMaiDto sua(@PathVariable String ma, @Valid @RequestBody KhuyenMaiDto d) {
         return khuyenMaiService.sua(ma, d);
+    }
+
+    @PutMapping("/{ma}/archive")
+    public KhuyenMaiDto archive(@PathVariable String ma) {
+        return khuyenMaiService.archive(ma);
+    }
+
+    @PutMapping("/{ma}/restore")
+    public KhuyenMaiDto restore(@PathVariable String ma) {
+        return khuyenMaiService.restore(ma);
     }
 
     @DeleteMapping("/{ma}")
