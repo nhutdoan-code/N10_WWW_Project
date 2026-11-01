@@ -153,6 +153,7 @@ INSERT INTO ThanhToan (maThanhToan,maDonHang,phuongThuc,soTien,trangThai,maGiaoD
 ('TT002','DH002','CHUYEN_KHOAN',25505000,'CHO_THANH_TOAN',NULL,'2026-10-12 14:05:00',NULL),
 ('TT003','DH003','VI_DIEN_TU',29015000,'DA_THANH_TOAN','GD-DH003','2026-10-14 09:15:00','2026-10-14 09:16:00');
 INSERT INTO SuDungKhuyenMai (maSuDung,maKm,maKh,maDonHang,ngaySuDung) VALUES ('SDKM001','NEST10','TK002','DH002','2026-10-12 14:05:00');
+UPDATE KhuyenMai SET daDung = 1 WHERE maKm = 'NEST10';
 INSERT INTO BienDongKho (maBienDong,maPhienBan,loaiBienDong,soLuong,tonTruoc,tonSau,maDonHang,thoiGian,ghiChu) VALUES
 ('BDK001','PB010','BAN_HANG',-1,26,25,'DH001','2026-09-20 10:30:00','Xuất kho cho đơn DH001'),
 ('BDK002','PB002','BAN_HANG',-1,16,15,'DH002','2026-10-12 14:05:00','Xuất kho cho đơn DH002'),

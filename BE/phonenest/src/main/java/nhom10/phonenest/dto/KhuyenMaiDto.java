@@ -21,6 +21,7 @@ public record KhuyenMaiDto(
         Integer soLuong,
         int daDung,
         boolean chiKhachMoi,
+        int gioiHanMoiKhach,
         @NotNull(message = "Vui lòng chọn ngày bắt đầu") LocalDate ngayBatDau,
         @NotNull(message = "Vui lòng chọn ngày kết thúc") LocalDate ngayKetThuc,
         String dieuKienApDung) {
