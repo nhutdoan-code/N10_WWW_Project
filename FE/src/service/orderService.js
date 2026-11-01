@@ -2,6 +2,8 @@ import api from '../config/api';
 
 export const orderService = {
   checkout: (data) => api.post('/customer/orders', data),
+  createMomoPayment: (ma) => api.post(`/customer/orders/${ma}/momo`),
+  paymentStatus: (ma) => api.get(`/customer/orders/${ma}/payment-status`),
   list: () => api.get('/customer/orders'),
   get: (ma) => api.get(`/customer/orders/${ma}`),
   cancel: (ma, lyDo, ghiChu) => api.put(`/customer/orders/${ma}/cancel`, { lyDo, ghiChu }),

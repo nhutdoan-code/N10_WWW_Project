@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payment/momo/ipn").permitAll()
                         // Public catalogue: read-only.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products", "/api/products/**",
