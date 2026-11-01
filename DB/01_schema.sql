@@ -5,6 +5,7 @@ CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
 USE BanDienThoai;
+SET NAMES utf8mb4;
 
 -- PhoneNest Database FINAL V2
 -- Chốt nghiệp vụ: Product -> ProductVariant (SKU); stock theo variant; payment tách order;

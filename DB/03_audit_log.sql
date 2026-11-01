@@ -9,6 +9,7 @@
 -- Khong dung DROP / TRUNCATE / DELETE.
 
 USE BanDienThoai;
+SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS NhatKyHoatDong (
     maNhatKy VARCHAR(50) PRIMARY KEY,

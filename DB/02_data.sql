@@ -1,4 +1,5 @@
 USE BanDienThoai;
+SET NAMES utf8mb4;
 
 START TRANSACTION;
 

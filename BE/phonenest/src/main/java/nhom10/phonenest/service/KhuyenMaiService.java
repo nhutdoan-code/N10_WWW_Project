@@ -1,12 +1,18 @@
 package nhom10.phonenest.service;
 
+import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.enums.HanhDongAudit;
 import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.enums.LoaiKhuyenMai;
 import nhom10.phonenest.exception.AppException;
+import nhom10.phonenest.repository.DonHangRepository;
 import nhom10.phonenest.repository.KhuyenMaiRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -15,10 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class KhuyenMaiService {
 
     private final KhuyenMaiRepository khuyenMaiRepository;
+    private final DonHangRepository donHangRepository;
     private final NhatKyHoatDongService nhatKyHoatDongService;
 
     @Transactional(readOnly = true)
@@ -47,10 +50,54 @@ public class KhuyenMaiService {
 
     public void xoa(String ma) {
         KhuyenMai k = tim(ma);
+        long ordersCount = donHangRepository.countOrdersByKhuyenMai(ma);
+        if (ordersCount > 0 || k.getDaDung() > 0) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Mã khuyến mãi đã có đơn hàng sử dụng (" + ordersCount + " đơn), hãy chuyển sang dừng hoạt động thay vì xóa");
+        }
         Map<String, Object> duLieuTruoc = snapshot(k);
         khuyenMaiRepository.delete(k);
         nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_PROMOTION, LoaiDoiTuongAudit.PROMOTION,
                 ma, duLieuTruoc, null);
+    }
+
+    public Map<String, Object> getImpact(String ma) {
+        KhuyenMai k = tim(ma);
+        long ordersCount = donHangRepository.countOrdersByKhuyenMai(ma);
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("maKm", k.getMaKm());
+        res.put("tenKm", k.getTenKm());
+        res.put("daDung", k.getDaDung());
+        res.put("soDonHangDaDung", ordersCount);
+        res.put("trangThaiHoatDong", k.isTrangThaiHoatDong());
+        res.put("coDonHangLienQuan", ordersCount > 0 || k.getDaDung() > 0);
+        return res;
+    }
+
+    public KhuyenMaiDto archive(String ma) {
+        KhuyenMai k = tim(ma);
+        if (!k.isTrangThaiHoatDong()) {
+            return toDto(k);
+        }
+        Map<String, Object> duLieuTruoc = snapshot(k);
+        k.setTrangThaiHoatDong(false);
+        KhuyenMai saved = khuyenMaiRepository.save(k);
+        Map<String, Object> duLieuSau = snapshot(saved);
+        nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PROMOTION, LoaiDoiTuongAudit.PROMOTION, ma, duLieuTruoc, duLieuSau);
+        return toDto(saved);
+    }
+
+    public KhuyenMaiDto restore(String ma) {
+        KhuyenMai k = tim(ma);
+        if (k.isTrangThaiHoatDong()) {
+            return toDto(k);
+        }
+        Map<String, Object> duLieuTruoc = snapshot(k);
+        k.setTrangThaiHoatDong(true);
+        KhuyenMai saved = khuyenMaiRepository.save(k);
+        Map<String, Object> duLieuSau = snapshot(saved);
+        nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_PROMOTION, LoaiDoiTuongAudit.PROMOTION, ma, duLieuTruoc, duLieuSau);
+        return toDto(saved);
     }
 
     private KhuyenMaiDto luu(KhuyenMai k, String ma, KhuyenMaiDto d, boolean taoMoi) {
@@ -58,6 +105,17 @@ public class KhuyenMaiService {
         if (d.ngayKetThuc().isBefore(d.ngayBatDau())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Ngày kết thúc phải sau ngày bắt đầu");
         }
+        if (d.phanTramGiam() == null || d.phanTramGiam().compareTo(BigDecimal.ZERO) <= 0
+                || d.phanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Phần trăm giảm phải trong khoảng (0, 100]");
+        }
+        if (d.donToiThieu() != null && d.donToiThieu().compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn tối thiểu không được âm");
+        }
+        if (d.soTienGiamToiDa() != null && d.soTienGiamToiDa().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền giảm tối đa phải lớn hơn 0");
+        }
+
         k.setMaKm(ma);
         k.setTenKm(d.tenKm().trim());
         k.setPhanTramGiam(d.phanTramGiam());
@@ -69,6 +127,10 @@ public class KhuyenMaiService {
         k.setSoLuong(d.soLuong());
         k.setChiKhachMoi(d.chiKhachMoi());
         k.setDieuKienApDung(d.dieuKienApDung());
+        if (d.trangThaiHoatDong() != null) {
+            k.setTrangThaiHoatDong(d.trangThaiHoatDong());
+        }
+
         KhuyenMai daLuu = khuyenMaiRepository.save(k);
         Map<String, Object> duLieuSau = snapshot(daLuu);
         if (taoMoi) {
@@ -105,12 +167,17 @@ public class KhuyenMaiService {
     }
 
     private KhuyenMaiDto toDto(KhuyenMai k) {
-        return new KhuyenMaiDto(k.getMaKm(), k.getTenKm(), k.getLoai(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(),
+        return new KhuyenMaiDto(
+                k.getMaKm(), k.getTenKm(), k.getLoai(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(),
                 k.getDonToiThieu(), k.getSoLuong(), k.getDaDung(), k.isChiKhachMoi(),
-                k.getNgayBatDau(), k.getNgayKetThuc(), k.getDieuKienApDung());
+                k.getNgayBatDau(), k.getNgayKetThuc(), k.getDieuKienApDung(), k.isTrangThaiHoatDong()
+        );
     }
 
     public String lyDoKhongDung(KhuyenMai k, BigDecimal tamTinh, boolean khachMoi) {
+        if (!k.isTrangThaiHoatDong()) {
+            return "Mã khuyến mãi đã ngừng hoạt động";
+        }
         LocalDate hom = LocalDate.now();
         if (hom.isBefore(k.getNgayBatDau()) || hom.isAfter(k.getNgayKetThuc())) {
             return "Mã khuyến mãi không còn hiệu lực";

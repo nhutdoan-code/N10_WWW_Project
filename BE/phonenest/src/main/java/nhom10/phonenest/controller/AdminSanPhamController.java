@@ -2,27 +2,22 @@ package nhom10.phonenest.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import nhom10.phonenest.dto.LoaiSanPhamDto;
 import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.service.LoaiSanPhamService;
 import nhom10.phonenest.service.LuuTruAnhService;
 import nhom10.phonenest.service.SanPhamService;
+import nhom10.phonenest.service.ai.SemanticSearchService;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -31,6 +26,7 @@ public class AdminSanPhamController {
     private final SanPhamService sanPhamService;
     private final LoaiSanPhamService loaiSanPhamService;
     private final LuuTruAnhService luuTruAnhService;
+    private final SemanticSearchService semanticSearchService;
 
     @PostMapping("/uploads")
     public Map<String, String> upload(@RequestParam MultipartFile file) {
@@ -47,6 +43,35 @@ public class AdminSanPhamController {
         return sanPhamService.get(ma, true);
     }
 
+    @GetMapping("/products/{ma}/impact")
+    public Map<String, Object> productImpact(@PathVariable String ma) {
+        return sanPhamService.getImpact(ma);
+    }
+
+    @PostMapping("/products/reindex")
+    public Map<String, Object> reindex() {
+        if (!semanticSearchService.isEmbeddingAvailable()) {
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Không thể đồng bộ dữ liệu AI. Dịch vụ tư vấn thông minh hiện chưa sẵn sàng. Vui lòng thử lại sau."
+            );
+        }
+        try {
+            int count = semanticSearchService.reindexAll();
+            return Map.of(
+                    "thanhCong", true,
+                    "soLuong", count,
+                    "thongBao", "Đồng bộ dữ liệu AI thành công. Đã cập nhật " + count + " sản phẩm."
+            );
+        } catch (Exception e) {
+            log.error("Lỗi khi đồng bộ dữ liệu AI: {}", e.getMessage(), e);
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Không thể đồng bộ dữ liệu AI. Dịch vụ tư vấn thông minh hiện chưa sẵn sàng. Vui lòng thử lại sau."
+            );
+        }
+    }
+
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     public SanPhamDto create(@Valid @RequestBody SanPhamDto d) {
@@ -56,6 +81,16 @@ public class AdminSanPhamController {
     @PutMapping("/products/{ma}")
     public SanPhamDto update(@PathVariable String ma, @Valid @RequestBody SanPhamDto d) {
         return sanPhamService.save(ma, d);
+    }
+
+    @PutMapping("/products/{ma}/archive")
+    public SanPhamDto archiveProduct(@PathVariable String ma) {
+        return sanPhamService.archive(ma);
+    }
+
+    @PutMapping("/products/{ma}/restore")
+    public SanPhamDto restoreProduct(@PathVariable String ma) {
+        return sanPhamService.restore(ma);
     }
 
     @DeleteMapping("/products/{ma}")
