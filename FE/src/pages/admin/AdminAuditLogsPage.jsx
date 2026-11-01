@@ -53,6 +53,54 @@ export const ENTITY_LABELS = {
   RETURN: 'Đổi trả',
 };
 
+export const FIELD_LABELS = {
+  maSanPham: 'Mã sản phẩm',
+  tenMay: 'Tên máy / sản phẩm',
+  giaBan: 'Giá bán',
+  giaNiemYet: 'Giá niêm yết',
+  soLuongTon: 'Số lượng tồn',
+  trangThai: 'Trạng thái kinh doanh',
+  trangThaiDonHang: 'Trạng thái đơn hàng',
+  anhChinh: 'Ảnh sản phẩm',
+  maThuongHieu: 'Mã thương hiệu',
+  tenThuongHieu: 'Thương hiệu',
+  maLoai: 'Mã danh mục',
+  tenLoai: 'Danh mục',
+  moTa: 'Mô tả',
+  maDonHang: 'Mã đơn hàng',
+  tongTien: 'Tổng thanh toán',
+  phiVanChuyen: 'Phí vận chuyển',
+  tienGiam: 'Số tiền giảm',
+  giamGia: 'Giảm giá',
+  tamTinh: 'Tạm tính',
+  phuongThucThanhToan: 'Phương thức thanh toán',
+  maKh: 'Mã khách hàng',
+  hoTen: 'Họ tên',
+  email: 'Email',
+  soDienThoai: 'Số điện thoại',
+  diaChi: 'Địa chỉ',
+  maKm: 'Mã khuyến mãi',
+  tenKm: 'Tên khuyến mãi',
+  phanTramGiam: 'Phần trăm giảm',
+  soTienGiamToiDa: 'Giảm tối đa',
+  donToiThieu: 'Đơn tối thiểu',
+  ngayBatDau: 'Ngày bắt đầu',
+  ngayKetThuc: 'Ngày kết thúc',
+  trangThaiHoatDong: 'Trạng thái hoạt động',
+  chiKhachMoi: 'Chỉ khách mới',
+  soLuong: 'Số lượng',
+  maKho: 'Mã kho',
+  khoa: 'Trạng thái khóa',
+  vaiTro: 'Vai trò',
+  lyDo: 'Lý do',
+  noiDung: 'Nội dung',
+  cauTraLoi: 'Câu trả lời',
+  phiCoBan: 'Phí cơ bản',
+  tinhThanh: 'Tỉnh/Thành phố',
+  items: 'Danh sách sản phẩm đơn hàng',
+  danhSachBienThe: 'Danh sách biến thể',
+};
+
 const MONEY_FIELDS = new Set([
   'giaBan',
   'giaNiemYet',
@@ -89,7 +137,7 @@ export function getActionBadgeClass(action) {
 
 function formatFieldValue(val, key = '') {
   if (val === null || val === undefined) return '—';
-  if (typeof val === 'boolean') return val ? 'Có' : 'Không';
+  if (typeof val === 'boolean') return val ? 'Có (True)' : 'Không (False)';
   if (typeof val === 'number') {
     if (MONEY_FIELDS.has(key)) {
       return `${val.toLocaleString('vi-VN')} ₫`;
@@ -103,8 +151,53 @@ function formatFieldValue(val, key = '') {
     }
     return val;
   }
-  if (typeof val === 'object') {
-    return <pre className="json-block">{JSON.stringify(val, null, 2)}</pre>;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return <span className="muted">(Danh sách trống)</span>;
+    if (typeof val[0] === 'object' && val[0] !== null) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '4px 0' }}>
+          {val.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: '#f8f9fa',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '0.82rem',
+              }}
+            >
+              {item.tenMay && <div><b>{item.tenMay}</b> {item.maSanPham && <code>({item.maSanPham})</code>}</div>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', color: '#4b5563', marginTop: '2px' }}>
+                {item.soLuong != null && <span>Số lượng: <b>{item.soLuong}</b></span>}
+                {item.giaBan != null && <span>Đơn giá: <b>{Number(item.giaBan).toLocaleString('vi-VN')} ₫</b></span>}
+                {item.thanhTien != null && <span>Thành tiền: <b>{Number(item.thanhTien).toLocaleString('vi-VN')} ₫</b></span>}
+              </div>
+              {!item.tenMay && Object.entries(item).map(([ik, iv]) => (
+                <div key={ik} style={{ fontSize: '0.8rem' }}>
+                  <span className="muted">{FIELD_LABELS[ik] || ik}:</span> {typeof iv === 'object' ? JSON.stringify(iv) : String(iv)}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return val.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
+  }
+  if (typeof val === 'object' && val !== null) {
+    const entries = Object.entries(val);
+    if (entries.length === 0) return <span className="muted">(Đối tượng trống)</span>;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0' }}>
+        {entries.map(([subKey, subVal]) => (
+          <div key={subKey} style={{ fontSize: '0.82rem' }}>
+            <span className="muted" style={{ marginRight: '6px' }}>{FIELD_LABELS[subKey] || subKey}:</span>
+            <b>{typeof subVal === 'object' ? JSON.stringify(subVal) : String(subVal)}</b>
+          </div>
+        ))}
+      </div>
+    );
   }
   return String(val);
 }
@@ -151,7 +244,7 @@ function AuditVisualDiff({ before, after }) {
             <tbody>
               {keys.map((k) => (
                 <tr key={k}>
-                  <td><code>{k}</code></td>
+                  <td><div><b>{FIELD_LABELS[k] || k}</b><div className="muted" style={{ fontSize: '0.75rem' }}>{k}</div></div></td>
                   <td>
                     {typeof after[k] === 'object' && after[k] !== null ? (
                       formatFieldValue(after[k], k)
@@ -191,7 +284,7 @@ function AuditVisualDiff({ before, after }) {
             <tbody>
               {keys.map((k) => (
                 <tr key={k}>
-                  <td><code>{k}</code></td>
+                  <td><div><b>{FIELD_LABELS[k] || k}</b><div className="muted" style={{ fontSize: '0.75rem' }}>{k}</div></div></td>
                   <td>
                     {typeof before[k] === 'object' && before[k] !== null ? (
                       formatFieldValue(before[k], k)
@@ -254,7 +347,7 @@ function AuditVisualDiff({ before, after }) {
 
             return (
               <tr key={k} className={isDifferent ? 'changed' : ''}>
-                <td><code>{k}</code></td>
+                <td><div><b>{FIELD_LABELS[k] || k}</b><div className="muted" style={{ fontSize: '0.75rem' }}>{k}</div></div></td>
                 <td>
                   {isNested ? (
                     formatFieldValue(vBefore, k)

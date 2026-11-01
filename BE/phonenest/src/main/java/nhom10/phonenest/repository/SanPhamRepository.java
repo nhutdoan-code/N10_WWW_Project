@@ -12,6 +12,8 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
 
     boolean existsByLoaiMaLoai(String maLoai);
 
+    long countByThuongHieuMaThuongHieu(String maThuongHieu);
+
     @Query("SELECT s FROM SanPham s " +
            "WHERE LOWER(s.tenMay) LIKE LOWER(:pattern) ESCAPE '\\' " +
            "   OR LOWER(s.maSanPham) LIKE LOWER(:pattern) ESCAPE '\\' " +

@@ -6,6 +6,15 @@ import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage, formatDate, formatPrice } from '../../utils/format';
 
+export const ALLOWED_TRANSITIONS = {
+  CHO_XAC_NHAN: ['DA_XAC_NHAN', 'DA_HUY'],
+  DA_XAC_NHAN: ['DANG_CHUAN_BI', 'DA_HUY'],
+  DANG_CHUAN_BI: ['DANG_GIAO', 'DA_HUY'],
+  DANG_GIAO: ['DA_GIAO', 'DA_HUY'],
+  DA_GIAO: [],
+  DA_HUY: [],
+};
+
 export default function AdminOrdersPage() {
   const { data: orders, reload } = useFetch(adminService.orders);
   const [selected, setSelected] = useState(null);
@@ -22,13 +31,27 @@ export default function AdminOrdersPage() {
     reload();
   };
 
-  const select = (o) => (
-    <select value={o.trangThai} onChange={(e) => run(() => adminService.updateOrderStatus(o.maDonHang, e.target.value), 'Đã cập nhật trạng thái')}>
-      {Object.entries(ORDER_STATUS).map(([value, label]) => (
-        <option key={value} value={value}>{label}</option>
-      ))}
-    </select>
-  );
+  const select = (o) => {
+    const nextStates = ALLOWED_TRANSITIONS[o.trangThai] || [];
+    if (nextStates.length === 0) {
+      return (
+        <span className={`badge ${o.trangThai === 'DA_GIAO' ? 'badge-audit-create' : 'badge-audit-delete'}`}>
+          {ORDER_STATUS[o.trangThai] || o.trangThai}
+        </span>
+      );
+    }
+    return (
+      <select
+        value={o.trangThai}
+        onChange={(e) => run(() => adminService.updateOrderStatus(o.maDonHang, e.target.value), 'Đã cập nhật trạng thái')}
+      >
+        <option value={o.trangThai}>{ORDER_STATUS[o.trangThai] || o.trangThai} (Hiện tại)</option>
+        {nextStates.map((st) => (
+          <option key={st} value={st}>➜ {ORDER_STATUS[st] || st}</option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <>
