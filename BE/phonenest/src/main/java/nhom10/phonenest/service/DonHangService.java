@@ -105,13 +105,13 @@ public class DonHangService {
         }
 
         if (coMa(req.maKm())) {
-            KhuyenMai k = dungVoucher(req.maKm(), LoaiKhuyenMai.DON_HANG, tam, moi);
+            KhuyenMai k = dungVoucher(req.maKm(), LoaiKhuyenMai.DON_HANG, tam, moi, maKh);
             d.setKhuyenMai(k);
             d.setGiamGia(khuyenMaiService.tinhGiam(k, tam));
         }
 
         if (coMa(req.maKmVanChuyen())) {
-            KhuyenMai k = dungVoucher(req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi);
+            KhuyenMai k = dungVoucher(req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi, maKh);
             d.setKhuyenMaiVanChuyen(k);
             d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
         }
@@ -125,9 +125,30 @@ public class DonHangService {
         d.setTongThanhToan(tongThanhToan);
 
         DonHang luu = donHangRepository.save(d);
+
+        if (luu.getKhuyenMai() != null) {
+            khuyenMaiService.ghiNhanSuDung(
+                    luu.getKhuyenMai(),
+                    maKh,
+                    luu.getMaDonHang()
+            );
+        }
+
+        if (luu.getKhuyenMaiVanChuyen() != null) {
+            khuyenMaiService.ghiNhanSuDung(
+                    luu.getKhuyenMaiVanChuyen(),
+                    maKh,
+                    luu.getMaDonHang()
+            );
+        }
+
         doiTon(luu, -1, LoaiBienDongKho.BAN_HANG);
         taoThanhToan(luu, req.phuongThucTt());
-        ghiTrangThai(luu, TrangThaiDonHang.CHO_XAC_NHAN, "Khách hàng đặt đơn");
+        ghiTrangThai(
+                luu,
+                TrangThaiDonHang.CHO_XAC_NHAN,
+                "Khách hàng đặt đơn"
+        );
 
         if (!muaNgay) {
             gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(g -> g.getChiTiet().clear());
@@ -173,6 +194,15 @@ public class DonHangService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác");
         }
         doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
+        khuyenMaiService.hoanLuot(
+                d.getKhuyenMai(),
+                d.getMaDonHang()
+        );
+
+        khuyenMaiService.hoanLuot(
+                d.getKhuyenMaiVanChuyen(),
+                d.getMaDonHang()
+        );
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
         d.setNgayCapNhat(LocalDateTime.now());
         HuyDonHang h = new HuyDonHang();
@@ -514,17 +544,41 @@ public class DonHangService {
         return x != null && !x.isBlank();
     }
 
-    private KhuyenMai dungVoucher(String ma, LoaiKhuyenMai loai, BigDecimal tam, boolean moi) {
-        KhuyenMai k = khuyenMaiRepository.findById(ma.trim()).filter(x -> x.getLoai() == loai)
-                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Mã khuyến mãi " + ma + " không hợp lệ hoặc không đúng loại"));
+    private KhuyenMai dungVoucher(
+            String ma,
+            LoaiKhuyenMai loai,
+            BigDecimal tam,
+            boolean moi,
+            String maKh) {
+
+        KhuyenMai k = khuyenMaiRepository.findById(ma.trim())
+                .filter(x -> x.getLoai() == loai)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.BAD_REQUEST,
+                        "Mã khuyến mãi " + ma + " không hợp lệ hoặc không đúng loại"
+                ));
+
         if (!k.isTrangThaiHoatDong()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Mã khuyến mãi " + ma + " đã ngừng hoạt động");
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Mã khuyến mãi " + ma + " đã ngừng hoạt động"
+            );
         }
-        String ly = khuyenMaiService.lyDoKhongDung(k, tam, moi);
+
+        String ly = khuyenMaiService.lyDoKhongDung(
+                k,
+                tam,
+                moi,
+                maKh
+        );
+
         if (ly != null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, k.getMaKm() + ": " + ly);
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    k.getMaKm() + ": " + ly
+            );
         }
-        k.setDaDung(k.getDaDung() + 1);
+
         return k;
     }
 }

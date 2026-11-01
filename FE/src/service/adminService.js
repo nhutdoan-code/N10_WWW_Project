@@ -38,9 +38,12 @@ export const adminService = {
   deleteAccount: (ma) => api.delete(`/admin/accounts/${ma}`),
   toggleLock: (ma) => api.put(`/admin/accounts/${ma}/toggle-lock`),
 
-  inventory: (loc) => api.get('/admin/inventory', { params: { loc } }),
-  importStock: (ma, soLuong) => api.post(`/admin/inventory/${ma}/import`, { soLuong }),
-  setStock: (ma, soLuong) => api.put(`/admin/inventory/${ma}`, { soLuong }),
+  inventory: (q, loc, page, size) => api.get('/admin/inventory', { params: { q: q || undefined, loc: loc || undefined, page, size } }),
+  inventoryStats: () => api.get('/admin/inventory/stats'),
+  inventoryHistory: (ma) => api.get(ma ? `/admin/inventory/${ma}/history` : '/admin/inventory/history'),
+  importStock: (ma, soLuong, ghiChu) => api.post(`/admin/inventory/${ma}/import`, { soLuong, ghiChu }),
+  importStockBatch: (items, ghiChu) => api.post('/admin/inventory/batch-import', { items, ghiChu }),
+  adjustStock: (ma, soLuongThucTe, lyDo) => api.put(`/admin/inventory/${ma}/adjust`, { soLuongThucTe, lyDo }),
 
   promotions: () => api.get('/admin/promotions'),
   savePromotion: (ma, data) => (ma ? api.put(`/admin/promotions/${ma}`, data) : api.post('/admin/promotions', data)),

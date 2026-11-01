@@ -64,6 +64,11 @@ export default function CheckoutPage() {
     try {
       const order = await orderService.checkout({ phuongThucTt: payment, maDiaChi, maKm: vDh?.maKm, maKmVanChuyen: vVc?.maKm, maSanPham: mua || undefined, soLuong: mua ? sl : undefined });
       if (!mua) reset();
+      if (payment === 'VI_DIEN_TU') {
+        const momo = await orderService.createMomoPayment(order.maDonHang);
+        window.location.assign(momo.payUrl);
+        return;
+      }
       toast('Đặt hàng thành công!');
       navigate(`/orders/${order.maDonHang}`);
     } catch (e) {

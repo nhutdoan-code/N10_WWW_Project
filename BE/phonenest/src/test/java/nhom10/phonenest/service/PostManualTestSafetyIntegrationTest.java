@@ -526,7 +526,8 @@ class PostManualTestSafetyIntegrationTest {
             KhuyenMaiDto dtoInvalid0 = new KhuyenMaiDto(
                     "KM01", "Giảm 0%", LoaiKhuyenMai.DON_HANG,
                     BigDecimal.ZERO, null, BigDecimal.ZERO,
-                    100, 0, false, LocalDate.now(), LocalDate.now().plusDays(10), "DK", true
+                    100, 0, false, 1,
+                    LocalDate.now(), LocalDate.now().plusDays(10), "DK", true
             );
             assertThatThrownBy(() -> khuyenMaiService.tao(dtoInvalid0))
                     .isInstanceOf(AppException.class)
@@ -536,7 +537,8 @@ class PostManualTestSafetyIntegrationTest {
             KhuyenMaiDto dtoInvalid101 = new KhuyenMaiDto(
                     "KM01", "Giảm 101%", LoaiKhuyenMai.DON_HANG,
                     new BigDecimal("100.5"), null, BigDecimal.ZERO,
-                    100, 0, false, LocalDate.now(), LocalDate.now().plusDays(10), "DK", true
+                    100, 0, false, 1,
+                    LocalDate.now(), LocalDate.now().plusDays(10), "DK", true
             );
             assertThatThrownBy(() -> khuyenMaiService.tao(dtoInvalid101))
                     .isInstanceOf(AppException.class)

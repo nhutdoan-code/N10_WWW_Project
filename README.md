@@ -20,6 +20,14 @@ Website bán điện thoại và phụ kiện.
 - `DB/` - Database
 - `API_DOCUMENTATION.md` - Tài liệu API
 
+## Thanh toán MoMo
+
+Thanh toán ví MoMo dùng môi trường test. Đặt các biến môi trường
+`MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL` và
+`MOMO_IPN_URL` trước khi chọn phương thức ví điện tử. `MOMO_IPN_URL` phải là URL
+HTTPS công khai để MoMo gọi được; hệ thống xác thực chữ ký và số tiền từ đơn hàng
+trước khi ghi nhận thanh toán.
+
 ## Thành viên
 
 - Nguyễn Nhựt Đoàn

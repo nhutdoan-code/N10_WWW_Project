@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.svg';
 import ChatWidget from '../components/ChatWidget';
@@ -11,7 +12,27 @@ import useFetch from '../hooks/useFetch';
 import { customerService } from '../service/customerService';
 import { productService } from '../service/productService';
 
+const HOT_LINES = [
+  'iPhone 18 Pro Max 256GB',
+  'iPhone Duo',
+  'Samsung Galaxy A07',
+  'Xiaomi 17T 512GB',
+  'Samsung Galaxy Z Fold8 Ultra',
+  'Oppo Reno 16F',
+];
+
+const DEAL_LINES = [
+  'iPhone 17 Pro Max 256GB',
+  'iPhone 18 Series',
+  'Samsung Galaxy S26 FE',
+  'Samsung Galaxy Z Flip8',
+  'Samsung Galaxy A17',
+];
+
 export default function MainLayout() {
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [hoverDismissed, setHoverDismissed] = useState(false);
+  const categoriesRef = useRef(null);
   const { user, logout, isAdmin, isCustomer } = useAuth();
   const { count, reset: resetCart } = useCart();
   const { ids } = useCompare();
@@ -23,6 +44,19 @@ export default function MainLayout() {
   );
   const { data: categories } = useFetch(productService.categories);
   const unread = notices?.filter((n) => !n.daDoc).length || 0;
+  const rootCategories = categories?.filter((category) => !category.maLoaiCha) || [];
+  const closeCategoriesByClick = () => {
+    setCategoriesOpen(false);
+    setHoverDismissed(true);
+  };
+
+  useEffect(() => {
+    const closeCategories = (event) => {
+      if (!categoriesRef.current?.contains(event.target)) setCategoriesOpen(false);
+    };
+    document.addEventListener('mousedown', closeCategories);
+    return () => document.removeEventListener('mousedown', closeCategories);
+  }, []);
 
   const handleLogout = () => {
     resetCart();
@@ -91,12 +125,64 @@ export default function MainLayout() {
       </header>
       <nav className="catnav no-print" aria-label="Danh mục">
         <div className="container">
-          <Link to="/" className={location.pathname === '/' && !location.search ? 'on' : ''}>Tất cả điện thoại</Link>
-          {categories?.filter((c) => !c.maLoaiCha).map((c) => (
-            <Link key={c.maLoai} to={`/?loai=${c.maLoai}`} className={location.search === `?loai=${c.maLoai}` ? 'on' : ''}>{c.tenLoai}</Link>
-          ))}
-          <Link to="/?gia=1">Dưới 5 triệu</Link>
-          <Link to="/?gia=4">Trên 20 triệu</Link>
+          <div
+            className={`catnav-item ${categoriesOpen ? 'open' : ''} ${hoverDismissed ? 'hover-dismissed' : ''}`}
+            ref={categoriesRef}
+            onMouseEnter={() => {
+              if (!hoverDismissed) setCategoriesOpen(true);
+            }}
+            onMouseLeave={() => {
+              setCategoriesOpen(false);
+              setHoverDismissed(false);
+            }}
+          >
+            <button
+              type="button"
+              className={`catnav-trigger ${location.pathname === '/' && !location.search ? 'on' : ''}`}
+              aria-expanded={categoriesOpen}
+              onClick={() => {
+                setCategoriesOpen(false);
+                setHoverDismissed(true);
+              }}
+            >
+              Tất cả điện thoại
+            </button>
+            {categoriesOpen && (
+              <div className="category-mega" role="menu">
+                <div className="category-mega-column category-mega-brand">
+                  <h3>Thương hiệu</h3>
+                  {rootCategories.map((category) => (
+                    <Link
+                      key={category.maLoai}
+                      className="brand-chip"
+                      to={`/?loai=${category.maLoai}`}
+                      role="menuitem"
+                      onClick={closeCategoriesByClick}
+                    >
+                      {category.tenLoai.replace(/^Điện thoại\s+/i, '')}
+                    </Link>
+                  ))}
+                </div>
+                <div className="category-mega-column">
+                  <h3>Dòng sản phẩm HOT</h3>
+                  {HOT_LINES.map((name) => (
+                    <Link key={name} className="category-chip" to={`/?q=${encodeURIComponent(name)}`} onClick={closeCategoriesByClick}>
+                      <span className="mega-product-thumb" aria-hidden="true" />
+                      {name}
+                    </Link>
+                  ))}
+                </div>
+                <div className="category-mega-column">
+                  <h3>Sản phẩm giá sốc</h3>
+                  {DEAL_LINES.map((name) => (
+                    <Link key={name} className="category-chip" to={`/?q=${encodeURIComponent(name)}`} onClick={closeCategoriesByClick}>
+                      {name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
       <main className="container main">

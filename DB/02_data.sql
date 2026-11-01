@@ -9,8 +9,10 @@ INSERT INTO TaiKhoan
 VALUES
 ('TK001', 'admin@phonenest.com', '0900000001', '$2a$10$Nbn8/QR7ux8nGgghO9zidejt47a021r4wVcq5NqIsIM6/RMkIEOqy', TRUE, 'LOCAL'),
 ('TK002', 'an@phonenest.com',    '0900000002', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL'),
-('TK003', 'binh@phonenest.com',  '0900000003', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL');
+('TK003', 'binh@phonenest.com',  '0900000003', '$2a$10$NZy7J28Ep9fHK2oEtkXs/Og8ulqg0yYt9/DckXW6GGG9Yl7ojyJaC', TRUE, 'LOCAL'),
+('TK004', 'hoang@phonenest.com', '0900000004', '$2y$10$8IJfBgj3GZ19coGUGISj0.q2OO5nRN2LvQ29O4MENuHwKfuw2s/UG', TRUE, 'LOCAL');
 INSERT INTO QuanTriVien (maQtv,hoTen,vaiTro,chucVu) VALUES ('TK001','Quản trị viên PhoneNest','ADMIN','Quản trị hệ thống');
+INSERT INTO QuanTriVien (maQtv,hoTen,vaiTro,chucVu) VALUES ('TK004','Quản trị viên PhoneNest','ADMIN','Quản trị hệ thống');
 INSERT INTO KhachHang (maKh,hoTen,diemTichLuy,hangThanhVien) VALUES
 ('TK002','Nguyễn Văn An',0,'THUONG'),('TK003','Trần Thị Bình',0,'THUONG');
 
@@ -152,6 +154,7 @@ INSERT INTO ThanhToan (maThanhToan,maDonHang,phuongThuc,soTien,trangThai,maGiaoD
 ('TT002','DH002','CHUYEN_KHOAN',25505000,'CHO_THANH_TOAN',NULL,'2026-10-12 14:05:00',NULL),
 ('TT003','DH003','VI_DIEN_TU',29015000,'DA_THANH_TOAN','GD-DH003','2026-10-14 09:15:00','2026-10-14 09:16:00');
 INSERT INTO SuDungKhuyenMai (maSuDung,maKm,maKh,maDonHang,ngaySuDung) VALUES ('SDKM001','NEST10','TK002','DH002','2026-10-12 14:05:00');
+UPDATE KhuyenMai SET daDung = 1 WHERE maKm = 'NEST10';
 INSERT INTO BienDongKho (maBienDong,maPhienBan,loaiBienDong,soLuong,tonTruoc,tonSau,maDonHang,thoiGian,ghiChu) VALUES
 ('BDK001','PB010','BAN_HANG',-1,26,25,'DH001','2026-09-20 10:30:00','Xuất kho cho đơn DH001'),
 ('BDK002','PB002','BAN_HANG',-1,16,15,'DH002','2026-10-12 14:05:00','Xuất kho cho đơn DH002'),
