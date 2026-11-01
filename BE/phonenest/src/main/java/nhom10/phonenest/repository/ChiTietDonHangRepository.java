@@ -55,4 +55,12 @@ public interface ChiTietDonHangRepository extends JpaRepository<ChiTietDonHang, 
     List<Object[]> findDeliveredSalesByCategoryBetweenDeliveryDates(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    // Tổng số lượng đã bán theo sản phẩm (không tính đơn đã hủy) - dùng cho sort "bán chạy"
+    @Query("SELECT c.phienBan.sanPham.maSanPham, SUM(c.soLuong) " +
+            "FROM ChiTietDonHang c " +
+            "WHERE c.donHang.trangThai <> nhom10.phonenest.enums.TrangThaiDonHang.DA_HUY " +
+            "GROUP BY c.phienBan.sanPham.maSanPham")
+    List<Object[]> tongDaBanTheoSanPham();
 }
+

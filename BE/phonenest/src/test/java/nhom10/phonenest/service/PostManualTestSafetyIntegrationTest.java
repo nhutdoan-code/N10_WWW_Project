@@ -22,6 +22,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -72,30 +76,77 @@ class PostManualTestSafetyIntegrationTest {
         @Mock
         private ThongBaoService thongBaoService;
 
+        @Mock
+        private TaiKhoanRepository taiKhoanRepository;
+
         @InjectMocks
         private DonHangService donHangService;
+
+        @BeforeEach
+        void setUpSecurityContext() {
+            var authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            "ADMIN001",
+                            null,
+                            List.of()
+                    );
+
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+        }
+
+        @AfterEach
+        void clearSecurityContext() {
+            SecurityContextHolder.clearContext();
+        }
 
         private DonHang taoDonHangMau(TrangThaiDonHang trangThai) {
             DonHang dh = new DonHang();
             dh.setMaDonHang("DH001");
             dh.setTrangThai(trangThai);
             dh.setTongThanhToan(new BigDecimal("15000000"));
+
             KhachHang kh = new KhachHang();
             kh.setMaKh("KH001");
             kh.setHoTen("Nguyễn Văn A");
+
             dh.setKhachHang(kh);
             dh.setChiTiet(new ArrayList<>());
+
             return dh;
+        }
+
+        private void mockFindByIdForUpdate(DonHang dh) {
+            when(donHangRepository.findByIdForUpdate("DH001"))
+                    .thenReturn(Optional.of(dh));
         }
 
         private void mockMapper() {
             when(mapper.toDto(any(DonHang.class))).thenAnswer(inv -> {
                 DonHang d = inv.getArgument(0);
+
                 return new DonHangDto(
-                        d.getMaDonHang(), "KH001", null, null, null, null,
-                        d.getTrangThai(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, d.getTongThanhToan(), null, null, null, "Khách",
-                        null, null, List.of()
+                        d.getMaDonHang(),
+                        "KH001",
+                        null,
+                        null,
+                        null,
+                        null,
+                        d.getTrangThai(),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        d.getTongThanhToan(),
+                        null,
+                        null,
+                        null,
+                        "Khách",
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of()
                 );
             });
         }
@@ -104,13 +155,21 @@ class PostManualTestSafetyIntegrationTest {
         @DisplayName("Valid transition: CHO_XAC_NHAN -> DA_XAC_NHAN succeeds")
         void validTransitionChoXacNhanToDaXacNhan() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.CHO_XAC_NHAN);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
+
+            mockFindByIdForUpdate(dh);
             mockMapper();
 
-            DonHangDto dto = donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.DA_XAC_NHAN);
+            DonHangDto dto = donHangService.capNhatTrangThai(
+                    "DH001",
+                    TrangThaiDonHang.DA_XAC_NHAN
+            );
 
-            assertThat(dto.trangThai()).isEqualTo(TrangThaiDonHang.DA_XAC_NHAN);
-            assertThat(dh.getTrangThai()).isEqualTo(TrangThaiDonHang.DA_XAC_NHAN);
+            assertThat(dto.trangThai())
+                    .isEqualTo(TrangThaiDonHang.DA_XAC_NHAN);
+
+            assertThat(dh.getTrangThai())
+                    .isEqualTo(TrangThaiDonHang.DA_XAC_NHAN);
+
             verify(nhatKyHoatDongService, times(1)).ghi(
                     eq(HanhDongAudit.CHANGE_ORDER_STATUS),
                     eq(LoaiDoiTuongAudit.ORDER),
@@ -121,77 +180,136 @@ class PostManualTestSafetyIntegrationTest {
         }
 
         @Test
-        @DisplayName("Valid transition: DANG_GIAO -> DA_GIAO succeeds")
-        void validTransitionDangGiaoToDaGiao() {
-            DonHang dh = taoDonHangMau(TrangThaiDonHang.DANG_GIAO);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
-            mockMapper();
-
-            DonHangDto dto = donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.DA_GIAO);
-
-            assertThat(dto.trangThai()).isEqualTo(TrangThaiDonHang.DA_GIAO);
-            assertThat(dh.getTrangThai()).isEqualTo(TrangThaiDonHang.DA_GIAO);
-        }
-
-        @Test
-        @DisplayName("Valid transition: Cancellation CHO_XAC_NHAN -> DA_HUY succeeds")
+        @DisplayName("Valid transition: CHO_XAC_NHAN -> DA_HUY succeeds")
         void validTransitionChoXacNhanToDaHuy() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.CHO_XAC_NHAN);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
+
+            mockFindByIdForUpdate(dh);
             mockMapper();
 
-            DonHangDto dto = donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.DA_HUY);
+            DonHangDto dto = donHangService.capNhatTrangThai(
+                    "DH001",
+                    TrangThaiDonHang.DA_HUY
+            );
 
-            assertThat(dto.trangThai()).isEqualTo(TrangThaiDonHang.DA_HUY);
-            assertThat(dh.getTrangThai()).isEqualTo(TrangThaiDonHang.DA_HUY);
+            assertThat(dto.trangThai())
+                    .isEqualTo(TrangThaiDonHang.DA_HUY);
+
+            assertThat(dh.getTrangThai())
+                    .isEqualTo(TrangThaiDonHang.DA_HUY);
         }
 
         @Test
-        @DisplayName("Invalid transition: Terminal state DA_GIAO cannot change to DANG_GIAO (HTTP 400)")
+        @DisplayName("Valid transition: DANG_GIAO -> CHO_KHACH_XAC_NHAN succeeds")
+        void validTransitionDangGiaoToChoKhachXacNhan() {
+            DonHang dh = taoDonHangMau(TrangThaiDonHang.DANG_GIAO);
+
+            mockFindByIdForUpdate(dh);
+            mockMapper();
+
+            DonHangDto dto = donHangService.danhDauDaGiao("DH001");
+
+            assertThat(dto.trangThai())
+                    .isEqualTo(TrangThaiDonHang.CHO_KHACH_XAC_NHAN);
+
+            assertThat(dh.getTrangThai())
+                    .isEqualTo(TrangThaiDonHang.CHO_KHACH_XAC_NHAN);
+
+            assertThat(dh.getNgayGiao())
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName("Invalid transition: Terminal state DA_GIAO cannot change")
         void invalidTransitionTerminalDaGiaoCannotChange() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.DA_GIAO);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
 
-            assertThatThrownBy(() -> donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.DANG_GIAO))
+            mockFindByIdForUpdate(dh);
+
+            assertThatThrownBy(() ->
+                    donHangService.capNhatTrangThai(
+                            "DH001",
+                            TrangThaiDonHang.DANG_GIAO
+                    )
+            )
                     .isInstanceOf(AppException.class)
-                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
+                    .matches(e ->
+                            ((AppException) e).getStatus()
+                                    == HttpStatus.BAD_REQUEST
+                    )
                     .hasMessageContaining("Đơn hàng đã kết thúc");
 
-            verify(nhatKyHoatDongService, never()).ghi(any(), any(), any(), any(), any());
+            verify(
+                    nhatKyHoatDongService,
+                    never()
+            ).ghi(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    any()
+            );
         }
 
         @Test
-        @DisplayName("Invalid transition: Terminal state DA_HUY cannot change to CHO_XAC_NHAN (HTTP 400)")
+        @DisplayName("Invalid transition: Terminal state DA_HUY cannot change")
         void invalidTransitionTerminalDaHuyCannotChange() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.DA_HUY);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
 
-            assertThatThrownBy(() -> donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.CHO_XAC_NHAN))
+            mockFindByIdForUpdate(dh);
+
+            assertThatThrownBy(() ->
+                    donHangService.capNhatTrangThai(
+                            "DH001",
+                            TrangThaiDonHang.CHO_XAC_NHAN
+                    )
+            )
                     .isInstanceOf(AppException.class)
-                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
+                    .matches(e ->
+                            ((AppException) e).getStatus()
+                                    == HttpStatus.BAD_REQUEST
+                    )
                     .hasMessageContaining("Đơn hàng đã kết thúc");
         }
 
         @Test
-        @DisplayName("Invalid transition: Cannot skip intermediate steps CHO_XAC_NHAN -> DA_GIAO (HTTP 400)")
+        @DisplayName("Invalid transition: Cannot skip CHO_XAC_NHAN -> DA_GIAO")
         void invalidTransitionSkipSteps() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.CHO_XAC_NHAN);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
 
-            assertThatThrownBy(() -> donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.DA_GIAO))
+            mockFindByIdForUpdate(dh);
+
+            assertThatThrownBy(() ->
+                    donHangService.capNhatTrangThai(
+                            "DH001",
+                            TrangThaiDonHang.DA_GIAO
+                    )
+            )
                     .isInstanceOf(AppException.class)
-                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST);
+                    .matches(e ->
+                            ((AppException) e).getStatus()
+                                    == HttpStatus.BAD_REQUEST
+                    );
         }
 
         @Test
-        @DisplayName("Invalid transition: Backward jump DANG_GIAO -> CHO_XAC_NHAN is rejected (HTTP 400)")
-        void invalidTransitionBackwardJump() {
+        @DisplayName("Invalid transition: Generic update cannot move DANG_GIAO -> CHO_KHACH_XAC_NHAN")
+        void invalidGenericTransitionDangGiaoToChoKhachXacNhan() {
             DonHang dh = taoDonHangMau(TrangThaiDonHang.DANG_GIAO);
-            when(donHangRepository.findById("DH001")).thenReturn(Optional.of(dh));
 
-            assertThatThrownBy(() -> donHangService.capNhatTrangThai("DH001", TrangThaiDonHang.CHO_XAC_NHAN))
+            mockFindByIdForUpdate(dh);
+
+            assertThatThrownBy(() ->
+                    donHangService.capNhatTrangThai(
+                            "DH001",
+                            TrangThaiDonHang.CHO_KHACH_XAC_NHAN
+                    )
+            )
                     .isInstanceOf(AppException.class)
-                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST);
+                    .matches(e ->
+                            ((AppException) e).getStatus()
+                                    == HttpStatus.BAD_REQUEST
+                    );
         }
     }
 

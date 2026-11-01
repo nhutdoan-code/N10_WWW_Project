@@ -6,6 +6,7 @@ import ProductImage from '../components/ProductImage';
 import { wishlistService } from '../service/wishlistService';
 import { errorMessage, formatPrice } from '../utils/format';
 
+import { anhTheoPhienBan } from '../utils/image';
 export default function CartPage() {
   const { items, total, count, setQuantity, remove, clear } = useCart();
   const { isCustomer } = useAuth();
@@ -38,7 +39,7 @@ export default function CartPage() {
         <div className="section">
           {items.map((item) => { const { sanPham: sp, phienBan: pb, soLuong } = item; return (
             <div key={pb.maPhienBan} className="cart-item">
-              <Link to={`/products/${sp.maSanPham}`}><ProductImage src={sp.anhChinh} alt="" /></Link>
+              <Link to={`/products/${sp.maSanPham}`}><ProductImage src={anhTheoPhienBan(sp, pb)} alt="" /></Link>
               <div>
                 <h4><Link to={`/products/${sp.maSanPham}`}>{sp.tenMay}</Link></h4>
                 <span className="price">{formatPrice(pb.giaBan)}</span>

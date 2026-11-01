@@ -40,7 +40,8 @@ public class ThongKeService {
             TrangThaiDonHang.CHO_XAC_NHAN,
             TrangThaiDonHang.DA_XAC_NHAN,
             TrangThaiDonHang.DANG_CHUAN_BI,
-            TrangThaiDonHang.DANG_GIAO
+            TrangThaiDonHang.DANG_GIAO,
+            TrangThaiDonHang.CHO_KHACH_XAC_NHAN
     );
 
     private final DonHangRepository donHangRepository;
@@ -255,11 +256,13 @@ public class ThongKeService {
 
     private String tenTrangThai(TrangThaiDonHang t) {
         if (t == null) return "—";
+
         return switch (t) {
             case CHO_XAC_NHAN -> "Chờ xác nhận";
             case DA_XAC_NHAN -> "Đã xác nhận";
             case DANG_CHUAN_BI -> "Đang chuẩn bị hàng";
             case DANG_GIAO -> "Đang giao hàng";
+            case CHO_KHACH_XAC_NHAN -> "Chờ khách xác nhận";
             case DA_GIAO -> "Đã giao thành công";
             case DA_HUY -> "Đã hủy";
         };

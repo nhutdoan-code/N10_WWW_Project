@@ -14,6 +14,8 @@ import useToast from '../hooks/useToast';
 import { productService } from '../service/productService';
 import { wishlistService } from '../service/wishlistService';
 import { errorMessage, formatPrice } from '../utils/format';
+
+import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
 import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
 
@@ -56,6 +58,10 @@ export default function ProductDetailPage() {
       setSoLuong(1);
     }
   }, [sp?.maSanPham]);
+  // Đổi phiên bản/màu thì bỏ ảnh đang chọn tay để hiện ảnh đúng màu mới
+  useEffect(() => {
+    setImage(null);
+  }, [maPhienBan]);
 
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
@@ -100,7 +106,10 @@ export default function ProductDetailPage() {
     setMaPhienBan(sel.maPhienBan);
     setSoLuong(1);
   };
-
+  const dsAnh = danhSachAnhTheoPhienBan(sp, phienBan);
+  const anhHienThi = image && dsAnh.some((a) => a.duongDan === image)
+      ? image
+      : anhTheoPhienBan(sp, phienBan);
   return (
     <>
     <nav className="crumbs" aria-label="Đường dẫn">
@@ -110,9 +119,9 @@ export default function ProductDetailPage() {
     </nav>
     <div className="detail">
       <div>
-        <ProductImage className="detail-img" src={image || sp.anhChinh} alt={sp.tenMay} />
+        <ProductImage className="detail-img" src={anhHienThi} alt={sp.tenMay} />
         <div className="thumbs">
-          {sp.hinhAnhs.map((anh) => {
+          {dsAnh.map((anh) => {
             const url = anh.duongDan;
             return <ProductImage key={anh.maHinhAnh || url} src={url} alt="" onClick={() => setImage(url)} />;
           })}
@@ -231,7 +240,7 @@ export default function ProductDetailPage() {
     <div className="sticky-spacer no-print" />
     <div className={showBar ? 'sticky-bar on no-print' : 'sticky-bar no-print'} aria-hidden={!showBar}>
       <div className="container sticky-inner">
-        <ProductImage src={sp.anhChinh} alt="" />
+        <ProductImage src={anhHienThi} alt="" />
         <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(giaBan)}</span></div>
         <div className="sticky-total">
           <span className="muted">Tạm tính</span>

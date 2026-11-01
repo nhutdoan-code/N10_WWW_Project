@@ -46,6 +46,10 @@ public class DonHangController {
     public DonHangDto huy(@PathVariable String ma, @Valid @RequestBody DonHangDto.HuyRequest req) {
         return donHangService.huy(SecurityUtil.currentUserId(), ma, req);
     }
+    @PutMapping("/orders/{ma}/confirm-received")
+    public DonHangDto xacNhanDaNhan(@PathVariable String ma) {
+        return donHangService.khachXacNhanDaNhan(SecurityUtil.currentUserId(), ma);
+    }
 
     @PostMapping("/orders/{ma}/reorder")
     public GioHangDto muaLai(@PathVariable String ma) {

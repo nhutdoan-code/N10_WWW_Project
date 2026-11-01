@@ -6,6 +6,7 @@ import nhom10.phonenest.entity.*;
 import nhom10.phonenest.enums.*;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.DonHangMapper;
+import nhom10.phonenest.mapper.SanPhamMapper;
 import nhom10.phonenest.repository.*;
 import nhom10.phonenest.util.*;
 import org.springframework.http.HttpStatus;
@@ -84,10 +85,7 @@ public class DonHangService {
             c.setTenSanPham(p.getSanPham().getTenMay());
             c.setTenPhienBan(p.getRam() + "GB/" + p.getBoNho() + "GB/" + p.getMauSac());
             c.setSku(p.getSku());
-            c.setHinhAnh(p.getSanPham().getHinhAnhs().stream()
-                    .filter(HinhAnhSanPham::isAnhChinh)
-                    .map(HinhAnhSanPham::getDuongDan)
-                    .findFirst().orElse(null));
+            c.setHinhAnh(SanPhamMapper.anhTheoMau(p.getSanPham(), p));
             c.setSoLuong(e.getValue());
             c.setDonGia(p.getGiaBan());
             c.setBaoHanhThang(p.getSanPham().getThoiHanBaoHanhThang());
@@ -188,32 +186,203 @@ public class DonHangService {
     }
 
     public DonHangDto capNhatTrangThai(String ma, TrangThaiDonHang moi) {
-        DonHang d = tim(ma);
-        TrangThaiDonHang trangThaiTruoc = d.getTrangThai();
-        if (d.getTrangThai() == TrangThaiDonHang.DA_GIAO || d.getTrangThai() == TrangThaiDonHang.DA_HUY) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã kết thúc");
+        DonHang d = timKhoa(ma);
+        TrangThaiDonHang truoc = d.getTrangThai();
+
+        if (truoc == TrangThaiDonHang.DA_GIAO
+                || truoc == TrangThaiDonHang.DA_HUY) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Đơn hàng đã kết thúc"
+            );
         }
-        if (!trangThaiTruoc.coTheChuyenSang(moi)) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Không thể chuyển trạng thái đơn hàng từ " + trangThaiTruoc + " sang " + moi);
+
+        if (truoc == TrangThaiDonHang.CHO_KHACH_XAC_NHAN) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Đơn đã giao, đang chờ khách hàng xác nhận nhận hàng"
+            );
         }
+
+        if (moi == TrangThaiDonHang.DA_GIAO) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Chỉ khách hàng mới xác nhận hoàn thành đơn hàng"
+            );
+        }
+
+        if (moi == TrangThaiDonHang.CHO_KHACH_XAC_NHAN) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Vui lòng dùng chức năng Xác nhận đã giao hàng"
+            );
+        }
+
+        // Giữ state-machine validation của branch Doan
+        if (!truoc.coTheChuyenSang(moi)) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Không thể chuyển trạng thái đơn hàng từ "
+                            + truoc + " sang " + moi
+            );
+        }
+
         if (moi == TrangThaiDonHang.DA_HUY) {
             doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
         }
+
         d.setTrangThai(moi);
         d.setNgayCapNhat(LocalDateTime.now());
-        if (moi == TrangThaiDonHang.DA_GIAO) {
-            d.setNgayGiao(d.getNgayCapNhat());
-            congDiem(d);
-        }
-        ghiTrangThai(d, moi, "Quản trị cập nhật trạng thái");
-        Map<String, Object> duLieuTruoc = new LinkedHashMap<>();
-        duLieuTruoc.put("trangThai", trangThaiTruoc.name());
-        Map<String, Object> duLieuSau = new LinkedHashMap<>();
-        duLieuSau.put("trangThai", moi.name());
-        nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_ORDER_STATUS, LoaiDoiTuongAudit.ORDER, ma, duLieuTruoc, duLieuSau);
-        thongBaoService.gui(d.getKhachHang().getMaKh(), "Đơn hàng " + ma + " chuyển sang trạng thái: " + moi.name());
+
+        ghiTrangThai(
+                d,
+                moi,
+                "Quản trị cập nhật trạng thái",
+                SecurityUtil.currentUserId()
+        );
+
+        auditTrangThai(ma, truoc, moi);
+
+        thongBaoService.gui(
+                d.getKhachHang().getMaKh(),
+                "Đơn hàng " + ma + " chuyển sang trạng thái: " + moi.name()
+        );
+
         return mapper.toDto(d);
+    }
+    public DonHangDto danhDauDaGiao(String ma) {
+        DonHang d = timKhoa(ma);
+
+        if (d.getTrangThai() != TrangThaiDonHang.DANG_GIAO) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Chỉ đơn đang giao mới được xác nhận đã giao hàng"
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        d.setTrangThai(TrangThaiDonHang.CHO_KHACH_XAC_NHAN);
+        d.setNgayGiao(now);
+        d.setNgayCapNhat(now);
+
+        ghiTrangThai(
+                d,
+                TrangThaiDonHang.CHO_KHACH_XAC_NHAN,
+                "Quản trị xác nhận đã giao hàng, chờ khách xác nhận",
+                SecurityUtil.currentUserId()
+        );
+
+        auditTrangThai(
+                ma,
+                TrangThaiDonHang.DANG_GIAO,
+                TrangThaiDonHang.CHO_KHACH_XAC_NHAN
+        );
+
+        thongBaoService.gui(
+                d.getKhachHang().getMaKh(),
+                "Đơn hàng " + ma
+                        + " đã được giao. Vui lòng xác nhận khi bạn đã nhận được hàng."
+        );
+
+        return mapper.toDto(d);
+    }
+
+    public DonHangDto khachXacNhanDaNhan(String maKh, String ma) {
+        DonHang d = timKhoa(ma);
+
+        if (!d.getKhachHang().getMaKh().equals(maKh)) {
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "Không tìm thấy đơn hàng"
+            );
+        }
+
+        if (d.getTrangThai() != TrangThaiDonHang.CHO_KHACH_XAC_NHAN) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Đơn hàng không ở trạng thái chờ xác nhận nhận hàng hoặc đã được xác nhận trước đó"
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        d.setTrangThai(TrangThaiDonHang.DA_GIAO);
+        d.setNgayKhachXacNhan(now);
+        d.setNguoiXacNhan(maKh);
+        d.setNgayCapNhat(now);
+
+        congDiem(d);
+
+        ghiTrangThai(
+                d,
+                TrangThaiDonHang.DA_GIAO,
+                "Khách hàng xác nhận đã nhận hàng",
+                maKh
+        );
+
+        auditTrangThai(
+                ma,
+                TrangThaiDonHang.CHO_KHACH_XAC_NHAN,
+                TrangThaiDonHang.DA_GIAO
+        );
+
+        thongBaoService.gui(
+                maKh,
+                "Đơn hàng " + ma
+                        + " đã hoàn thành. Cảm ơn bạn đã mua sắm tại PhoneNest!"
+        );
+
+        return mapper.toDto(d);
+    }
+    private void ghiTrangThai(
+            DonHang d,
+            TrangThaiDonHang t,
+            String gc,
+            String maTk
+    ) {
+        LichSuTrangThaiDonHang l = new LichSuTrangThaiDonHang();
+
+        l.setMaLichSu(IdGenerator.next("LSTT"));
+        l.setDonHang(d);
+        l.setTrangThai(t);
+        l.setThoiGian(LocalDateTime.now());
+        l.setGhiChu(gc);
+
+        taiKhoanRepository.findById(maTk)
+                .ifPresent(l::setNguoiCapNhat);
+
+        lichSuRepository.save(l);
+    }
+
+    private DonHang timKhoa(String ma) {
+        return donHangRepository.findByIdForUpdate(ma)
+                .orElseThrow(() ->
+                        new AppException(
+                                HttpStatus.NOT_FOUND,
+                                "Không tìm thấy đơn hàng"
+                        )
+                );
+    }
+
+    private void auditTrangThai(
+            String ma,
+            TrangThaiDonHang truoc,
+            TrangThaiDonHang sau
+    ) {
+        Map<String, Object> duLieuTruoc = new LinkedHashMap<>();
+        duLieuTruoc.put("trangThai", truoc.name());
+
+        Map<String, Object> duLieuSau = new LinkedHashMap<>();
+        duLieuSau.put("trangThai", sau.name());
+
+        nhatKyHoatDongService.ghi(
+                HanhDongAudit.CHANGE_ORDER_STATUS,
+                LoaiDoiTuongAudit.ORDER,
+                ma,
+                duLieuTruoc,
+                duLieuSau
+        );
     }
 
     public GioHangDto muaLai(String maKh, String ma) {
