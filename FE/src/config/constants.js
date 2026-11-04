@@ -66,3 +66,12 @@ export const RETURN_STATUS = {
 
 export const ORDER_STEPS = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO', 'CHO_KHACH_XAC_NHAN', 'DA_GIAO'];
 
+export const PAYMENT_STATUS = {
+  CHO_THANH_TOAN: 'Chờ thanh toán',
+  DA_THANH_TOAN: 'Đã thanh toán',
+  THAT_BAI: 'Thất bại',
+  DA_HOAN_TIEN: 'Đã hoàn tiền',
+  DA_HUY: 'Đã hủy',
+  CAN_HOAN_TIEN: 'Cần hoàn tiền',
+};
+
