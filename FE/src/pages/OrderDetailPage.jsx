@@ -122,7 +122,7 @@ export default function OrderDetailPage() {
             )}
           </div>
 
-          {o.phuongThucTt === 'VI_DIEN_TU' && o.trangThai !== 'DA_HUY' && paymentStatus?.status !== 'DA_THANH_TOAN' && (
+          {o.phuongThucTt === 'VI_DIEN_TU' && o.trangThai !== 'DA_HUY' && paymentStatus?.status !== 'DA_THANH_TOAN' && paymentStatus?.status !== 'CAN_HOAN_TIEN' && (
             <div className="section">
               <h3>Thanh toán MoMo</h3>
               <p className="muted">Trạng thái: {paymentStatus?.status === 'THAT_BAI' ? 'Chưa thành công' : 'Chờ thanh toán'}</p>
@@ -130,6 +130,22 @@ export default function OrderDetailPage() {
               <button type="button" className="btn btn-primary" onClick={payWithMomo} disabled={paying}>
                 {paying ? 'Đang chuyển đến MoMo...' : 'Thanh toán lại với MoMo'}
               </button>
+            </div>
+          )}
+
+          {paymentStatus?.status === 'CAN_HOAN_TIEN' && (
+            <div className="section" style={{ borderLeft: '4px solid #f59e0b', background: '#fffbeb', padding: '1rem', borderRadius: 8 }}>
+              <h3 style={{ color: '#b45309', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán MoMo</h3>
+              <p style={{ margin: 0, color: '#92400e' }}>
+                Đơn hàng đã hủy nhưng hệ thống ghi nhận bạn đã thanh toán MoMo thành công. Cửa hàng đang tiếp nhận để xử lý hoàn tiền hoặc đối soát cho bạn.
+              </p>
+            </div>
+          )}
+
+          {o.phuongThucTt === 'VI_DIEN_TU' && paymentStatus?.status === 'DA_THANH_TOAN' && (
+            <div className="section">
+              <h3>Thanh toán MoMo</h3>
+              <p style={{ color: '#16a34a', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công qua ví MoMo</p>
             </div>
           )}
 

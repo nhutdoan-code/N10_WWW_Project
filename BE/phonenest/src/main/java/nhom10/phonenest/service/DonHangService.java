@@ -181,7 +181,10 @@ public class DonHangService {
     }
 
     public DonHangDto huy(String maKh, String ma, DonHangDto.HuyRequest req) {
-        DonHang d = donCuaToi(maKh, ma);
+        DonHang d = timKhoa(ma);
+        if (!d.getKhachHang().getMaKh().equals(maKh)) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng");
+        }
         if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN
                 && d.getTrangThai() != TrangThaiDonHang.DA_XAC_NHAN
                 && d.getTrangThai() != TrangThaiDonHang.DANG_CHUAN_BI) {
