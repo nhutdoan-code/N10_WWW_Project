@@ -12,6 +12,8 @@ import nhom10.phonenest.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -72,10 +74,23 @@ public class DonHangService {
         d.setSoDienThoaiNhan(dc.getSoDienThoaiNhan());
         d.setDiaChiGiaoHang(diaChiService.diaChiDayDu(dc));
 
+        // 1. Khóa bi quan các phiên bản sản phẩm theo thứ tự maPhienBan tăng dần để chống overselling và chống deadlock
+        List<String> sortedVariantIds = muc.keySet().stream().sorted().toList();
+        Map<String, PhienBanSanPham> lockedVariants = new LinkedHashMap<>();
+        for (String pbId : sortedVariantIds) {
+            PhienBanSanPham p = phienBanRepository.findByIdForUpdate(pbId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên bản: " + pbId));
+            lockedVariants.put(pbId, p);
+        }
+
         BigDecimal tam = BigDecimal.ZERO;
         for (var e : muc.entrySet()) {
-            PhienBanSanPham p = phienBanRepository.findById(e.getKey()).orElseThrow();
-            if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH || e.getValue() > p.getSoLuongTon()) {
+            PhienBanSanPham p = lockedVariants.get(e.getKey());
+            if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH
+                    || (p.getSanPham() != null && p.getSanPham().getTrangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH)) {
+                throw new AppException(HttpStatus.BAD_REQUEST, p.getSanPham().getTenMay() + " không còn kinh doanh");
+            }
+            if (e.getValue() > p.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, p.getSanPham().getTenMay() + " không đủ hàng");
             }
             ChiTietDonHang c = new ChiTietDonHang();
@@ -142,7 +157,7 @@ public class DonHangService {
             );
         }
 
-        doiTon(luu, -1, LoaiBienDongKho.BAN_HANG);
+        doiTon(luu, -1, LoaiBienDongKho.BAN_HANG, lockedVariants);
         taoThanhToan(luu, req.phuongThucTt());
         ghiTrangThai(
                 luu,
@@ -155,12 +170,7 @@ public class DonHangService {
         }
 
         DonHangDto dto = mapper.toDto(luu);
-        thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + luu.getMaDonHang() + " đang chờ xác nhận");
-        taiKhoanRepository.findById(maKh).ifPresent(tk -> emailService.gui(
-                tk.getEmail(),
-                "Xác nhận đơn hàng " + luu.getMaDonHang(),
-                "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: " + dto.tongTien().toBigInteger() + " VND."
-        ));
+        guiThongBaoSauCommit(maKh, luu.getMaDonHang(), dto.tongTien());
         return dto;
     }
 
@@ -184,6 +194,9 @@ public class DonHangService {
         DonHang d = timKhoa(ma);
         if (!d.getKhachHang().getMaKh().equals(maKh)) {
             throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng");
+        }
+        if (d.getTrangThai() == TrangThaiDonHang.DA_HUY) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã được hủy trước đó");
         }
         if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN
                 && d.getTrangThai() != TrangThaiDonHang.DA_XAC_NHAN
@@ -425,7 +438,7 @@ public class DonHangService {
     }
 
     public DonHangDto suaDong(String ma, String id, int sl) {
-        DonHang d = tim(ma);
+        DonHang d = timKhoa(ma);
         if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ sửa khi chờ xác nhận");
         }
@@ -438,13 +451,17 @@ public class DonHangService {
             if (d.getChiTiet().size() == 1) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Đơn phải còn ít nhất một sản phẩm");
             }
-            capTon(c.getPhienBan(), c.getSoLuong(), d, LoaiBienDongKho.DIEU_CHINH);
+            PhienBanSanPham pb = phienBanRepository.findByIdForUpdate(c.getPhienBan().getMaPhienBan())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không tồn tại"));
+            capTon(pb, c.getSoLuong(), d, LoaiBienDongKho.DIEU_CHINH);
             d.getChiTiet().remove(c);
         } else {
-            if (delta > c.getPhienBan().getSoLuongTon()) {
+            PhienBanSanPham pb = phienBanRepository.findByIdForUpdate(c.getPhienBan().getMaPhienBan())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không tồn tại"));
+            if (delta > pb.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Không đủ tồn kho");
             }
-            capTon(c.getPhienBan(), -delta, d, LoaiBienDongKho.DIEU_CHINH);
+            capTon(pb, -delta, d, LoaiBienDongKho.DIEU_CHINH);
             c.setSoLuong(sl);
         }
         recalc(d);
@@ -497,22 +514,73 @@ public class DonHangService {
     }
 
     private void doiTon(DonHang d, int dau, LoaiBienDongKho loai) {
-        d.getChiTiet().forEach(c -> capTon(c.getPhienBan(), dau * c.getSoLuong(), d, loai));
+        doiTon(d, dau, loai, null);
+    }
+
+    private void doiTon(DonHang d, int dau, LoaiBienDongKho loai, Map<String, PhienBanSanPham> prelockedVariants) {
+        Map<String, Integer> deltaMap = new TreeMap<>();
+        for (ChiTietDonHang c : d.getChiTiet()) {
+            String pbId = c.getPhienBan().getMaPhienBan();
+            deltaMap.put(pbId, deltaMap.getOrDefault(pbId, 0) + (dau * c.getSoLuong()));
+        }
+        for (Map.Entry<String, Integer> entry : deltaMap.entrySet()) {
+            PhienBanSanPham p = (prelockedVariants != null) ? prelockedVariants.get(entry.getKey()) : null;
+            if (p == null) {
+                p = phienBanRepository.findByIdForUpdate(entry.getKey())
+                        .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên bản: " + entry.getKey()));
+            }
+            capTon(p, entry.getValue(), d, loai);
+        }
     }
 
     private void capTon(PhienBanSanPham p, int delta, DonHang d, LoaiBienDongKho loai) {
-        int truoc = p.getSoLuongTon(), sau = Math.max(0, truoc + delta);
+        int truoc = p.getSoLuongTon();
+        long sauLong = (long) truoc + delta;
+        if (sauLong < 0) {
+            throw new AppException(HttpStatus.CONFLICT, "Tồn kho không đủ để thực hiện thao tác");
+        }
+        if (sauLong > KhoService.MAX_TOTAL_STOCK) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Tồn kho vượt quá giới hạn tối đa cho phép");
+        }
+        int sau = (int) sauLong;
         p.setSoLuongTon(sau);
+
         BienDongKho b = new BienDongKho();
         b.setMaBienDong(IdGenerator.next("BDK"));
         b.setPhienBan(p);
         b.setLoaiBienDong(loai);
-        b.setSoLuong(delta);
+        b.setSoLuong(Math.abs(delta));
         b.setTonTruoc(truoc);
         b.setTonSau(sau);
         b.setDonHang(d);
         b.setThoiGian(LocalDateTime.now());
         bienDongRepository.save(b);
+    }
+
+    private void guiThongBaoSauCommit(String maKh, String maDonHang, BigDecimal tongTien) {
+        Runnable notificationTask = () -> {
+            thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + maDonHang + " đang chờ xác nhận");
+            taiKhoanRepository.findById(maKh).ifPresent(tk -> emailService.gui(
+                    tk.getEmail(),
+                    "Xác nhận đơn hàng " + maDonHang,
+                    "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: " + (tongTien != null ? tongTien.toBigInteger() : "0") + " VND."
+            ));
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        notificationTask.run();
+                    } catch (Exception e) {
+                        // Email/notification failure must not impact committed order
+                    }
+                }
+            });
+        } else {
+            notificationTask.run();
+        }
     }
 
     private void ghiTrangThai(DonHang d, TrangThaiDonHang t, String gc) {

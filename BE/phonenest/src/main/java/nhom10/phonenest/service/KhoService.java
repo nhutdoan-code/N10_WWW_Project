@@ -183,22 +183,27 @@ public class KhoService {
             }
         }
 
-        items.entrySet()
+        // Pre-resolve variants and map to maPhienBan
+        Map<String, Integer> variantQuantities = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : items.entrySet()) {
+            PhienBanSanPham variant = pbRepo
+                    .findBySku(entry.getKey())
+                    .orElseThrow(() ->
+                            new AppException(
+                                    HttpStatus.NOT_FOUND,
+                                    "Không tìm thấy SKU: " + entry.getKey()
+                            )
+                    );
+            variantQuantities.put(variant.getMaPhienBan(), entry.getValue());
+        }
+
+        // Sort by maPhienBan ascending to enforce global deterministic lock order
+        variantQuantities.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> {
-
-                    PhienBanSanPham variant = pbRepo
-                            .findBySku(entry.getKey())
-                            .orElseThrow(() ->
-                                    new AppException(
-                                            HttpStatus.NOT_FOUND,
-                                            "Không tìm thấy SKU: " + entry.getKey()
-                                    )
-                            );
-
                     nhapKho(
-                            variant.getMaPhienBan(),
+                            entry.getKey(),
                             entry.getValue(),
                             request.ghiChu(),
                             actorId
