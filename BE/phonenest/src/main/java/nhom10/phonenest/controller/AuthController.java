@@ -5,17 +5,12 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.AuthDto;
 import nhom10.phonenest.service.AuthService;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-
     private final AuthService authService;
 
     @PostMapping("/register")
@@ -25,8 +20,14 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public void forgotPassword(@Valid @RequestBody AuthDto.ForgotPassword request) {
+    public String forgotPassword(@Valid @RequestBody AuthDto.ForgotPassword request) {
         authService.forgotPassword(request.email());
+        return "Nếu email tồn tại, mã xác minh sẽ được gửi đến email đó.";
+    }
+
+    @PostMapping("/verify-reset-otp")
+    public AuthDto.ResetToken verifyResetOtp(@Valid @RequestBody AuthDto.VerifyResetOtp request) {
+        return new AuthDto.ResetToken(authService.verifyResetOtp(request));
     }
 
     @PostMapping("/reset-password")

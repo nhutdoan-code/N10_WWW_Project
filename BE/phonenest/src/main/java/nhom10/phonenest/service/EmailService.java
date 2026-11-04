@@ -14,7 +14,8 @@ public class EmailService {
     private final ObjectProvider<JavaMailSender> mailSender;
     private final String from;
 
-    public EmailService(ObjectProvider<JavaMailSender> mailSender, @Value("${app.mail.from}") String from) {
+    public EmailService(ObjectProvider<JavaMailSender> mailSender,
+                        @Value("${app.mail.from:no-reply@phonenest.vn}") String from) {
         this.mailSender = mailSender;
         this.from = from;
     }
@@ -22,18 +23,22 @@ public class EmailService {
     public void gui(String den, String tieuDe, String noiDung) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
-            log.info("[EMAIL] Đến: {} | Tiêu đề: {} | Nội dung: {}", den, tieuDe, noiDung);
+            log.info("[EMAIL MOCK] Đến: {} | Tiêu đề: {} | Nội dung: {}", den, tieuDe, noiDung);
             return;
         }
+
+        SimpleMailMessage mail = new SimpleMailMessage();
+        String fromAddress = (from != null && !from.isBlank()) ? from : "no-reply@phonenest.vn";
+        mail.setFrom(fromAddress);
+        mail.setTo(den);
+        mail.setSubject(tieuDe);
+        mail.setText(noiDung);
+
         try {
-            SimpleMailMessage mail = new SimpleMailMessage();
-            mail.setFrom(from);
-            mail.setTo(den);
-            mail.setSubject(tieuDe);
-            mail.setText(noiDung);
             sender.send(mail);
+            log.info("[EMAIL SENT] Đến: {} | Tiêu đề: {}", den, tieuDe);
         } catch (Exception e) {
-            log.warn("Không gửi được email tới {}: {}", den, e.getMessage());
+            log.warn("Không gửi được email tới {}: {}. Ghi nhận log: {}", den, e.getMessage(), noiDung);
         }
     }
 }
