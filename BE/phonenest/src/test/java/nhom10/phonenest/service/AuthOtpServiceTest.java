@@ -102,6 +102,60 @@ class AuthOtpServiceTest {
     }
 
     @Test
+    @DisplayName("forgotPassword enforces rate limiting cooldown across repeated requests")
+    void forgotPassword_RateLimiting_CooldownEnforced() {
+        TaiKhoan tk = new TaiKhoan();
+        tk.setMaTk("TK002");
+        tk.setEmail("spam@phonenest.com");
+        tk.setTrangThaiHoatDong(true);
+
+        when(taiKhoanRepository.findByEmail("spam@phonenest.com")).thenReturn(Optional.of(tk));
+
+        // Lần đầu thành công
+        authService.forgotPassword("spam@phonenest.com");
+
+        // Lần 2 gửi ngay lập tức -> ném TOO_MANY_REQUESTS
+        AppException ex = assertThrows(AppException.class, () ->
+                authService.forgotPassword("spam@phonenest.com"));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Vui lòng đợi"));
+    }
+
+    @Test
+    @DisplayName("forgotPassword also rate-limits non-existent emails to prevent user enumeration")
+    void forgotPassword_NonExistentEmail_RateLimited() {
+        when(taiKhoanRepository.findByEmail("ghost@phonenest.com")).thenReturn(Optional.empty());
+
+        // Lần 1 không báo lỗi (im lặng)
+        assertDoesNotThrow(() -> authService.forgotPassword("ghost@phonenest.com"));
+
+        // Lần 2 gọi ngay lập tức -> ném TOO_MANY_REQUESTS như tài khoản thật
+        AppException ex = assertThrows(AppException.class, () ->
+                authService.forgotPassword("ghost@phonenest.com"));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
+    }
+
+    @Test
+    @DisplayName("forgotPassword throws exception when email service fails, preventing false success")
+    void forgotPassword_EmailServiceFailure_PropagatesError() {
+        TaiKhoan tk = new TaiKhoan();
+        tk.setMaTk("TK002");
+        tk.setEmail("an@phonenest.com");
+        tk.setTrangThaiHoatDong(true);
+
+        when(taiKhoanRepository.findByEmail("an@phonenest.com")).thenReturn(Optional.of(tk));
+        doThrow(new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Lỗi kết nối SMTP"))
+                .when(emailService).gui(anyString(), anyString(), anyString());
+
+        AppException ex = assertThrows(AppException.class, () ->
+                authService.forgotPassword("an@phonenest.com"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatus());
+    }
+
+    @Test
     @DisplayName("verifyResetOtp fails when OTP record is expired")
     void verifyResetOtp_Expired() {
         TaiKhoan tk = new TaiKhoan();

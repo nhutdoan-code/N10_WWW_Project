@@ -1,8 +1,10 @@
 package nhom10.phonenest.service;
 
 import lombok.extern.slf4j.Slf4j;
+import nhom10.phonenest.exception.AppException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -23,8 +25,11 @@ public class EmailService {
     public void gui(String den, String tieuDe, String noiDung) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
-            log.info("[EMAIL MOCK] Đến: {} | Tiêu đề: {} | Nội dung: {}", den, tieuDe, noiDung);
-            return;
+            log.error("JavaMailSender không khả dụng, không thể gửi email tới {}", den);
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Dịch vụ email hiện không khả dụng. Vui lòng thử lại sau."
+            );
         }
 
         SimpleMailMessage mail = new SimpleMailMessage();
@@ -38,7 +43,11 @@ public class EmailService {
             sender.send(mail);
             log.info("[EMAIL SENT] Đến: {} | Tiêu đề: {}", den, tieuDe);
         } catch (Exception e) {
-            log.warn("Không gửi được email tới {}: {}. Ghi nhận log: {}", den, e.getMessage(), noiDung);
+            log.error("Không gửi được email tới {}: {}", den, e.getMessage());
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Không thể gửi email xác minh lúc này. Vui lòng thử lại sau."
+            );
         }
     }
 }

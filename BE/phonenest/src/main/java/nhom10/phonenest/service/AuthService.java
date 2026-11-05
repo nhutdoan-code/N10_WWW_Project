@@ -22,6 +22,7 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -31,7 +32,10 @@ public class AuthService {
 
     private static final int DIEM_GIOI_THIEU = 50;
     private static final int MAX_OTP_ATTEMPTS = 5;
+    private static final int OTP_COOLDOWN_SECONDS = 60;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private final ConcurrentHashMap<String, LocalDateTime> otpRequestCooldownMap = new ConcurrentHashMap<>();
 
     private final TaiKhoanRepository taiKhoanRepository;
     private final KhachHangRepository khachHangRepository;
@@ -207,10 +211,41 @@ public class AuthService {
 
     @Transactional
     public void forgotPassword(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Giới hạn tần suất yêu cầu OTP (Rate limiting / Cooldown)
+        // Áp dụng bộ đếm cho tất cả các email để ngăn chặn tấn công spam OTP và không làm lộ sự tồn tại của email
+        LocalDateTime lastRequested = otpRequestCooldownMap.get(normalizedEmail);
+        if (lastRequested != null && now.isBefore(lastRequested.plusSeconds(OTP_COOLDOWN_SECONDS))) {
+            long remaining = java.time.Duration.between(now, lastRequested.plusSeconds(OTP_COOLDOWN_SECONDS)).toSeconds();
+            if (remaining <= 0) remaining = 1;
+            throw new AppException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Vui lòng đợi " + remaining + " giây trước khi yêu cầu mã OTP mới"
+            );
+        }
+        otpRequestCooldownMap.put(normalizedEmail, now);
+        if (otpRequestCooldownMap.size() > 5000) {
+            otpRequestCooldownMap.entrySet().removeIf(e -> e.getValue().plusMinutes(10).isBefore(now));
+        }
+
         taiKhoanRepository
-                .findByEmail(email.trim().toLowerCase())
+                .findByEmail(normalizedEmail)
                 .filter(TaiKhoan::isTrangThaiHoatDong)
                 .ifPresent(tk -> {
+                    // Kiểm tra thêm tần suất theo bản ghi cơ sở dữ liệu phòng trường hợp khởi động lại ứng dụng
+                    passwordResetOtpRepository
+                            .findTopByMaTkOrderByCreatedAtDesc(tk.getMaTk())
+                            .ifPresent(lastRecord -> {
+                                if (now.isBefore(lastRecord.getCreatedAt().plusSeconds(OTP_COOLDOWN_SECONDS))) {
+                                    throw new AppException(
+                                            HttpStatus.TOO_MANY_REQUESTS,
+                                            "Vui lòng đợi 60 giây trước khi yêu cầu mã OTP mới"
+                                    );
+                                }
+                            });
+
                     passwordResetOtpRepository
                             .invalidateActiveByMaTk(tk.getMaTk());
 
@@ -218,8 +253,6 @@ public class AuthService {
                             "%06d",
                             SECURE_RANDOM.nextInt(1_000_000)
                     );
-
-                    LocalDateTime now = LocalDateTime.now();
 
                     PasswordResetOtp record = new PasswordResetOtp();
                     record.setMaTk(tk.getMaTk());
