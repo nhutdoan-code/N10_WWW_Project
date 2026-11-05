@@ -28,6 +28,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<Map<String, String>> handleApp(AppException e) {
+        if (e.getCode() != null) {
+            return ResponseEntity.status(e.getStatus()).body(Map.of(
+                    "message", e.getMessage(),
+                    "code", e.getCode()
+            ));
+        }
         return ResponseEntity.status(e.getStatus()).body(Map.of("message", e.getMessage()));
     }
 

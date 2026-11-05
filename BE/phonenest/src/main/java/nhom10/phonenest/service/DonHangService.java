@@ -1,6 +1,8 @@
 package nhom10.phonenest.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import nhom10.phonenest.dto.*;
 import nhom10.phonenest.entity.*;
 import nhom10.phonenest.enums.*;
@@ -9,6 +11,7 @@ import nhom10.phonenest.mapper.DonHangMapper;
 import nhom10.phonenest.mapper.SanPhamMapper;
 import nhom10.phonenest.repository.*;
 import nhom10.phonenest.util.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -57,7 +61,17 @@ public class DonHangService {
     private final EmailService emailService;
     private final NhatKyHoatDongService nhatKyHoatDongService;
 
+    @Autowired(required = false)
+    private CheckoutIdempotencyRepository checkoutIdempotencyRepository;
+
+    @Autowired(required = false)
+    private ObjectMapper objectMapper;
+
     public DonHangDto datHang(String maKh, DonHangDto.Checkout req) {
+        return datHang(maKh, req, null);
+    }
+
+    public DonHangDto datHang(String maKh, DonHangDto.Checkout req, Long idempotencyRecordId) {
         KhachHang kh = khachHangRepository.findById(maKh).orElseThrow();
         boolean muaNgay = req.maSanPham() != null && !req.maSanPham().isBlank();
         Map<String, Integer> muc = thanhToanService.mucMua(maKh, req.maSanPham(), req.soLuong());
@@ -170,6 +184,25 @@ public class DonHangService {
         }
 
         DonHangDto dto = mapper.toDto(luu);
+
+        if (idempotencyRecordId != null && checkoutIdempotencyRepository != null) {
+            String jsonPayload = null;
+            if (objectMapper != null) {
+                try {
+                    jsonPayload = objectMapper.writeValueAsString(dto);
+                } catch (Exception e) {
+                    log.warn("Không thể serialize DonHangDto để lưu cache idempotency: {}", e.getMessage());
+                }
+            }
+            checkoutIdempotencyRepository.markSuccessInCurrentTx(
+                    idempotencyRecordId,
+                    luu.getMaDonHang(),
+                    jsonPayload,
+                    LocalDateTime.now(),
+                    IdempotencyStatus.SUCCESS,
+                    IdempotencyStatus.IN_PROGRESS
+            );
+        }
         guiThongBaoSauCommit(maKh, luu.getMaDonHang(), dto.tongTien());
         return dto;
     }

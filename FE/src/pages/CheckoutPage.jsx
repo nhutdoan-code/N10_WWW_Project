@@ -10,6 +10,17 @@ import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatPrice } from '../utils/format';
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function CheckoutPage() {
   const { items, total, reset } = useCart();
   const { data: addresses, reload: reloadAddresses } = useFetch(customerService.addresses);
@@ -22,6 +33,20 @@ export default function CheckoutPage() {
   const [dangDat, setDangDat] = useState(false);
 
   const dangDatRef = useRef(false);
+  const daDatThanhCongRef = useRef(false);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('phonenest_checkout_key');
+      if (stored && /^[0-9a-fA-F-]{36}$/.test(stored)) {
+        return stored;
+      }
+    } catch {
+      // sessionStorage unavailable
+    }
+    return generateUUID();
+  });
+  const idempotencyKeyRef = useRef(idempotencyKey);
+  idempotencyKeyRef.current = idempotencyKey;
 
   const [params] = useSearchParams();
   const location = useLocation();
@@ -85,6 +110,49 @@ export default function CheckoutPage() {
     ? Number(pv.mienPhiTu) - tamTinh
     : 0;
 
+  // Theo dõi sự thay đổi của payload: khi người dùng đổi lựa chọn, sinh key mới
+  const currentPayloadSig = `${maDiaChi}|${payment}|${vDh?.maKm || ''}|${vVc?.maKm || ''}|${maPhienBanMua || ''}|${muaNgay ? slMua : ''}|${muaNgay ? '' : items.map((i) => `${i.phienBan?.maPhienBan}:${i.soLuong}`).join(',')}`;
+  const lastPayloadSigRef = useRef(null);
+
+  useEffect(() => {
+    let storedSig = null;
+    try {
+      storedSig = sessionStorage.getItem('phonenest_checkout_sig');
+    } catch {
+      // ignore
+    }
+
+    if (lastPayloadSigRef.current === null) {
+      lastPayloadSigRef.current = currentPayloadSig;
+      if (storedSig && storedSig === currentPayloadSig) {
+        return;
+      }
+      const newKey = generateUUID();
+      setIdempotencyKey(newKey);
+      idempotencyKeyRef.current = newKey;
+      try {
+        sessionStorage.setItem('phonenest_checkout_key', newKey);
+        sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    if (currentPayloadSig !== lastPayloadSigRef.current) {
+      lastPayloadSigRef.current = currentPayloadSig;
+      const newKey = generateUUID();
+      setIdempotencyKey(newKey);
+      idempotencyKeyRef.current = newKey;
+      try {
+        sessionStorage.setItem('phonenest_checkout_key', newKey);
+        sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
+      } catch {
+        // ignore
+      }
+    }
+  }, [currentPayloadSig]);
+
   const addressSaved = async (saved) => {
     setEditingAddress(null);
     toast('Đã lưu địa chỉ giao hàng');
@@ -93,9 +161,9 @@ export default function CheckoutPage() {
     reload();
   };
 
-  // Đặt hàng và chống gửi request nhiều lần
+  // Đặt hàng và chống gửi request nhiều lần (Idempotent Checkout)
   const placeOrder = async () => {
-    if (dangDatRef.current) return;
+    if (dangDatRef.current || daDatThanhCongRef.current) return;
 
     if (!maDiaChi) {
       toast('Vui lòng chọn địa chỉ giao hàng.', 'error');
@@ -115,8 +183,15 @@ export default function CheckoutPage() {
         maKmVanChuyen: vVc?.maKm,
         maSanPham: maPhienBanMua || undefined,
         soLuong: muaNgay ? slMua : undefined,
-      });
+      }, idempotencyKeyRef.current);
 
+      daDatThanhCongRef.current = true;
+      try {
+        sessionStorage.removeItem('phonenest_checkout_key');
+        sessionStorage.removeItem('phonenest_checkout_sig');
+      } catch {
+        // ignore
+      }
       if (!muaNgay) reset();
 
       if (payment === 'VI_DIEN_TU') {
@@ -127,7 +202,27 @@ export default function CheckoutPage() {
 
       navigate(`/orders/${order.maDonHang}`);
     } catch (err) {
-      toast(errorMessage(err), 'error');
+      if (err.response?.status === 409) {
+        const msg = errorMessage(err);
+        const code = err.response?.data?.code;
+        if (code === 'IDEMPOTENCY_PAYLOAD_MISMATCH' || (!code && msg && msg.toLowerCase().includes('khác'))) {
+          toast(msg || 'Thông tin đơn hàng đã thay đổi. Đang làm mới phiên đặt hàng...', 'error');
+          const newKey = generateUUID();
+          setIdempotencyKey(newKey);
+          idempotencyKeyRef.current = newKey;
+          try {
+            sessionStorage.setItem('phonenest_checkout_key', newKey);
+            sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
+          } catch {
+            // ignore
+          }
+        } else {
+          // IDEMPOTENCY_IN_PROGRESS: giữ nguyên key, hiển thị thông báo chờ đối soát
+          toast(msg || 'Yêu cầu đặt hàng của bạn đang được xử lý hoặc đang chờ đối soát, vui lòng chờ trong giây lát.', 'warning');
+        }
+      } else {
+        toast(errorMessage(err), 'error');
+      }
     } finally {
       dangDatRef.current = false;
       setDangDat(false);
@@ -169,115 +264,124 @@ export default function CheckoutPage() {
             + Thêm địa chỉ mới
           </button>
 
-          <div className="section">
-            <h3>Phương thức thanh toán</h3>
-            {PAYMENT_METHODS.map((m) => (
-              <label key={m.value} className="option">
+          <h3>Phương thức thanh toán</h3>
+          {PAYMENT_METHODS.map((m) => (
+            <label key={m.id} className="option">
+              <input
+                type="radio"
+                name="pm"
+                checked={payment === m.id}
+                onChange={() => setPayment(m.id)}
+              />
+              <div>
+                <b>{m.name}</b>
+                <div className="muted">{m.desc}</div>
+              </div>
+            </label>
+          ))}
+
+          <h3>Voucher giảm giá</h3>
+          <div className="voucher-group">
+            <div className="title">Voucher đơn hàng</div>
+            {ds('DON_HANG').slice(0, xemHet.DON_HANG ? undefined : 2).map((v) => (
+              <label
+                key={v.maKm}
+                className={`option voucher ${!v.apDungDuoc ? 'disabled' : ''}`}
+              >
                 <input
                   type="radio"
-                  name="payment"
-                  checked={payment === m.value}
-                  onChange={() => setPayment(m.value)}
-                />
-                {m.label}
-              </label>
-            ))}
-          </div>
-
-          <div className="section">
-            <h3>Mã khuyến mãi</h3>
-            {loiPv && <p className="error">{loiPv}</p>}
-
-            <h4>Voucher đơn hàng</h4>
-            {ds('DON_HANG').length === 0 && <p className="muted">Không có mã khả dụng.</p>}
-            {(xemHet.DON_HANG ? ds('DON_HANG') : ds('DON_HANG').slice(0, 3)).map((v) => (
-              <label key={v.maKm} className={`option ${!v.apDungDuoc ? 'disabled' : ''}`}>
-                <input
-                  type="radio"
-                  name="voucher-dh"
+                  name="vDh"
                   disabled={!v.apDungDuoc}
                   checked={vDh?.maKm === v.maKm}
-                  onChange={() => setChon((c) => ({ ...c, dh: v.maKm }))}
+                  onChange={() => setChon((p) => ({ ...p, dh: v.maKm }))}
                 />
                 <div>
-                  <b>{v.maKm}</b> — {v.tenKm}
+                  <b>{v.tenKm}</b>
                   <div className="muted">{v.dieuKien}</div>
-                  {!v.apDungDuoc && <small className="error">{v.lyDo}</small>}
+                  {!v.apDungDuoc && <span className="reason">{v.lyDoKhongDung}</span>}
                 </div>
+                {v.apDungDuoc && (
+                  <span className="discount">-{formatPrice(v.soTienGiam)}</span>
+                )}
               </label>
             ))}
-            {ds('DON_HANG').length > 3 && (
-              <button type="button" className="link-btn" onClick={() => toggleXem('DON_HANG')}>
-                {xemHet.DON_HANG ? 'Thu gọn' : `Xem thêm (${ds('DON_HANG').length - 3} mã)`}
+            {ds('DON_HANG').length > 2 && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => toggleXem('DON_HANG')}
+              >
+                {xemHet.DON_HANG ? 'Thu gọn' : `Xem thêm (${ds('DON_HANG').length - 2})`}
               </button>
             )}
+          </div>
 
-            <h4>Voucher vận chuyển</h4>
-            {ds('VAN_CHUYEN').length === 0 && <p className="muted">Không có mã khả dụng.</p>}
-            {(xemHet.VAN_CHUYEN ? ds('VAN_CHUYEN') : ds('VAN_CHUYEN').slice(0, 3)).map((v) => (
-              <label key={v.maKm} className={`option ${!v.apDungDuoc ? 'disabled' : ''}`}>
+          <div className="voucher-group">
+            <div className="title">Voucher vận chuyển</div>
+            {ds('VAN_CHUYEN').slice(0, xemHet.VAN_CHUYEN ? undefined : 2).map((v) => (
+              <label
+                key={v.maKm}
+                className={`option voucher ${!v.apDungDuoc ? 'disabled' : ''}`}
+              >
                 <input
                   type="radio"
-                  name="voucher-vc"
+                  name="vVc"
                   disabled={!v.apDungDuoc}
                   checked={vVc?.maKm === v.maKm}
-                  onChange={() => setChon((c) => ({ ...c, vc: v.maKm }))}
+                  onChange={() => setChon((p) => ({ ...p, vc: v.maKm }))}
                 />
                 <div>
-                  <b>{v.maKm}</b> — {v.tenKm}
+                  <b>{v.tenKm}</b>
                   <div className="muted">{v.dieuKien}</div>
-                  {!v.apDungDuoc && <small className="error">{v.lyDo}</small>}
+                  {!v.apDungDuoc && <span className="reason">{v.lyDoKhongDung}</span>}
                 </div>
+                {v.apDungDuoc && (
+                  <span className="discount">-{formatPrice(v.soTienGiam)}</span>
+                )}
               </label>
             ))}
-            {ds('VAN_CHUYEN').length > 3 && (
-              <button type="button" className="link-btn" onClick={() => toggleXem('VAN_CHUYEN')}>
-                {xemHet.VAN_CHUYEN ? 'Thu gọn' : `Xem thêm (${ds('VAN_CHUYEN').length - 3} mã)`}
+            {ds('VAN_CHUYEN').length > 2 && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => toggleXem('VAN_CHUYEN')}
+              >
+                {xemHet.VAN_CHUYEN ? 'Thu gọn' : `Xem thêm (${ds('VAN_CHUYEN').length - 2})`}
               </button>
             )}
           </div>
         </div>
 
-        <aside className="side">
-          <div className="summary">
-            <h3>Đơn hàng của bạn</h3>
-            {dangTinh && <p className="muted">Đang tính phí và khuyến mãi...</p>}
-
-            {dong.map((d) => (
-              <div
-                key={d.maPhienBan || d.maSanPham}
-                className="row between"
-                style={{ flexWrap: 'nowrap' }}
-              >
-                <span>{d.tenMay} × {d.soLuong}</span>
-                <span>{formatPrice(Number(d.donGia) * Number(d.soLuong))}</span>
+        <aside className="summary">
+          <h3>Đơn hàng của bạn ({dong.length} món)</h3>
+          {dong.map((d, index) => (
+            <div key={d.maPhienBan || index} className="row between item">
+              <div>
+                <b>{d.tenMay}</b>
+                <div className="muted">Số lượng: {d.soLuong}</div>
               </div>
-            ))}
-
-            <div className="row between total">
-              <span>Tạm tính</span>
-              <span>{formatPrice(tamTinh)}</span>
+              <span>{formatPrice(Number(d.donGia) * d.soLuong)}</span>
             </div>
+          ))}
 
-            <div className="row between">
-              <span>Phí vận chuyển</span>
-              <span>{pv ? (phi > 0 ? formatPrice(phi) : 'Miễn phí') : '—'}</span>
+          <div className="divider" />
+          <div className="row between"><span>Tạm tính</span><span>{formatPrice(tamTinh)}</span></div>
+          <div className="row between"><span>Phí vận chuyển</span><span>{formatPrice(phi)}</span></div>
+          {vDh && (
+            <div className="row between text-success">
+              <span>Giảm giá đơn hàng ({vDh.maKm})</span>
+              <span>-{formatPrice(giamDh)}</span>
             </div>
+          )}
+          {vVc && (
+            <div className="row between text-success">
+              <span>Giảm phí vận chuyển ({vVc.maKm})</span>
+              <span>-{formatPrice(giamVc)}</span>
+            </div>
+          )}
+          <div className="divider" />
 
-            {giamVc > 0 && (
-              <div className="row between">
-                <span>Giảm phí vận chuyển</span>
-                <span>- {formatPrice(giamVc)}</span>
-              </div>
-            )}
-
-            {giamDh > 0 && (
-              <div className="row between">
-                <span>Voucher giảm giá</span>
-                <span>- {formatPrice(giamDh)}</span>
-              </div>
-            )}
-
+          <div>
             <div className="row between total">
               <b>Tổng thanh toán</b>
               <b className="price">{formatPrice(tong)}</b>
@@ -302,10 +406,10 @@ export default function CheckoutPage() {
             <button
               type="button"
               className="btn btn-primary btn-lg"
-              disabled={!maDiaChi || dangTinh || !pv || dangDat}
+              disabled={!maDiaChi || dangTinh || !pv || dangDat || daDatThanhCongRef.current}
               onClick={placeOrder}
             >
-              {dangDat ? 'Đang xử lý đơn hàng...' : 'Xác nhận đặt hàng'}
+              {dangDat ? 'Đang xử lý đơn hàng...' : (daDatThanhCongRef.current ? 'Đã đặt hàng' : 'Xác nhận đặt hàng')}
             </button>
 
             {!maDiaChi && (
