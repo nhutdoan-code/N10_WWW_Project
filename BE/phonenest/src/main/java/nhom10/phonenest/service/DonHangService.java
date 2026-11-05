@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -133,14 +134,30 @@ public class DonHangService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không thể dùng cùng một mã khuyến mãi cho cả đơn hàng và vận chuyển");
         }
 
+        // 2. Khóa bi quan các khuyến mãi theo thứ tự bảng chữ cái để chống overselling và chống deadlock
+        List<String> sortedVoucherCodes = Stream.of(req.maKm(), req.maKmVanChuyen())
+                .filter(this::coMa)
+                .map(String::trim)
+                .map(s -> s.toUpperCase(Locale.ROOT))
+                .distinct()
+                .sorted()
+                .toList();
+        Map<String, KhuyenMai> lockedVouchers = new LinkedHashMap<>();
+        for (String code : sortedVoucherCodes) {
+            KhuyenMai k = khuyenMaiRepository.findByIdForUpdate(code)
+                    .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Mã khuyến mãi " + code + " không hợp lệ hoặc không đúng loại"));
+            lockedVouchers.put(code, k);
+            lockedVouchers.put(k.getMaKm(), k);
+        }
+
         if (coMa(req.maKm())) {
-            KhuyenMai k = dungVoucher(req.maKm(), LoaiKhuyenMai.DON_HANG, tam, moi, maKh);
+            KhuyenMai k = dungVoucher(lockedVouchers, req.maKm(), LoaiKhuyenMai.DON_HANG, tam, moi, maKh);
             d.setKhuyenMai(k);
             d.setGiamGia(khuyenMaiService.tinhGiam(k, tam));
         }
 
         if (coMa(req.maKmVanChuyen())) {
-            KhuyenMai k = dungVoucher(req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi, maKh);
+            KhuyenMai k = dungVoucher(lockedVouchers, req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi, maKh);
             d.setKhuyenMaiVanChuyen(k);
             d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
         }
@@ -243,15 +260,13 @@ public class DonHangService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác");
         }
         doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
-        khuyenMaiService.hoanLuot(
-                d.getKhuyenMai(),
-                d.getMaDonHang()
-        );
-
-        khuyenMaiService.hoanLuot(
-                d.getKhuyenMaiVanChuyen(),
-                d.getMaDonHang()
-        );
+        List<KhuyenMai> vouchersToRefund = Stream.of(d.getKhuyenMai(), d.getKhuyenMaiVanChuyen())
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(KhuyenMai::getMaKm, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (KhuyenMai km : vouchersToRefund) {
+            khuyenMaiService.hoanLuot(km, d.getMaDonHang());
+        }
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
         d.setNgayCapNhat(LocalDateTime.now());
         HuyDonHang h = new HuyDonHang();
@@ -308,6 +323,13 @@ public class DonHangService {
 
         if (moi == TrangThaiDonHang.DA_HUY) {
             doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
+            List<KhuyenMai> vouchersToRefund = Stream.of(d.getKhuyenMai(), d.getKhuyenMaiVanChuyen())
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(KhuyenMai::getMaKm, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            for (KhuyenMai km : vouchersToRefund) {
+                khuyenMaiService.hoanLuot(km, d.getMaDonHang());
+            }
         }
 
         d.setTrangThai(moi);
@@ -649,18 +671,32 @@ public class DonHangService {
     }
 
     private KhuyenMai dungVoucher(
+            Map<String, KhuyenMai> lockedVouchers,
             String ma,
             LoaiKhuyenMai loai,
             BigDecimal tam,
             boolean moi,
             String maKh) {
 
-        KhuyenMai k = khuyenMaiRepository.findById(ma.trim())
-                .filter(x -> x.getLoai() == loai)
-                .orElseThrow(() -> new AppException(
-                        HttpStatus.BAD_REQUEST,
-                        "Mã khuyến mãi " + ma + " không hợp lệ hoặc không đúng loại"
-                ));
+        String clean = ma != null ? ma.trim().toUpperCase(Locale.ROOT) : "";
+        KhuyenMai k = (lockedVouchers != null) ? lockedVouchers.get(clean) : null;
+        if (k == null && lockedVouchers != null && ma != null) {
+            k = lockedVouchers.get(ma.trim());
+        }
+        if (k == null) {
+            k = khuyenMaiRepository.findByIdForUpdate(clean)
+                    .orElseThrow(() -> new AppException(
+                            HttpStatus.BAD_REQUEST,
+                            "Mã khuyến mãi " + ma + " không hợp lệ hoặc không đúng loại"
+                    ));
+        }
+
+        if (k.getLoai() != loai) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Mã khuyến mãi " + ma + " không hợp lệ hoặc không đúng loại"
+            );
+        }
 
         if (!k.isTrangThaiHoatDong()) {
             throw new AppException(
@@ -677,9 +713,11 @@ public class DonHangService {
         );
 
         if (ly != null) {
+            String errorCode = (ly.contains("hết lượt") || ly.contains("giới hạn")) ? "VOUCHER_USAGE_LIMIT_REACHED" : null;
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    k.getMaKm() + ": " + ly
+                    k.getMaKm() + ": " + ly,
+                    errorCode
             );
         }
 

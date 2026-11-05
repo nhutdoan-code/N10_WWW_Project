@@ -202,26 +202,34 @@ export default function CheckoutPage() {
 
       navigate(`/orders/${order.maDonHang}`);
     } catch (err) {
-      if (err.response?.status === 409) {
-        const msg = errorMessage(err);
-        const code = err.response?.data?.code;
-        if (code === 'IDEMPOTENCY_PAYLOAD_MISMATCH' || (!code && msg && msg.toLowerCase().includes('khác'))) {
-          toast(msg || 'Thông tin đơn hàng đã thay đổi. Đang làm mới phiên đặt hàng...', 'error');
-          const newKey = generateUUID();
-          setIdempotencyKey(newKey);
-          idempotencyKeyRef.current = newKey;
-          try {
-            sessionStorage.setItem('phonenest_checkout_key', newKey);
-            sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
-          } catch {
-            // ignore
-          }
-        } else {
-          // IDEMPOTENCY_IN_PROGRESS: giữ nguyên key, hiển thị thông báo chờ đối soát
-          toast(msg || 'Yêu cầu đặt hàng của bạn đang được xử lý hoặc đang chờ đối soát, vui lòng chờ trong giây lát.', 'warning');
+      const msg = errorMessage(err);
+      const code = err.response?.data?.code;
+      const status = err.response?.status;
+
+      if (code === 'IDEMPOTENCY_PAYLOAD_MISMATCH' || (!code && status === 409 && msg && msg.toLowerCase().includes('khác'))) {
+        toast(msg || 'Thông tin đơn hàng đã thay đổi. Đang làm mới phiên đặt hàng...', 'error');
+        const newKey = generateUUID();
+        setIdempotencyKey(newKey);
+        idempotencyKeyRef.current = newKey;
+        try {
+          sessionStorage.setItem('phonenest_checkout_key', newKey);
+          sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
+        } catch {
+          // ignore
         }
+      } else if (code === 'IDEMPOTENCY_IN_PROGRESS') {
+        // Request trước đó vẫn đang được xử lý hoặc chờ đối soát: GIỮ NGUYÊN idempotency key, cảnh báo người dùng chờ
+        toast(msg || 'Yêu cầu đặt hàng của bạn đang được xử lý hoặc đang chờ đối soát, vui lòng chờ trong giây lát.', 'warning');
+      } else if (code === 'VOUCHER_USAGE_LIMIT_REACHED') {
+        // Mã lỗi ổn định: Voucher đã hết lượt hoặc vượt quá giới hạn mỗi khách
+        toast(msg || 'Mã khuyến mãi đã hết lượt sử dụng hoặc vượt quá giới hạn. Vui lòng chọn mã khác.', 'error');
+        reload();
+      } else if (status === 409) {
+        // Lỗi 409 khác không xác định
+        toast(msg || 'Có xung đột khi xử lý đơn hàng. Vui lòng thử lại.', 'error');
       } else {
         toast(errorMessage(err), 'error');
+        reload();
       }
     } finally {
       dangDatRef.current = false;
@@ -294,6 +302,11 @@ export default function CheckoutPage() {
                   disabled={!v.apDungDuoc}
                   checked={vDh?.maKm === v.maKm}
                   onChange={() => setChon((p) => ({ ...p, dh: v.maKm }))}
+                  onClick={() => {
+                    if (vDh?.maKm === v.maKm) {
+                      setChon((p) => ({ ...p, dh: null }));
+                    }
+                  }}
                 />
                 <div>
                   <b>{v.tenKm}</b>
@@ -329,6 +342,11 @@ export default function CheckoutPage() {
                   disabled={!v.apDungDuoc}
                   checked={vVc?.maKm === v.maKm}
                   onChange={() => setChon((p) => ({ ...p, vc: v.maKm }))}
+                  onClick={() => {
+                    if (vVc?.maKm === v.maKm) {
+                      setChon((p) => ({ ...p, vc: null }));
+                    }
+                  }}
                 />
                 <div>
                   <b>{v.tenKm}</b>

@@ -177,7 +177,8 @@ CREATE TABLE KhuyenMai (
     ngayBatDau DATETIME NOT NULL,
     ngayKetThuc DATETIME NOT NULL,
     dieuKienApDung TEXT,
-    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT CK_KhuyenMai_DaDungNonNegative CHECK (daDung >= 0)
 );
 
 CREATE TABLE SuDungKhuyenMai (
@@ -189,7 +190,9 @@ CREATE TABLE SuDungKhuyenMai (
     CONSTRAINT FK_SuDungKhuyenMai_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT FK_SuDungKhuyenMai_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT UQ_SuDungKhuyenMai_DonHang UNIQUE (maKm, maDonHang),
-    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm)
+    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm),
+    INDEX IDX_SuDungKhuyenMai_DonHang (maDonHang),
+    INDEX IDX_SuDungKhuyenMai_Km_Kh (maKm, maKh)
 );
 
 CREATE TABLE PhiVanChuyen (
