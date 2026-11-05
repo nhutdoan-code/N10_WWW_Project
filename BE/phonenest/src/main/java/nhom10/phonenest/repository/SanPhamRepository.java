@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SanPhamRepository extends JpaRepository<SanPham, String> {
 
@@ -15,8 +16,15 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
     long countByThuongHieuMaThuongHieu(String maThuongHieu);
 
     @Query("SELECT s FROM SanPham s " +
-           "WHERE LOWER(s.tenMay) LIKE LOWER(:pattern) ESCAPE '\\' " +
-           "   OR LOWER(s.maSanPham) LIKE LOWER(:pattern) ESCAPE '\\' " +
+           "WHERE (:pattern IS NULL OR LOWER(s.tenMay) LIKE :pattern OR LOWER(s.maSanPham) LIKE :pattern) " +
            "ORDER BY s.maSanPham DESC")
     List<SanPham> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
+
+    @Query("""
+        SELECT DISTINCT s
+        FROM SanPham s
+        LEFT JOIN FETCH s.phienBans
+        WHERE s.maSanPham = :ma
+    """)
+    Optional<SanPham> findByIdWithPhienBans(@Param("ma") String ma);
 }
