@@ -1,7 +1,9 @@
 import api from '../config/api';
 
 export const orderService = {
-  checkout: (data) => api.post('/customer/orders', data),
+  checkout: (data, idempotencyKey) => api.post('/customer/orders', data, {
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
+  }),
   createMomoPayment: (ma) => api.post(`/customer/orders/${ma}/momo`),
   paymentStatus: (ma) => api.get(`/customer/orders/${ma}/payment-status`),
   list: () => api.get('/customer/orders'),
