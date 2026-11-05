@@ -250,11 +250,19 @@ public KhuyenMaiDto restore(String ma) {
         if (k.isChiKhachMoi() && !khachMoi) {
             return "Chỉ dành cho khách hàng mua lần đầu";
         }
-        if (maKh != null && suDungKhuyenMaiRepository.countByKhuyenMaiMaKmAndKhachHangMaKh(k.getMaKm(), maKh)
-                >= k.getGioiHanMoiKhach()) {
+        if (maKh != null && demLuotDung(k.getMaKm(), maKh) >= k.getGioiHanMoiKhach()) {
             return "Bạn đã đạt giới hạn sử dụng mã này";
         }
         return null;
+    }
+
+    public long demLuotDung(String maKm, String maKh) {
+        if (maKm == null || maKh == null) return 0;
+        try {
+            return suDungKhuyenMaiRepository.findByKhuyenMaiMaKmAndKhachHangMaKhForCheck(maKm, maKh).size();
+        } catch (Exception e) {
+            return suDungKhuyenMaiRepository.countByKhuyenMaiMaKmAndKhachHangMaKh(maKm, maKh);
+        }
     }
 
     public BigDecimal tinhGiam(KhuyenMai k, BigDecimal coSo) {
@@ -268,7 +276,7 @@ public KhuyenMaiDto restore(String ma) {
 
     public void ghiNhanSuDung(KhuyenMai k, String maKh, String maDonHang) {
         if (khuyenMaiRepository.tangDaDungNeuConLuot(k.getMaKm()) == 0) {
-            throw new AppException(HttpStatus.CONFLICT, "Mã khuyến mãi vừa hết lượt sử dụng");
+            throw new AppException(HttpStatus.CONFLICT, "Mã khuyến mãi " + k.getMaKm() + " vừa hết lượt sử dụng", "VOUCHER_USAGE_LIMIT_REACHED");
         }
         k.setDaDung(k.getDaDung() + 1);
         nhom10.phonenest.entity.SuDungKhuyenMai suDung = new nhom10.phonenest.entity.SuDungKhuyenMai();
@@ -286,12 +294,13 @@ public KhuyenMaiDto restore(String ma) {
         if (k == null) {
             return;
         }
+        KhuyenMai locked = khuyenMaiRepository.findByIdForUpdate(k.getMaKm()).orElse(k);
         List<nhom10.phonenest.entity.SuDungKhuyenMai> usages =
-                suDungKhuyenMaiRepository.findByDonHangMaDonHangAndKhuyenMaiMaKm(maDonHang, k.getMaKm());
+                suDungKhuyenMaiRepository.findByDonHangMaDonHangAndKhuyenMaiMaKm(maDonHang, locked.getMaKm());
         if (!usages.isEmpty()) {
             suDungKhuyenMaiRepository.deleteAll(usages);
-            if (khuyenMaiRepository.hoanDaDung(k.getMaKm()) > 0) {
-                k.setDaDung(Math.max(0, k.getDaDung() - 1));
+            if (khuyenMaiRepository.hoanDaDung(locked.getMaKm()) > 0) {
+                locked.setDaDung(Math.max(0, locked.getDaDung() - 1));
             }
         }
     }
