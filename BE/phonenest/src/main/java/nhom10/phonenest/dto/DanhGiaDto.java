@@ -24,7 +24,8 @@ public record DanhGiaDto(
             @Min(value = 1, message = "Điểm đánh giá từ 1 đến 5 sao") @Max(value = 5, message = "Điểm đánh giá từ 1 đến 5 sao") int diemSao,
             @Size(max = 1000, message = "Nội dung đánh giá tối đa 1000 ký tự") String noiDungBinhLuan,
             @Size(max = 500, message = "Link ảnh tối đa 500 ký tự")
-            @Pattern(regexp = "^$|^https?://\\S+$", message = "Link ảnh phải bắt đầu bằng http:// hoặc https://") String hinhAnhThucTe) {
+            @Pattern(regexp = "^$|^https?://\\S+$|^/uploads/[0-9a-fA-F-]+\\.(?:jpg|jpeg|png|webp)$",
+                    message = "Ảnh đánh giá không hợp lệ") String hinhAnhThucTe) {
     }
 
     public record TrangThai(String maSanPham, boolean duocDanhGia, String lyDo, DanhGiaDto danhGia) {

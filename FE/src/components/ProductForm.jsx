@@ -33,7 +33,7 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     giaBan: '',
     soLuongTon: 0,
     moTa: '',
-    trangThai: 'CON_HANG',
+    trangThai: 'DANG_KINH_DOANH',
     hinhAnhs: [],
     anhChinh: null,
     ...product,
@@ -112,6 +112,33 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
       ),
     );
   };
+  // Màu hiện có trong form
+  const mauOptions = [...new Set(
+      configurations.flatMap((c) => c.colors.map((x) => (x.mauSac || '').trim())).filter(Boolean),
+  )];
+
+  // Phiên bản đã lưu (có mã) để gán ảnh riêng
+  const pbOptions = configurations.flatMap((c) =>
+      c.colors
+          .filter((x) => x.maPhienBan && (x.mauSac || '').trim())
+          .map((x) => ({ ma: x.maPhienBan, label: `${c.ram}GB / ${c.boNho}GB - ${x.mauSac.trim()}` })),
+  );
+
+  const phamViAnh = (anh) => {
+    if (anh.maPhienBan) return `pb:${anh.maPhienBan}`;
+    if (anh.mauSac) return `mau:${anh.mauSac}`;
+    return '';
+  };
+
+  const setPhamViAnh = (anh, value) => setForm((f) => ({
+    ...f,
+    hinhAnhs: f.hinhAnhs.map((a) => {
+      if (a !== anh) return a;
+      if (value.startsWith('pb:')) return { ...a, maPhienBan: value.slice(3), mauSac: null };
+      if (value.startsWith('mau:')) return { ...a, maPhienBan: null, mauSac: value.slice(4) };
+      return { ...a, maPhienBan: null, mauSac: null };
+    }),
+  }));
 
   const submit = (e) => {
     e.preventDefault();
@@ -135,9 +162,9 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
 
     const phienBans = flattenConfigurations(configurations);
 
-    if (form.trangThai !== 'NGUNG_KINH_DOANH'
-        && !phienBans.some((p) => p.trangThai !== 'NGUNG_KINH_DOANH')) {
-      return toast('Sản phẩm phải có ít nhất một phiên bản còn kinh doanh', 'error');
+    if ((form.trangThai || 'DANG_KINH_DOANH') === 'DANG_KINH_DOANH'
+      && !phienBans.some((p) => p.trangThai === 'DANG_KINH_DOANH')) {
+      return toast('Sản phẩm đang kinh doanh phải có ít nhất một phiên bản đang kinh doanh', 'error');
     }
 
     const thongSo = { ...form.thongSo };
@@ -149,20 +176,20 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
     // Trường giá/tồn cấp sản phẩm chỉ để thoả DTO; backend luôn tính lại từ phiên bản.
     // Ưu tiên giá thấp nhất của phiên bản đang kinh doanh, không lấy variant ngừng bán.
     const activePrices = phienBans
-        .filter((p) => p.trangThai !== 'NGUNG_KINH_DOANH' && Number.isFinite(Number(p.giaBan)))
-        .map((p) => Number(p.giaBan));
-
+      .filter((p) => p.trangThai === 'DANG_KINH_DOANH' && Number.isFinite(Number(p.giaBan)))
+      .map((p) => Number(p.giaBan));
     const giaBanMin = activePrices.length ? Math.min(...activePrices) : 0;
-
     const tonActive = phienBans
-        .filter((p) => p.trangThai !== 'NGUNG_KINH_DOANH')
-        .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
+      .filter((p) => p.trangThai === 'DANG_KINH_DOANH')
+      .reduce((s, v) => s + (Number(v.soLuongTon) || 0), 0);
 
     // Chỉ gửi identity + metadata ảnh; backend reconcile theo maHinhAnh.
     const hinhAnhs = (form.hinhAnhs || []).map((anh) => ({
       maHinhAnh: anh.maHinhAnh || null,
       duongDan: anh.duongDan,
       gocChup: anh.gocChup ?? null,
+      mauSac: anh.mauSac || null,
+      maPhienBan: anh.maPhienBan || null,
     }));
 
     onSubmit({
@@ -276,17 +303,34 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
         {(form.hinhAnhs || []).map((anh) => {
           const url = anh.duongDan;
           return (
-            <div key={anh.maHinhAnh || url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
-              <ProductImage src={url} alt="" />
-              <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, anhChinh: url })} disabled={form.anhChinh === url}>
-                {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
-              </button>
-              <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(anh)}>×</button>
-            </div>
+              <div key={anh.maHinhAnh || url} className={`img-item ${form.anhChinh === url ? 'chinh' : ''}`}>
+                <ProductImage src={url} alt=""/>
+                <button type="button" className="btn btn-ghost" onClick={() => setForm({...form, anhChinh: url})}
+                        disabled={form.anhChinh === url}>
+                  {form.anhChinh === url ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
+                </button>
+                <select value={phamViAnh(anh)} onChange={(e) => setPhamViAnh(anh, e.target.value)}
+                        aria-label="Phạm vi áp dụng của ảnh">
+                  <option value="">Ảnh chung (toàn sản phẩm)</option>
+                  {mauOptions.length > 0 && (
+                      <optgroup label="Theo màu (mọi dung lượng)">
+                        {mauOptions.map((m) => <option key={m} value={`mau:${m}`}>{m}</option>)}
+                      </optgroup>
+                  )}
+                  {pbOptions.length > 0 && (
+                      <optgroup label="Chỉ riêng một phiên bản">
+                        {pbOptions.map((p) => <option key={p.ma} value={`pb:${p.ma}`}>{p.label}</option>)}
+                      </optgroup>
+                  )}
+                </select>
+                <button type="button" className="img-remove" aria-label="Xóa ảnh" onClick={() => removeImage(anh)}>×
+                </button>
+              </div>
           );
         })}
         <label className="img-add">
-          <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={upload} disabled={uploading} />
+          <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={upload}
+                 disabled={uploading}/>
           {uploading ? 'Đang tải...' : '+ Tải ảnh lên'}
         </label>
       </div>
@@ -294,17 +338,14 @@ export default function ProductForm({ product, categories, brands = [], onSubmit
 
       <label className="check">
         <input
-          type="checkbox"
-          checked={form.trangThai === 'NGUNG_KINH_DOANH'}
-          onChange={(e) => setForm({
-            ...form,
-            trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'CON_HANG'
-          })}
+            type="checkbox"
+            checked={form.trangThai === 'NGUNG_KINH_DOANH'}
+            onChange={(e) => setForm({...form, trangThai: e.target.checked ? 'NGUNG_KINH_DOANH' : 'DANG_KINH_DOANH'})}
         />
         Ngừng kinh doanh
       </label>
       <div className="row end">
-        <button type="button" className="btn" onClick={onCancel}>Hủy</button>
+      <button type="button" className="btn" onClick={onCancel}>Hủy</button>
         <button className="btn btn-primary" disabled={uploading}>Lưu</button>
       </div>
     </form>

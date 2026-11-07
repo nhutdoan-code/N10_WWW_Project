@@ -1,442 +1,450 @@
--- PhoneNest - SCHEMA hiện tại (tách từ Phone.sql)
--- Chạy file này trước để tạo database và cấu trúc bảng.
+DROP DATABASE IF EXISTS BanDienThoai;
 
--- --------------------------------------------------------
--- Host:                         127.0.0.1
--- Server version:               12.2.2-MariaDB - MariaDB Server
--- Server OS:                    Win64
--- HeidiSQL Version:             12.14.0.7165
--- --------------------------------------------------------
+CREATE DATABASE BanDienThoai
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8 */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+USE BanDienThoai;
+SET NAMES utf8mb4;
 
+-- PhoneNest Database FINAL V2
+-- Chốt nghiệp vụ: Product -> ProductVariant (SKU); stock theo variant; payment tách order;
+-- return theo order item; lịch sử trạng thái và biến động kho có audit.
+-- Quy tắc nghiệp vụ động (giới hạn voucher/khách, tổng số lượng đổi trả, chuyển trạng thái,
+-- đồng bộ tồn kho, một giao dịch thanh toán thành công...) được kiểm soát ở Service layer.
 
--- Dumping database structure for bandienthoai
-CREATE DATABASE IF NOT EXISTS `bandienthoai` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
-USE `bandienthoai`;
+CREATE TABLE TaiKhoan (
+    maTk VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    soDienThoai VARCHAR(20) UNIQUE,
+    matKhau VARCHAR(255) NOT NULL,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE,
+    loaiDangNhap VARCHAR(50) NOT NULL DEFAULT 'LOCAL'
+);
 
--- Dumping structure for table bandienthoai.biendongkho
-CREATE TABLE IF NOT EXISTS `biendongkho` (
-                                             `maBienDong` varchar(50) NOT NULL,
-    `maPhienBan` varchar(50) NOT NULL,
-    `loaiBienDong` varchar(50) DEFAULT NULL,
-    `soLuong` int(11) NOT NULL,
-    `tonTruoc` int(11) NOT NULL,
-    `tonSau` int(11) NOT NULL,
-    `maDonHang` varchar(50) DEFAULT NULL,
-    `thoiGian` datetime DEFAULT NULL,
-    `ghiChu` varchar(255) DEFAULT NULL,
-    PRIMARY KEY (`maBienDong`),
-    KEY `idx_bdk_phienban` (`maPhienBan`),
-    KEY `idx_bdk_donhang` (`maDonHang`),
-    CONSTRAINT `fk_bdk_donhang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`),
-    CONSTRAINT `fk_bdk_phienban` FOREIGN KEY (`maPhienBan`) REFERENCES `phienbansanpham` (`maPhienBan`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE KhachHang (
+    maKh VARCHAR(50) PRIMARY KEY,
+    hoTen VARCHAR(100) NOT NULL,
+    ngaySinh DATE,
+    anhDaiDien VARCHAR(500),
+    diemTichLuy INT NOT NULL DEFAULT 0,
+    hangThanhVien VARCHAR(50),
+    maGioiThieu VARCHAR(50),
+    CONSTRAINT FK_KhachHang_TaiKhoan FOREIGN KEY (maKh) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.chitietdonhang
-CREATE TABLE IF NOT EXISTS `chitietdonhang` (
-                                                `maDonHang` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    `soLuong` int(11) NOT NULL,
-    `donGia` decimal(15,2) NOT NULL,
-    `maChiTiet` varchar(50) NOT NULL,
-    `maPhienBan` varchar(50) NOT NULL,
-    `tenSanPham` varchar(255) DEFAULT NULL,
-    `tenPhienBan` varchar(255) DEFAULT NULL,
-    `sku` varchar(255) DEFAULT NULL,
-    `hinhAnh` varchar(255) DEFAULT NULL,
-    `baoHanhThang` int(11) NOT NULL DEFAULT 12,
-    PRIMARY KEY (`maChiTiet`),
-    UNIQUE KEY `uk_ctdh_donhang_sanpham` (`maDonHang`,`maSanPham`),
-    UNIQUE KEY `uk_ctdh_donhang_phienban` (`maDonHang`,`maPhienBan`),
-    KEY `FK_ChiTietDonHang_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_ChiTietDonHang_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_ChiTietDonHang_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON UPDATE CASCADE,
-    CONSTRAINT `CK_ChiTietDonHang_SoLuong` CHECK (`soLuong` > 0),
-    CONSTRAINT `CK_ChiTietDonHang_DonGia` CHECK (`donGia` >= 0)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE QuanTriVien (
+    maQtv VARCHAR(50) PRIMARY KEY,
+    hoTen VARCHAR(100) NOT NULL,
+    vaiTro VARCHAR(100) NOT NULL DEFAULT 'ADMIN',
+    chucVu VARCHAR(100),
+    CONSTRAINT FK_QuanTriVien_TaiKhoan FOREIGN KEY (maQtv) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.chitietgiohang
-CREATE TABLE IF NOT EXISTS `chitietgiohang` (
-                                                `maGioHang` varchar(50) NOT NULL,
-    `maPhienBan` varchar(50) NOT NULL,
-    `soLuong` int(11) NOT NULL DEFAULT 1,
-    PRIMARY KEY (`maGioHang`,`maPhienBan`),
-    KEY `IDX_ChiTietGioHang_GioHang` (`maGioHang`),
-    KEY `IDX_ChiTietGioHang_PhienBan` (`maPhienBan`),
-    CONSTRAINT `FK_ChiTietGioHang_GioHang` FOREIGN KEY (`maGioHang`) REFERENCES `giohang` (`maGioHang`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_ChiTietGioHang_PhienBan` FOREIGN KEY (`maPhienBan`) REFERENCES `phienbansanpham` (`maPhienBan`) ON UPDATE CASCADE,
-    CONSTRAINT `CK_ChiTietGioHang_SoLuong` CHECK (`soLuong` > 0)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ThongBao (
+    maThongBao VARCHAR(50) PRIMARY KEY,
+    maTk VARCHAR(50) NOT NULL,
+    tieuDe VARCHAR(200),
+    noiDung TEXT NOT NULL,
+    loai VARCHAR(50),
+    daDoc BOOLEAN NOT NULL DEFAULT FALSE,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_ThongBao_TaiKhoan FOREIGN KEY (maTk) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.danhgia
-CREATE TABLE IF NOT EXISTS `danhgia` (
-                                         `maDanhGia` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    `maDonHang` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    `diemSao` int(11) NOT NULL,
-    `noiDungBinhLuan` text DEFAULT NULL,
-    `hinhAnhThucTe` varchar(500) DEFAULT NULL,
-    `ngayDanhGia` date NOT NULL,
-    PRIMARY KEY (`maDanhGia`),
-    UNIQUE KEY `UQ_DanhGia_DonHang_SanPham` (`maDonHang`,`maSanPham`),
-    KEY `FK_DanhGia_KhachHang` (`maKh`),
-    KEY `FK_DanhGia_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_DanhGia_ChiTietDonHang` FOREIGN KEY (`maDonHang`, `maSanPham`) REFERENCES `chitietdonhang` (`maDonHang`, `maSanPham`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_DanhGia_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_DanhGia_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `CK_DanhGia_DiemSao` CHECK (`diemSao` between 1 and 5)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE TinhThanh (maTinh VARCHAR(10) PRIMARY KEY, tenTinh VARCHAR(100) NOT NULL);
+CREATE TABLE PhuongXa (
+    maPhuong VARCHAR(10) PRIMARY KEY,
+    tenPhuong VARCHAR(100) NOT NULL,
+    maTinh VARCHAR(10) NOT NULL,
+    CONSTRAINT FK_PhuongXa_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX IDX_PhuongXa_maTinh (maTinh)
+);
 
--- Dumping structure for table bandienthoai.diachi
-CREATE TABLE IF NOT EXISTS `diachi` (
-                                        `maDiaChi` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    `tenNguoiNhan` varchar(100) NOT NULL,
-    `soDienThoaiNhan` varchar(20) NOT NULL,
-    `diaChiNhanHang` varchar(255) NOT NULL,
-    `maTinh` varchar(10) NOT NULL,
-    `maPhuong` varchar(10) NOT NULL,
-    `macDinh` tinyint(1) NOT NULL DEFAULT 0,
-    PRIMARY KEY (`maDiaChi`),
-    KEY `FK_DiaChi_KhachHang` (`maKh`),
-    KEY `FK_DiaChi_TinhThanh` (`maTinh`),
-    KEY `FK_DiaChi_PhuongXa` (`maPhuong`),
-    CONSTRAINT `FK_DiaChi_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_DiaChi_PhuongXa` FOREIGN KEY (`maPhuong`) REFERENCES `phuongxa` (`maPhuong`) ON UPDATE CASCADE,
-    CONSTRAINT `FK_DiaChi_TinhThanh` FOREIGN KEY (`maTinh`) REFERENCES `tinhthanh` (`maTinh`) ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE DiaChi (
+    maDiaChi VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL,
+    tenNguoiNhan VARCHAR(100) NOT NULL,
+    soDienThoaiNhan VARCHAR(20) NOT NULL,
+    diaChiNhanHang VARCHAR(255) NOT NULL,
+    maTinh VARCHAR(10) NOT NULL,
+    maPhuong VARCHAR(10) NOT NULL,
+    macDinh BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT FK_DiaChi_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DiaChi_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_DiaChi_PhuongXa FOREIGN KEY (maPhuong) REFERENCES PhuongXa(maPhuong) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
--- Dumping structure for table bandienthoai.donhang
-CREATE TABLE IF NOT EXISTS `donhang` (
-                                         `maDonHang` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    `maKm` varchar(50) DEFAULT NULL,
-    `diaChiGiaoHang` varchar(500) DEFAULT NULL,
-    `ngayCapNhat` datetime DEFAULT NULL,
-    `ngayGiao` datetime DEFAULT NULL,
-    `maKmVanChuyen` varchar(50) DEFAULT NULL,
-    `giamGia` decimal(15,2) NOT NULL DEFAULT 0.00,
-    `phiVanChuyen` decimal(15,2) NOT NULL DEFAULT 0.00,
-    `giamPhiVanChuyen` decimal(15,2) NOT NULL DEFAULT 0.00,
-    `ngayMua` datetime NOT NULL DEFAULT current_timestamp(),
-    `phuongThucTt` enum('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
-    `trangThai` enum('CHO_XAC_NHAN','DANG_XU_LY','DANG_GIAO','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
-    `ghiChu` text DEFAULT NULL,
-    `tenNguoiNhan` varchar(255) DEFAULT NULL,
-    `soDienThoaiNhan` varchar(255) DEFAULT NULL,
-    `tamTinh` decimal(15,2) NOT NULL DEFAULT 0.00,
-    `tongThanhToan` decimal(15,2) NOT NULL DEFAULT 0.00,
-    PRIMARY KEY (`maDonHang`),
-    KEY `FK_DonHang_KhachHang` (`maKh`),
-    KEY `FK_DonHang_KhuyenMai` (`maKm`),
-    KEY `FK_DonHang_KhuyenMaiVanChuyen` (`maKmVanChuyen`),
-    CONSTRAINT `FK_DonHang_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON UPDATE CASCADE,
-    CONSTRAINT `FK_DonHang_KhuyenMai` FOREIGN KEY (`maKm`) REFERENCES `khuyenmai` (`maKm`) ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT `FK_DonHang_KhuyenMaiVanChuyen` FOREIGN KEY (`maKmVanChuyen`) REFERENCES `khuyenmai` (`maKm`) ON DELETE SET NULL ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE LoaiSanPham (
+    maLoai VARCHAR(50) PRIMARY KEY,
+    tenLoai VARCHAR(100) NOT NULL,
+    moTa TEXT,
+    maLoaiCha VARCHAR(50),
+    CONSTRAINT FK_LoaiSanPham_LoaiCha FOREIGN KEY (maLoaiCha) REFERENCES LoaiSanPham(maLoai) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
--- Dumping structure for table bandienthoai.giohang
-CREATE TABLE IF NOT EXISTS `giohang` (
-                                         `maGioHang` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    `ngayTao` datetime NOT NULL,
-    `ngayCapNhat` datetime DEFAULT NULL,
-    PRIMARY KEY (`maGioHang`),
-    UNIQUE KEY `maKh` (`maKh`),
-    CONSTRAINT `FK_GioHang_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ThuongHieu (
+    maThuongHieu VARCHAR(50) PRIMARY KEY,
+    tenThuongHieu VARCHAR(100) NOT NULL UNIQUE,
+    moTa TEXT,
+    logo VARCHAR(500),
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE
+);
 
--- Dumping structure for table bandienthoai.hinhanhsanpham
-CREATE TABLE IF NOT EXISTS `hinhanhsanpham` (
-                                                `maHinhAnh` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    `duongDan` varchar(500) NOT NULL,
-    `gocChup` varchar(100) DEFAULT NULL,
-    `anhChinh` tinyint(1) NOT NULL DEFAULT 0,
-    PRIMARY KEY (`maHinhAnh`),
-    KEY `FK_HinhAnhSanPham_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_HinhAnhSanPham_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE SanPham (
+    maSanPham VARCHAR(50) PRIMARY KEY,
+    maLoai VARCHAR(50) NOT NULL,
+    maThuongHieu VARCHAR(50) NOT NULL,
+    tenMay VARCHAR(150) NOT NULL,
+    moTa TEXT,
+    kichThuocManHinh DECIMAL(4,2),
+    loaiManHinh VARCHAR(100),
+    tanSoQuet INT,
+    chip VARCHAR(100),
+    cameraSau VARCHAR(150),
+    cameraTruoc VARCHAR(100),
+    pin INT,
+    congSuatSac INT,
+    heDieuHanh VARCHAR(100),
+    nfc BOOLEAN NOT NULL DEFAULT FALSE,
+    ho5G BOOLEAN NOT NULL DEFAULT FALSE,
+    trongLuong INT,
+    thoiHanBaoHanhThang INT NOT NULL DEFAULT 12,
+    trangThai ENUM('DANG_KINH_DOANH','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'DANG_KINH_DOANH',
+    diemDanhGiaTb DECIMAL(3,2) NOT NULL DEFAULT 0,
+    CONSTRAINT FK_SanPham_LoaiSanPham FOREIGN KEY (maLoai) REFERENCES LoaiSanPham(maLoai) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_SanPham_ThuongHieu FOREIGN KEY (maThuongHieu) REFERENCES ThuongHieu(maThuongHieu) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
--- Dumping structure for table bandienthoai.hoidap
-CREATE TABLE IF NOT EXISTS `hoidap` (
-                                        `maCauHoi` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    `noiDungCauHoi` text NOT NULL,
-    `noiDungTraLoi` text DEFAULT NULL,
-    `ngayHoi` date NOT NULL,
-    `ngayTraLoi` date DEFAULT NULL,
-    PRIMARY KEY (`maCauHoi`),
-    KEY `FK_HoiDap_KhachHang` (`maKh`),
-    KEY `FK_HoiDap_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_HoiDap_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_HoiDap_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE PhienBanSanPham (
+    maPhienBan VARCHAR(50) PRIMARY KEY,
+    maSanPham VARCHAR(50) NOT NULL,
+    sku VARCHAR(100) NOT NULL UNIQUE,
+    ram INT NOT NULL,
+    boNho INT NOT NULL,
+    mauSac VARCHAR(100) NOT NULL,
+    giaBan DECIMAL(15,2) NOT NULL,
+    giaNiemYet DECIMAL(15,2),
+    soLuongTon INT NOT NULL DEFAULT 0,
+    trangThai ENUM('DANG_KINH_DOANH','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'DANG_KINH_DOANH',
+    CONSTRAINT FK_PhienBanSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_PhienBan_CauHinh UNIQUE (maSanPham, ram, boNho, mauSac),
+    INDEX IDX_PhienBan_SanPham (maSanPham),
+    INDEX IDX_PhienBan_TrangThai_Ton (trangThai, soLuongTon)
+);
 
--- Dumping structure for table bandienthoai.huydonhang
-CREATE TABLE IF NOT EXISTS `huydonhang` (
-                                            `maDonHang` varchar(50) NOT NULL,
-    `lyDo` varchar(100) NOT NULL,
-    `ghiChu` varchar(255) DEFAULT NULL,
-    `ngayHuy` datetime NOT NULL DEFAULT current_timestamp(),
-    PRIMARY KEY (`maDonHang`),
-    CONSTRAINT `FK_HuyDonHang_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE HinhAnhSanPham (
+    maHinhAnh VARCHAR(50) PRIMARY KEY,
+    maSanPham VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50),
+    duongDan VARCHAR(500) NOT NULL,
+    gocChup VARCHAR(100),
+    mauSac VARCHAR(100) NULL,
+    anhChinh BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT FK_HinhAnhSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HinhAnhSanPham_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE SET NULL
+);
 
--- Dumping structure for table bandienthoai.khachhang
-CREATE TABLE IF NOT EXISTS `khachhang` (
-                                           `maKh` varchar(50) NOT NULL,
-    `hoTen` varchar(100) NOT NULL,
-    `ngaySinh` date DEFAULT NULL,
-    `anhDaiDien` varchar(500) DEFAULT NULL,
-    `diemTichLuy` int(11) NOT NULL DEFAULT 0,
-    `hangThanhVien` varchar(50) DEFAULT NULL,
-    `maGioiThieu` varchar(50) DEFAULT NULL,
-    PRIMARY KEY (`maKh`),
-    CONSTRAINT `FK_KhachHang_TaiKhoan` FOREIGN KEY (`maKh`) REFERENCES `taikhoan` (`maTk`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE GioHang (
+    maGioHang VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL UNIQUE,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_GioHang_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.khuyenmai
-CREATE TABLE IF NOT EXISTS `khuyenmai` (
-                                           `maKm` varchar(50) NOT NULL,
-    `tenKm` varchar(150) NOT NULL,
-    `phanTramGiam` decimal(5,2) NOT NULL,
-    `soTienGiamToiDa` decimal(15,2) DEFAULT NULL,
-    `ngayBatDau` date NOT NULL,
-    `ngayKetThuc` date NOT NULL,
-    `dieuKienApDung` text DEFAULT NULL,
-    `loai` enum('DON_HANG','VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
-    `donToiThieu` decimal(15,2) NOT NULL DEFAULT 0.00,
-    `soLuong` int(11) DEFAULT NULL,
-    `daDung` int(11) NOT NULL DEFAULT 0,
-    `chiKhachMoi` tinyint(1) NOT NULL DEFAULT 0,
-    `gioiHanMoiKhach` int(11) NOT NULL DEFAULT 1,
-    `trangThaiHoatDong` tinyint(1) NOT NULL DEFAULT 1,
-    PRIMARY KEY (`maKm`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ChiTietGioHang (
+    maGioHang VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50) NOT NULL,
+    soLuong INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (maGioHang, maPhienBan),
+    CONSTRAINT FK_ChiTietGioHang_GioHang FOREIGN KEY (maGioHang) REFERENCES GioHang(maGioHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietGioHang_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
--- Dumping structure for table bandienthoai.lichsutrangthaidonhang
-CREATE TABLE IF NOT EXISTS `lichsutrangthaidonhang` (
-                                                        `maLichSu` varchar(50) NOT NULL,
-    `maDonHang` varchar(50) NOT NULL,
-    `trangThai` varchar(50) DEFAULT NULL,
-    `thoiGian` datetime DEFAULT NULL,
-    `ghiChu` varchar(255) DEFAULT NULL,
-    `nguoiCapNhat` varchar(50) DEFAULT NULL,
-    PRIMARY KEY (`maLichSu`),
-    KEY `idx_lsttdh_donhang` (`maDonHang`),
-    KEY `idx_lsttdh_nguoicapnhat` (`nguoiCapNhat`),
-    CONSTRAINT `fk_lsttdh_donhang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`),
-    CONSTRAINT `fk_lsttdh_taikhoan` FOREIGN KEY (`nguoiCapNhat`) REFERENCES `taikhoan` (`maTk`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE KhuyenMai (
+    maKm VARCHAR(50) PRIMARY KEY,
+    tenKm VARCHAR(150) NOT NULL,
+    loai ENUM('DON_HANG','VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
+    phanTramGiam DECIMAL(5,2) NOT NULL,
+    soTienGiamToiDa DECIMAL(15,2),
+    donToiThieu DECIMAL(15,2) NOT NULL DEFAULT 0,
+    soLuong INT,
+    daDung INT NOT NULL DEFAULT 0,
+    chiKhachMoi BOOLEAN NOT NULL DEFAULT FALSE,
+    gioiHanMoiKhach INT NOT NULL DEFAULT 1,
+    ngayBatDau DATETIME NOT NULL,
+    ngayKetThuc DATETIME NOT NULL,
+    dieuKienApDung TEXT,
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT CK_KhuyenMai_DaDungNonNegative CHECK (daDung >= 0)
+);
 
--- Dumping structure for table bandienthoai.loaisanpham
-CREATE TABLE IF NOT EXISTS `loaisanpham` (
-                                             `maLoai` varchar(50) NOT NULL,
-    `tenLoai` varchar(100) NOT NULL,
-    `moTa` text DEFAULT NULL,
-    `maLoaiCha` varchar(50) DEFAULT NULL,
-    PRIMARY KEY (`maLoai`),
-    KEY `FK_LoaiSanPham_LoaiCha` (`maLoaiCha`),
-    CONSTRAINT `FK_LoaiSanPham_LoaiCha` FOREIGN KEY (`maLoaiCha`) REFERENCES `loaisanpham` (`maLoai`) ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE SuDungKhuyenMai (
+    maSuDung VARCHAR(50) PRIMARY KEY,
+    maKm VARCHAR(50) NOT NULL,
+    maKh VARCHAR(50) NOT NULL,
+    maDonHang VARCHAR(50),
+    ngaySuDung DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_SuDungKhuyenMai_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_SuDungKhuyenMai_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_SuDungKhuyenMai_DonHang UNIQUE (maKm, maDonHang),
+    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm),
+    INDEX IDX_SuDungKhuyenMai_DonHang (maDonHang),
+    INDEX IDX_SuDungKhuyenMai_Km_Kh (maKm, maKh)
+);
 
--- Dumping structure for table bandienthoai.password_reset_otp
-CREATE TABLE IF NOT EXISTS `password_reset_otp` (
-                                                    `id` bigint(20) NOT NULL AUTO_INCREMENT,
-    `maTk` varchar(50) NOT NULL,
-    `otpHash` varchar(255) NOT NULL,
-    `createdAt` datetime NOT NULL,
-    `otpExpiresAt` datetime NOT NULL,
-    `attempts` int(11) NOT NULL DEFAULT 0,
-    `otpVerified` tinyint(1) NOT NULL DEFAULT 0,
-    `resetTokenHash` varchar(255) DEFAULT NULL,
-    `resetExpiresAt` datetime DEFAULT NULL,
-    `used` tinyint(1) NOT NULL DEFAULT 0,
-    PRIMARY KEY (`id`),
-    KEY `idx_reset_otp_account` (`maTk`),
-    KEY `idx_reset_otp_token` (`resetTokenHash`),
-    CONSTRAINT `fk_reset_otp_taikhoan` FOREIGN KEY (`maTk`) REFERENCES `taikhoan` (`maTk`) ON DELETE CASCADE
-    ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE PhiVanChuyen (
+    maPhi VARCHAR(50) PRIMARY KEY,
+    maTinh VARCHAR(10) UNIQUE,
+    phiCoBan DECIMAL(15,2) NOT NULL,
+    mienPhiTu DECIMAL(15,2),
+    thoiGianGiao VARCHAR(50),
+    CONSTRAINT FK_PhiVanChuyen_TinhThanh FOREIGN KEY (maTinh) REFERENCES TinhThanh(maTinh) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.phienbansanpham
-CREATE TABLE IF NOT EXISTS `phienbansanpham` (
-                                                 `maPhienBan` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    `sku` varchar(100) NOT NULL,
-    `ram` int(11) NOT NULL DEFAULT 0,
-    `boNho` int(11) NOT NULL DEFAULT 0,
-    `mauSac` varchar(50) NOT NULL,
-    `giaBan` decimal(15,2) NOT NULL,
-    `giaNiemYet` decimal(15,2) DEFAULT NULL,
-    `soLuongTon` int(11) NOT NULL DEFAULT 0,
-    `trangThai` enum('CON_HANG','HET_HANG','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'CON_HANG',
-    PRIMARY KEY (`maPhienBan`),
-    UNIQUE KEY `UQ_PhienBan_SKU` (`sku`),
-    UNIQUE KEY `UQ_PhienBan_CauHinh` (`maSanPham`,`ram`,`boNho`,`mauSac`),
-    KEY `FK_PhienBan_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_PhienBan_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON UPDATE CASCADE,
-    CONSTRAINT `CK_PhienBan_GiaBan` CHECK (`giaBan` >= 0),
-    CONSTRAINT `CK_PhienBan_SoLuongTon` CHECK (`soLuongTon` >= 0)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE DonHang (
+    maDonHang VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL,
+    maKm VARCHAR(50),
+    maKmVanChuyen VARCHAR(50),
+    tenNguoiNhan VARCHAR(100) NOT NULL,
+    soDienThoaiNhan VARCHAR(20) NOT NULL,
+    diaChiGiaoHang VARCHAR(500) NOT NULL,
+    tamTinh DECIMAL(15,2) NOT NULL DEFAULT 0,
+    giamGia DECIMAL(15,2) NOT NULL DEFAULT 0,
+    phiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
+    giamPhiVanChuyen DECIMAL(15,2) NOT NULL DEFAULT 0,
+    tongThanhToan DECIMAL(15,2) NOT NULL DEFAULT 0,
+    ngayMua DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayGiao DATETIME,
+    ngayKhachXacNhan DATETIME NULL,
+    nguoiXacNhan VARCHAR(50) NULL,
+    trangThai ENUM('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
+    ghiChu VARCHAR(500),
+    CONSTRAINT FK_DonHang_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_DonHang_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT FK_DonHang_KhuyenMaiVanChuyen FOREIGN KEY (maKmVanChuyen) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT FK_DonHang_NguoiXacNhan
+        FOREIGN KEY (nguoiXacNhan)
+            REFERENCES TaiKhoan(maTk)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL,
+    INDEX IDX_DonHang_KhachHang_NgayMua (maKh, ngayMua),
+    INDEX IDX_DonHang_TrangThai (trangThai)
+);
 
--- Dumping structure for table bandienthoai.phivanchuyen
-CREATE TABLE IF NOT EXISTS `phivanchuyen` (
-                                              `maPhi` varchar(50) NOT NULL,
-    `maTinh` varchar(10) DEFAULT NULL,
-    `phiCoBan` decimal(15,2) NOT NULL,
-    `mienPhiTu` decimal(15,2) DEFAULT NULL,
-    `thoiGianGiao` varchar(50) DEFAULT NULL,
-    PRIMARY KEY (`maPhi`),
-    UNIQUE KEY `maTinh` (`maTinh`),
-    CONSTRAINT `FK_PhiVanChuyen_TinhThanh` FOREIGN KEY (`maTinh`) REFERENCES `tinhthanh` (`maTinh`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE SuDungKhuyenMai ADD CONSTRAINT FK_SuDungKhuyenMai_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE SET NULL;
 
--- Dumping structure for table bandienthoai.phuongxa
-CREATE TABLE IF NOT EXISTS `phuongxa` (
-                                          `maPhuong` varchar(10) NOT NULL,
-    `tenPhuong` varchar(100) NOT NULL,
-    `maTinh` varchar(10) NOT NULL,
-    PRIMARY KEY (`maPhuong`),
-    KEY `IDX_PhuongXa_maTinh` (`maTinh`),
-    CONSTRAINT `FK_PhuongXa_TinhThanh` FOREIGN KEY (`maTinh`) REFERENCES `tinhthanh` (`maTinh`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ChiTietDonHang (
+    maChiTiet VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    maPhienBan VARCHAR(50) NOT NULL,
+    tenSanPham VARCHAR(150) NOT NULL,
+    tenPhienBan VARCHAR(150) NOT NULL,
+    sku VARCHAR(100) NOT NULL,
+    hinhAnh VARCHAR(500),
+    soLuong INT NOT NULL,
+    donGia DECIMAL(15,2) NOT NULL,
+    baoHanhThang INT NOT NULL DEFAULT 12,
+    CONSTRAINT FK_ChiTietDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietDonHang_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_ChiTietDonHang_PhienBan UNIQUE (maDonHang, maPhienBan),
+    INDEX IDX_ChiTietDonHang_PhienBan (maPhienBan)
+);
 
--- Dumping structure for table bandienthoai.quantrivien
-CREATE TABLE IF NOT EXISTS `quantrivien` (
-                                             `maQtv` varchar(50) NOT NULL,
-    `hoTen` varchar(100) NOT NULL,
-    `vaiTro` varchar(100) DEFAULT NULL,
-    `chucVu` varchar(100) DEFAULT NULL,
-    PRIMARY KEY (`maQtv`),
-    CONSTRAINT `FK_QuanTriVien_TaiKhoan` FOREIGN KEY (`maQtv`) REFERENCES `taikhoan` (`maTk`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE LichSuTrangThaiDonHang (
+    maLichSu VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    trangThai ENUM('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL,
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ghiChu VARCHAR(500),
+    nguoiCapNhat VARCHAR(50),
+    CONSTRAINT FK_LichSuTrangThai_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_LichSuTrangThai_TaiKhoan FOREIGN KEY (nguoiCapNhat) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX IDX_LichSuTrangThai_DonHang_ThoiGian (maDonHang, thoiGian)
+);
 
--- Dumping structure for table bandienthoai.sanpham
-CREATE TABLE IF NOT EXISTS `sanpham` (
-                                         `maSanPham` varchar(50) NOT NULL,
-    `maLoai` varchar(50) NOT NULL,
-    `tenMay` varchar(150) NOT NULL,
-    `giaBan` decimal(15,2) NOT NULL,
-    `moTa` text DEFAULT NULL,
-    `kichThuocManHinh` decimal(3,2) DEFAULT NULL,
-    `loaiManHinh` varchar(50) DEFAULT NULL,
-    `tanSoQuet` int(11) DEFAULT NULL,
-    `chip` varchar(100) DEFAULT NULL,
-    `ram` int(11) DEFAULT NULL,
-    `boNho` int(11) DEFAULT NULL,
-    `cameraSau` varchar(150) DEFAULT NULL,
-    `cameraTruoc` int(11) DEFAULT NULL,
-    `pin` int(11) DEFAULT NULL,
-    `congSuatSac` int(11) DEFAULT NULL,
-    `heDieuHanh` varchar(50) DEFAULT NULL,
-    `nfc` tinyint(1) NOT NULL DEFAULT 0,
-    `ho5G` tinyint(1) NOT NULL DEFAULT 0,
-    `trongLuong` int(11) DEFAULT NULL,
-    `soLuongTon` int(11) NOT NULL DEFAULT 0,
-    `trangThai` enum('CON_HANG','HET_HANG','NGUNG_KINH_DOANH') NOT NULL DEFAULT 'CON_HANG',
-    `diemDanhGiaTb` decimal(3,2) DEFAULT 0.00,
-    `thoiHanBaoHanhThang` int(11) NOT NULL DEFAULT 12 COMMENT 'Thời hạn bảo hành tính theo tháng',
-    PRIMARY KEY (`maSanPham`),
-    KEY `FK_SanPham_LoaiSanPham` (`maLoai`),
-    CONSTRAINT `FK_SanPham_LoaiSanPham` FOREIGN KEY (`maLoai`) REFERENCES `loaisanpham` (`maLoai`) ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ThanhToan (
+    maThanhToan VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    phuongThuc ENUM('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
+    soTien DECIMAL(15,2) NOT NULL,
+    trangThai ENUM('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
+    maGiaoDich VARCHAR(150) UNIQUE,
+    maGiaoDichMoMo VARCHAR(100),
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayThanhToan DATETIME,
+    CONSTRAINT FK_ThanhToan_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX IDX_ThanhToan_maDonHang (maDonHang)
+);
 
--- Dumping structure for table bandienthoai.taikhoan
-CREATE TABLE IF NOT EXISTS `taikhoan` (
-                                          `maTk` varchar(50) NOT NULL,
-    `email` varchar(255) NOT NULL,
-    `matKhau` varchar(255) NOT NULL,
-    `ngayTao` date NOT NULL,
-    `trangThaiHoatDong` tinyint(1) NOT NULL DEFAULT 1,
-    `loaiDangNhap` varchar(50) DEFAULT NULL,
-    `soDienThoai` varchar(20) DEFAULT NULL,
-    PRIMARY KEY (`maTk`),
-    UNIQUE KEY `email` (`email`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE BienDongKho (
+    maBienDong VARCHAR(50) PRIMARY KEY,
+    maPhienBan VARCHAR(50) NOT NULL,
+    loaiBienDong ENUM('NHAP_KHO','BAN_HANG','HOAN_HUY_DON','DOI_TRA','DIEU_CHINH') NOT NULL,
+    soLuong INT NOT NULL,
+    tonTruoc INT NOT NULL,
+    tonSau INT NOT NULL,
+    maDonHang VARCHAR(50),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ghiChu VARCHAR(500),
+    CONSTRAINT FK_BienDongKho_PhienBan FOREIGN KEY (maPhienBan) REFERENCES PhienBanSanPham(maPhienBan) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_BienDongKho_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX IDX_BienDongKho_PhienBan_ThoiGian (maPhienBan, thoiGian)
+);
 
--- Dumping structure for table bandienthoai.thanhtoan
-CREATE TABLE IF NOT EXISTS `thanhtoan` (
-                                           `maThanhToan` varchar(50) NOT NULL,
-    `maDonHang` varchar(50) NOT NULL,
-    `phuongThuc` varchar(50) DEFAULT NULL,
-    `soTien` decimal(15,2) DEFAULT NULL,
-    `trangThai` varchar(50) DEFAULT 'CHO_THANH_TOAN',
-    `maGiaoDich` varchar(255) DEFAULT NULL,
-    `ngayTao` datetime DEFAULT NULL,
-    `ngayThanhToan` datetime DEFAULT NULL,
-    PRIMARY KEY (`maThanhToan`),
-    UNIQUE KEY `uk_thanhtoan_maGiaoDich` (`maGiaoDich`),
-    KEY `idx_thanhtoan_donhang` (`maDonHang`),
-    CONSTRAINT `fk_thanhtoan_donhang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE YeuCauDoiTra (
+    maYeuCau VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    lyDoChung TEXT,
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trangThai ENUM('CHO_DUYET','DA_DUYET','TU_CHOI','DANG_XU_LY','HOAN_TAT') NOT NULL DEFAULT 'CHO_DUYET',
+    ghiChuXuLy VARCHAR(500),
+    CONSTRAINT FK_YeuCauDoiTra_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
--- Dumping structure for table bandienthoai.thongbao
-CREATE TABLE IF NOT EXISTS `thongbao` (
-                                          `maThongBao` varchar(50) NOT NULL,
-    `maTk` varchar(50) NOT NULL,
-    `noiDung` text NOT NULL,
-    `daDoc` tinyint(1) NOT NULL DEFAULT 0,
-    `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
-    PRIMARY KEY (`maThongBao`),
-    KEY `FK_ThongBao_TaiKhoan` (`maTk`),
-    CONSTRAINT `FK_ThongBao_TaiKhoan` FOREIGN KEY (`maTk`) REFERENCES `taikhoan` (`maTk`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE ChiTietDoiTra (
+    maChiTietDoiTra VARCHAR(50) PRIMARY KEY,
+    maYeuCau VARCHAR(50) NOT NULL,
+    maChiTietDonHang VARCHAR(50) NOT NULL,
+    soLuong INT NOT NULL,
+    loaiYeuCau ENUM('DOI_HANG','TRA_HANG_HOAN_TIEN') NOT NULL,
+    lyDo TEXT NOT NULL,
+    hinhAnhMinhChung VARCHAR(500),
+    soTienHoan DECIMAL(15,2),
+    CONSTRAINT FK_ChiTietDoiTra_YeuCau FOREIGN KEY (maYeuCau) REFERENCES YeuCauDoiTra(maYeuCau) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ChiTietDoiTra_ChiTietDonHang FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_ChiTietDoiTra UNIQUE (maYeuCau, maChiTietDonHang)
+);
 
--- Dumping structure for table bandienthoai.tinhthanh
-CREATE TABLE IF NOT EXISTS `tinhthanh` (
-                                           `maTinh` varchar(10) NOT NULL,
-    `tenTinh` varchar(100) NOT NULL,
-    PRIMARY KEY (`maTinh`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE DanhGia (
+    maDanhGia VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL,
+    maChiTietDonHang VARCHAR(50) NOT NULL UNIQUE,
+    maSanPham VARCHAR(50) NOT NULL,
+    diemSao INT NOT NULL,
+    noiDungBinhLuan TEXT,
+    hinhAnhThucTe VARCHAR(500),
+    ngayDanhGia DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_DanhGia_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DanhGia_ChiTietDonHang FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_DanhGia_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.wishlist
-CREATE TABLE IF NOT EXISTS `wishlist` (
-                                          `maDanhSach` varchar(50) NOT NULL,
-    `maKh` varchar(50) NOT NULL,
-    PRIMARY KEY (`maDanhSach`),
-    UNIQUE KEY `maKh` (`maKh`),
-    CONSTRAINT `FK_Wishlist_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `khachhang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE HoiDap (
+    maCauHoi VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL,
+    maSanPham VARCHAR(50) NOT NULL,
+    noiDungCauHoi TEXT NOT NULL,
+    noiDungTraLoi TEXT,
+    ngayHoi DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayTraLoi DATETIME,
+    CONSTRAINT FK_HoiDap_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HoiDap_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.wishlistsanpham
-CREATE TABLE IF NOT EXISTS `wishlistsanpham` (
-                                                 `maDanhSach` varchar(50) NOT NULL,
-    `maSanPham` varchar(50) NOT NULL,
-    PRIMARY KEY (`maDanhSach`,`maSanPham`),
-    KEY `FK_WishlistSanPham_SanPham` (`maSanPham`),
-    CONSTRAINT `FK_WishlistSanPham_SanPham` FOREIGN KEY (`maSanPham`) REFERENCES `sanpham` (`maSanPham`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `FK_WishlistSanPham_Wishlist` FOREIGN KEY (`maDanhSach`) REFERENCES `wishlist` (`maDanhSach`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE Wishlist (
+    maDanhSach VARCHAR(50) PRIMARY KEY,
+    maKh VARCHAR(50) NOT NULL UNIQUE,
+    CONSTRAINT FK_Wishlist_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE CASCADE
+);
 
--- Dumping structure for table bandienthoai.yeucaudoitra
-CREATE TABLE IF NOT EXISTS `yeucaudoitra` (
-                                              `maYeuCau` varchar(50) NOT NULL,
-    `maDonHang` varchar(50) NOT NULL,
-    `lyDo` text DEFAULT NULL,
-    `hinhAnhMinhChung` varchar(500) DEFAULT NULL,
-    `ngayTao` date NOT NULL,
-    `trangThai` enum('CHO_DUYET','DA_DUYET','TU_CHOI','DA_HOAN_TIEN') NOT NULL DEFAULT 'CHO_DUYET',
-    `ghiChuXuLy` text DEFAULT NULL,
-    `lyDoChung` text DEFAULT NULL,
-    PRIMARY KEY (`maYeuCau`),
-    UNIQUE KEY `maDonHang` (`maDonHang`),
-    CONSTRAINT `FK_YeuCauDoiTra_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `donhang` (`maDonHang`) ON DELETE CASCADE ON UPDATE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE WishlistSanPham (
+    maDanhSach VARCHAR(50) NOT NULL,
+    maSanPham VARCHAR(50) NOT NULL,
+    PRIMARY KEY (maDanhSach, maSanPham),
+    CONSTRAINT FK_WishlistSanPham_Wishlist FOREIGN KEY (maDanhSach) REFERENCES Wishlist(maDanhSach) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_WishlistSanPham_SanPham FOREIGN KEY (maSanPham) REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE HuyDonHang (
+    maDonHang VARCHAR(50) PRIMARY KEY,
+    lyDo VARCHAR(200) NOT NULL,
+    ghiChu VARCHAR(500),
+    ngayHuy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    nguoiHuy VARCHAR(50),
+    CONSTRAINT FK_HuyDonHang_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HuyDonHang_TaiKhoan FOREIGN KEY (nguoiHuy) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+-- Audit log hoat dong quan tri: chi ghi va doc (append-only), khong FK toi TaiKhoan
+-- hay doi tuong nghiep vu de giu lich su khi tai khoan/doi tuong bi xoa.
+CREATE TABLE NhatKyHoatDong (
+    maNhatKy VARCHAR(50) PRIMARY KEY,
+    maTk VARCHAR(50) NOT NULL,
+    tenNguoiThucHien VARCHAR(150) NOT NULL,
+    hanhDong VARCHAR(50) NOT NULL,
+    loaiDoiTuong VARCHAR(50) NOT NULL,
+    maDoiTuong VARCHAR(50),
+    moTa VARCHAR(500),
+    duLieuTruoc LONGTEXT,
+    duLieuSau LONGTEXT,
+    ipAddress VARCHAR(45),
+    requestMethod VARCHAR(10),
+    requestPath VARCHAR(255),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX IDX_NhatKyHoatDong_ThoiGian (thoiGian),
+    INDEX IDX_NhatKyHoatDong_MaTk_ThoiGian (maTk, thoiGian),
+    INDEX IDX_NhatKyHoatDong_LoaiDoiTuong_HanhDong (loaiDoiTuong, hanhDong)
+);
+
+-- Hanh vi mua sam chi phuc vu ca nhan hoa goi y, khong luu IP/referrer.
+CREATE TABLE HanhViNguoiDung (
+    maHanhVi VARCHAR(36) PRIMARY KEY,
+    visitorId VARCHAR(36) NOT NULL,
+    maTk VARCHAR(50),
+    loaiHanhVi VARCHAR(20) NOT NULL,
+    productId VARCHAR(50),
+    searchTerm VARCHAR(120),
+    pageType VARCHAR(30),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_HanhViNguoiDung_TaiKhoan FOREIGN KEY (maTk)
+        REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_HanhViNguoiDung_SanPham FOREIGN KEY (productId)
+        REFERENCES SanPham(maSanPham) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX IDX_HanhViNguoiDung_Visitor_Time (visitorId, thoiGian),
+    INDEX IDX_HanhViNguoiDung_TaiKhoan_Time (maTk, thoiGian),
+    INDEX IDX_HanhViNguoiDung_Product_Time (productId, thoiGian),
+    INDEX IDX_HanhViNguoiDung_Time (thoiGian)
+);
+
+-- Quản lý mã OTP đặt lại mật khẩu
+CREATE TABLE IF NOT EXISTS password_reset_otp (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    maTk VARCHAR(50) NOT NULL,
+    otpHash VARCHAR(255) NOT NULL,
+    createdAt DATETIME NOT NULL,
+    otpExpiresAt DATETIME NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    otpVerified BOOLEAN NOT NULL DEFAULT FALSE,
+    resetTokenHash VARCHAR(255) DEFAULT NULL,
+    resetExpiresAt DATETIME DEFAULT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    KEY idx_reset_otp_account (maTk),
+    KEY idx_reset_otp_token (resetTokenHash),
+    CONSTRAINT fk_reset_otp_taikhoan FOREIGN KEY (maTk) REFERENCES TaiKhoan(maTk) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-/*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
-/*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
-/*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
+-- Quản lý Idempotency cho Checkout (PNE-004)
+CREATE TABLE IF NOT EXISTS checkout_idempotency (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id VARCHAR(50) NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    order_id VARCHAR(50) DEFAULT NULL,
+    response_payload LONGTEXT DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_idempotency (user_id, idempotency_key),
+    KEY idx_idempotency_order (order_id),
+    KEY idx_idempotency_created (created_at),
+    CONSTRAINT fk_idempotency_user FOREIGN KEY (user_id) REFERENCES TaiKhoan(maTk) ON DELETE CASCADE,
+    CONSTRAINT fk_idempotency_order FOREIGN KEY (order_id) REFERENCES DonHang(maDonHang) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

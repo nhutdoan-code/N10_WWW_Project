@@ -1,4 +1,3 @@
-
 package nhom10.phonenest.entity;
 
 import jakarta.persistence.*;
@@ -18,9 +17,15 @@ public class HinhAnhSanPham {
     @JoinColumn(name = "maSanPham", nullable = false)
     private SanPham sanPham;
 
+    @ManyToOne
+    @JoinColumn(name = "maPhienBan")
+    private PhienBanSanPham phienBan;
+
     private String duongDan;
 
     private String gocChup;
 
     private boolean anhChinh;
+
+    private String mauSac;
 }

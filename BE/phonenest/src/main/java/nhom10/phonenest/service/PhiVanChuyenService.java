@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.PhiVanChuyenDto;
 import nhom10.phonenest.entity.PhiVanChuyen;
 import nhom10.phonenest.entity.TinhThanh;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.PhiVanChuyenRepository;
 import nhom10.phonenest.repository.TinhThanhRepository;
@@ -13,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class PhiVanChuyenService {
 
     private final PhiVanChuyenRepository phiVanChuyenRepository;
     private final TinhThanhRepository tinhThanhRepository;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     @Transactional(readOnly = true)
     public List<PhiVanChuyenDto> list() {
@@ -43,11 +48,11 @@ public class PhiVanChuyenService {
         PhiVanChuyen p = new PhiVanChuyen();
         p.setMaPhi(IdGenerator.next("PVC"));
         p.setMaTinh(d.maTinh());
-        return luu(p, d);
+        return luu(p, d, true);
     }
 
     public PhiVanChuyenDto sua(String ma, PhiVanChuyenDto d) {
-        return luu(tim(ma), d);
+        return luu(tim(ma), d, false);
     }
 
     public void xoa(String ma) {
@@ -55,7 +60,10 @@ public class PhiVanChuyenService {
         if (p.getMaTinh() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không thể xóa mức phí mặc định");
         }
+        Map<String, Object> duLieuTruoc = snapshot(p);
         phiVanChuyenRepository.delete(p);
+        nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_SHIPPING_FEE, LoaiDoiTuongAudit.SHIPPING_FEE,
+                ma, duLieuTruoc, null);
     }
 
     @Transactional(readOnly = true)
@@ -70,11 +78,30 @@ public class PhiVanChuyenService {
         return mienPhi ? BigDecimal.ZERO : p.getPhiCoBan();
     }
 
-    private PhiVanChuyenDto luu(PhiVanChuyen p, PhiVanChuyenDto d) {
+    private PhiVanChuyenDto luu(PhiVanChuyen p, PhiVanChuyenDto d, boolean taoMoi) {
+        Map<String, Object> duLieuTruoc = taoMoi ? null : snapshot(p);
         p.setPhiCoBan(d.phiCoBan());
         p.setMienPhiTu(d.mienPhiTu());
         p.setThoiGianGiao(d.thoiGianGiao());
-        return toDto(phiVanChuyenRepository.save(p));
+        PhiVanChuyen daLuu = phiVanChuyenRepository.save(p);
+        Map<String, Object> duLieuSau = snapshot(daLuu);
+        if (taoMoi) {
+            nhatKyHoatDongService.ghi(HanhDongAudit.CREATE_SHIPPING_FEE, LoaiDoiTuongAudit.SHIPPING_FEE,
+                    daLuu.getMaPhi(), null, duLieuSau);
+        } else {
+            nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_SHIPPING_FEE, LoaiDoiTuongAudit.SHIPPING_FEE,
+                    daLuu.getMaPhi(), duLieuTruoc, duLieuSau);
+        }
+        return toDto(daLuu);
+    }
+
+    private Map<String, Object> snapshot(PhiVanChuyen p) {
+        Map<String, Object> duLieu = new LinkedHashMap<>();
+        duLieu.put("maTinh", p.getMaTinh());
+        duLieu.put("phiCoBan", p.getPhiCoBan());
+        duLieu.put("mienPhiTu", p.getMienPhiTu());
+        duLieu.put("thoiGianGiao", p.getThoiGianGiao());
+        return duLieu;
     }
 
     private PhiVanChuyen tim(String ma) {

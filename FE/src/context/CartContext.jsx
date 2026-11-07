@@ -3,6 +3,7 @@ import { STORAGE_KEYS } from '../config/constants';
 import { cartService } from '../service/cartService';
 import { storage } from '../utils/storage';
 import useAuth from '../hooks/useAuth';
+import { recordActivity } from '../utils/activityTracking';
 
 export const CartContext = createContext(null);
 const KEY = STORAGE_KEYS.guestCart;
@@ -42,7 +43,6 @@ export function CartProvider({ children }) {
   // Thêm phiên bản
   const add = async (sp, phienBan, soLuong = 1) => {
     if (!phienBan) throw new Error('Vui lòng chọn phiên bản sản phẩm');
-
     const qty = Number(soLuong);
     if (!Number.isInteger(qty) || qty < 1) {
       throw new Error('Số lượng không hợp lệ');
@@ -51,28 +51,24 @@ export function CartProvider({ children }) {
     if (isCustomer) {
       const cart = await cartService.add(phienBan.maPhienBan, qty);
       setItems(cart.items || []);
+      recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
       return;
     }
-
-    const current = items.find(
-        (i) => i.phienBan.maPhienBan === phienBan.maPhienBan
-    );
-
+    const current = items.find((i) => i.phienBan.maPhienBan === phienBan.maPhienBan);
     const totalQty = (current?.soLuong || 0) + qty;
-
     if (totalQty > Number(phienBan.soLuongTon)) {
       throw new Error(`Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`);
     }
-
     saveGuest(
-        current
-            ? items.map((i) =>
-                i.phienBan.maPhienBan === phienBan.maPhienBan
-                    ? { ...i, soLuong: totalQty }
-                    : i
-            )
-            : [...items, { sanPham: sp, phienBan, soLuong: qty }]
+      current
+        ? items.map((i) =>
+            i.phienBan.maPhienBan === phienBan.maPhienBan
+              ? { ...i, soLuong: totalQty }
+              : i
+          )
+        : [...items, { sanPham: sp, phienBan, soLuong: qty }]
     );
+    recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
   };
 
   // Cập nhật số lượng

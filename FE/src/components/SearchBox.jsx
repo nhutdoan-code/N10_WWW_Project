@@ -5,6 +5,7 @@ import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { productService } from '../service/productService';
 import { formatPrice } from '../utils/format';
+import { recordActivity } from '../utils/activityTracking';
 
 export default function SearchBox() {
   const [text, setText] = useState('');
@@ -62,7 +63,14 @@ export default function SearchBox() {
           {loading && <div className="muted pad">Đang tìm...</div>}
           {!loading && results.length === 0 && <div className="muted pad">Không tìm thấy sản phẩm</div>}
           {results.map((sp) => (
-            <Link key={sp.maSanPham} to={`/products/${sp.maSanPham}`} onClick={() => setOpen(false)}>
+            <Link
+              key={sp.maSanPham}
+              to={`/products/${sp.maSanPham}`}
+              onClick={() => {
+                recordActivity({ type: 'SEARCH', searchTerm: debounced.slice(0, 120) });
+                setOpen(false);
+              }}
+            >
               <ProductImage src={sp.anhChinh} alt="" />
               <span>{sp.tenMay}</span>
               <b>{formatPrice(sp.giaBan)}</b>

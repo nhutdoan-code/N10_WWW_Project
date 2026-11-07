@@ -6,7 +6,7 @@ import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage, formatPrice } from '../../utils/format';
 
-const EMPTY = { maKm: '', tenKm: '', loai: 'DON_HANG', phanTramGiam: '', soTienGiamToiDa: '', donToiThieu: 0, soLuong: '', chiKhachMoi: false, ngayBatDau: '', ngayKetThuc: '', dieuKienApDung: '' };
+const EMPTY = { maKm: '', tenKm: '', loai: 'DON_HANG', phanTramGiam: '', soTienGiamToiDa: '', donToiThieu: 0, soLuong: '', daDung: 0, chiKhachMoi: false, gioiHanMoiKhach: 1, ngayBatDau: '', ngayKetThuc: '', dieuKienApDung: '' };
 
 export default function AdminPromotionsPage() {
   const { data: list, reload } = useFetch(adminService.promotions);
@@ -77,7 +77,7 @@ export default function AdminPromotionsPage() {
       {editing && (
         <Modal title={editing.isNew ? 'Tạo khuyến mãi' : 'Sửa khuyến mãi'} onClose={() => setEditing(null)}>
           <form className="form" onSubmit={submit}>
-            <FormField label="Mã khuyến mãi" value={editing.maKm} onChange={set('maKm')} disabled={!editing.isNew} required />
+            <FormField label="Mã khuyến mãi" value={editing.maKm} onChange={(e) => setEditing({ ...editing, maKm: e.target.value.toUpperCase().replace(/\s/g, '') })} disabled={!editing.isNew} required />
             <FormField label="Tên chương trình" value={editing.tenKm} onChange={set('tenKm')} required />
             <label className="field">
               <span>Loại voucher</span>
@@ -88,12 +88,13 @@ export default function AdminPromotionsPage() {
             </label>
             <div className="grid-2">
               <FormField label="Phần trăm giảm (%)" type="number" min="1" max="100" value={editing.phanTramGiam} onChange={set('phanTramGiam')} required />
-              <FormField label="Giảm tối đa (₫)" type="number" min="0" value={editing.soTienGiamToiDa ?? ''} onChange={set('soTienGiamToiDa')} />
+              <FormField label={`Giảm tối đa (₫)${editing.loai === 'VAN_CHUYEN' ? ' (bắt buộc)' : ''}`} type="number" min="0" value={editing.soTienGiamToiDa ?? ''} onChange={set('soTienGiamToiDa')} required={editing.loai === 'VAN_CHUYEN'} />
             </div>
             <div className="grid-2">
               <FormField label="Đơn tối thiểu (₫)" type="number" min="0" value={editing.donToiThieu ?? 0} onChange={set('donToiThieu')} />
               <FormField label="Số lượng mã (để trống = không giới hạn)" type="number" min="1" value={editing.soLuong ?? ''} onChange={set('soLuong')} />
             </div>
+            <FormField label="Giới hạn mỗi khách" type="number" min="1" value={editing.gioiHanMoiKhach ?? 1} onChange={set('gioiHanMoiKhach')} required />
             <label className="option">
               <input type="checkbox" checked={!!editing.chiKhachMoi} onChange={(e) => setEditing({ ...editing, chiKhachMoi: e.target.checked })} /> Chỉ dành cho khách mua lần đầu
             </label>

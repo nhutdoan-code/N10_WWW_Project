@@ -2,39 +2,40 @@ package nhom10.phonenest.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.io.Serializable;
 
 @Entity
-@Table(name = "chitietgiohang")
+@Table(name = "ChiTietGioHang")
 @Getter
 @Setter
 @NoArgsConstructor
 public class ChiTietGioHang {
 
- @EmbeddedId
- private Id id = new Id();
+    @EmbeddedId
+    private Id id = new Id();
 
- @ManyToOne
- @MapsId("maGioHang")
- @JoinColumn(name = "maGioHang", nullable = false)
- private GioHang gioHang;
+    @ManyToOne
+    @MapsId("maGioHang")
+    @JoinColumn(name = "maGioHang", nullable = false)
+    private GioHang gioHang;
 
- @ManyToOne
- @MapsId("maPhienBan")
- @JoinColumn(name = "maPhienBan", nullable = false)
- private PhienBanSanPham phienBan;
+    @ManyToOne
+    @MapsId("maPhienBan")
+    @JoinColumn(name = "maPhienBan", nullable = false)
+    private PhienBanSanPham phienBan;
 
- @Column(name = "soLuong", nullable = false)
- private int soLuong = 1;
+    @Column(name = "soLuong", nullable = false)
+    private int soLuong = 1;
 
- @Embeddable
- @Getter
- @Setter
- @NoArgsConstructor
- @AllArgsConstructor
- @EqualsAndHashCode
- public static class Id implements Serializable {
-  private String maGioHang;
-  private String maPhienBan;
- }
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    public static class Id implements Serializable {
+        private String maGioHang;
+        private String maPhienBan;
+    }
 }

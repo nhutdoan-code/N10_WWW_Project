@@ -5,9 +5,11 @@ import HeroSlider from '../components/HeroSlider';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
 import ProductImage from '../components/ProductImage';
+import ProductFilters from '../components/ProductFilters';
 import { PRICE_RANGES, SORT_OPTIONS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
+import { productStatus } from '../utils/stock';
 import { formatPrice } from '../utils/format';
 
 const SERVICES = [
@@ -16,6 +18,10 @@ const SERVICES = [
   { icon: 'refresh', title: 'Đổi trả dễ dàng', text: 'Hỗ trợ đổi trả khi máy lỗi' },
   { icon: 'gift', title: 'Voucher mỗi ngày', text: 'Tự chọn mã tốt nhất khi thanh toán' },
 ];
+
+const POPULAR_BRANDS = ['iPhone', 'Samsung Galaxy', 'Xiaomi / Redmi / POCO', 'OPPO', 'Điện thoại Google', 'Điện thoại vivo'];
+const CATEGORY_TREE_NAMES = ['iPhone', 'Samsung Galaxy', 'Xiaomi / Redmi / POCO', 'OPPO'];
+const PRODUCTS_PER_PAGE = 12;
 
 const Section = ({ title, to, children }) => (
   <section className="block">
@@ -32,28 +38,88 @@ export default function HomePage() {
   const q = params.get('q') || '';
   const maLoai = params.get('loai') || '';
   const price = Number(params.get('gia')) || 0;
-  const [sort, setSort] = useState('');
+  const maTh = params.get('hang') || '';
+  const ram = params.get('ram') || '';
+  const boNho = params.get('bonho') || '';
+  const chiConHang = params.get('conhang') === '1';
+  const rating = params.get('sao') || '';
+  const sort = params.get('sort') || '';
+  const page = Math.max(1, Number(params.get('page')) || 1);
   const { data: categories } = useFetch(productService.categories);
+  const { data: brands } = useFetch(productService.brands);
   const range = PRICE_RANGES[price];
-  const macDinh = !q && !maLoai && !price && !sort;
+  const macDinh = !q && !maLoai && !price && !sort && !maTh && !ram && !boNho && !chiConHang && !rating;
 
   const setFilter = (key, value) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
+    if (key !== 'page') next.delete('page');
     setParams(next);
   };
-
+  const xoaLoc = () => {
+    const next = new URLSearchParams(params);
+    ['hang', 'ram', 'bonho', 'conhang', 'sao', 'gia'].forEach((k) => next.delete(k));
+    setParams(next);
+  };
   const { data: products, loading, error } = useFetch(
-    () => productService.list({ q, maLoai, min: range.min, max: range.max, sort }),
-    [q, maLoai, price, sort]
+      () => productService.list({
+        q: q || undefined,
+        maLoai: maLoai || undefined,
+        maThuongHieu: maTh || undefined,
+        min: range.min,
+        max: range.max,
+        ram: ram || undefined,
+        boNho: boNho || undefined,
+        conHang: chiConHang || undefined,
+        minRating: rating || undefined,
+        sort: sort || undefined,
+      }),
+      [q, maLoai, maTh, price, ram, boNho, chiConHang, rating, sort]
   );
   const { data: banChay } = useFetch(() => (macDinh ? productService.list({ sort: 'ban_chay' }) : Promise.resolve(null)), [macDinh]);
 
-  const conHang = (banChay || []).filter((p) => p.trangThai === 'CON_HANG');
+  const conHang = (banChay || []).filter((p) => ['CON_HANG', 'SAP_HET'].includes(productStatus(p)));
   const danhGia = [...conHang].sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const giaTot = [...conHang].filter((p) => p.giaBan < 10000000).sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const hang = categories?.filter((c) => !c.maLoaiCha) || [];
+  const thuongHieuNoiBat = POPULAR_BRANDS
+    .map((name) => hang.find((category) => category.tenLoai === name))
+    .filter(Boolean);
+  const popularCategoryIds = new Set(
+    CATEGORY_TREE_NAMES
+      .map((name) => hang.find((category) => category.tenLoai === name)?.maLoai)
+      .filter(Boolean)
+  );
+  const categoryParentById = new Map((categories || []).map((category) => [category.maLoai, category.maLoaiCha]));
+  const filteredCategories = (categories || []).filter((category) => {
+    let parentId = category.maLoaiCha;
+    while (parentId) {
+      if (popularCategoryIds.has(parentId)) return true;
+      parentId = categoryParentById.get(parentId);
+    }
+    return popularCategoryIds.has(category.maLoai);
+  });
+  const totalProducts = products?.length || 0;
+  const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const firstProduct = totalProducts ? (currentPage - 1) * PRODUCTS_PER_PAGE + 1 : 0;
+  const lastProduct = Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts);
+  const visibleProducts = products?.slice(firstProduct - 1, lastProduct);
+  const setPage = (nextPage) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next);
+    document.getElementById('tat-ca')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const pageItems = totalPages <= 7
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : currentPage <= 4
+      ? [1, 2, 3, 4, 5, 'ellipsis', totalPages]
+      : currentPage >= totalPages - 3
+        ? [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+        : [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 
   const slide = (id, tone, tag, title, text, cta, to, p) => ({
     id, tone, tag, title, text, cta, to, image: p?.anhChinh, price: p && formatPrice(p.giaBan),
@@ -94,8 +160,8 @@ export default function HomePage() {
           </section>
 
           <section className="brand-tiles">
-            {hang.map((c) => (
-              <Link key={c.maLoai} to={`/?loai=${c.maLoai}`}>{c.tenLoai}</Link>
+            {thuongHieuNoiBat.map((c) => (
+              <Link key={c.maLoai} to={`/?loai=${c.maLoai}`}>{c.tenLoai.replace(/^Điện thoại\s+/i, '')}</Link>
             ))}
           </section>
 
@@ -119,21 +185,32 @@ export default function HomePage() {
         </div>
         <div className="shop">
           {categories && (
-            <aside className="card">
-              <h3>Danh mục</h3>
-              <CategoryTree categories={categories} value={maLoai} onChange={(v) => setFilter('loai', v)} />
-            </aside>
+              <aside className="card">
+                {categories && (
+                    <>
+                      <h3>Danh mục</h3>
+                      <CategoryTree categories={filteredCategories} value={maLoai} onChange={(v) => setFilter('loai', v)}/>
+                    </>
+                )}
+                <ProductFilters
+                    brands={brands || []}
+                    values={{hang: maTh, ram, bonho: boNho, conhang: chiConHang, sao: rating}}
+                    onChange={setFilter}
+                    onReset={xoaLoc}
+                />
+              </aside>
           )}
           <div>
             <div className="toolbar">
               <div className="chips">
                 {PRICE_RANGES.map((r, i) => (
-                  <button key={r.label} className={price === i ? 'chip active' : 'chip'} onClick={() => setFilter('gia', i || '')}>{r.label}</button>
+                    <button key={r.label} className={price === i ? 'chip active' : 'chip'}
+                            onClick={() => setFilter('gia', i || '')}>{r.label}</button>
                 ))}
               </div>
-              <select aria-label="Sắp xếp" value={sort} onChange={(e) => setSort(e.target.value)}>
+              <select aria-label="Sắp xếp" value={sort} onChange={(e) => setFilter('sort', e.target.value)}>
                 {SORT_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </div>
@@ -141,10 +218,31 @@ export default function HomePage() {
             {products?.length === 0 && <p className="muted">Không có sản phẩm phù hợp. Thử đổi mức giá hoặc danh mục khác.</p>}
             <div className="grid">
               {!products && loading && Array.from({ length: 8 }, (_, i) => <div key={i} className="card skeleton" />)}
-              {products?.map((sp) => (
+              {visibleProducts?.map((sp) => (
                 <ProductCard key={sp.maSanPham} sp={sp} />
               ))}
             </div>
+            {products && totalProducts > 0 && (
+              <div className="home-pagination">
+                <div className="home-pagination-pages" aria-label="Phân trang sản phẩm">
+                  <button type="button" className="page-arrow" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} aria-label="Trang trước">‹</button>
+                  {pageItems.map((item, index) => item === 'ellipsis'
+                    ? <span className="page-ellipsis" key={`ellipsis-${index}`}>...</span>
+                    : (
+                      <button
+                        type="button"
+                        key={item}
+                        className={item === currentPage ? 'page-number active' : 'page-number'}
+                        aria-current={item === currentPage ? 'page' : undefined}
+                        onClick={() => setPage(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  <button type="button" className="page-arrow" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} aria-label="Trang sau">›</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>

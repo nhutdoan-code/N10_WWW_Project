@@ -4,13 +4,17 @@ import nhom10.phonenest.dto.HoiDapDto;
 import nhom10.phonenest.entity.HoiDap;
 import nhom10.phonenest.entity.KhachHang;
 import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.HoiDapRepository;
 import nhom10.phonenest.repository.KhachHangRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.util.IdGenerator;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,7 @@ public class HoiDapService {
     private final SanPhamRepository sanPhamRepository;
     private final KhachHangRepository khachHangRepository;
     private final ThongBaoService thongBaoService;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     public HoiDapDto hoi(String maKh, HoiDapDto.Hoi r) {
         SanPham sp = sanPhamRepository.findById(r.maSanPham())
@@ -57,14 +62,29 @@ public class HoiDapService {
 
     public HoiDapDto traLoi(String ma, String noiDung) {
         HoiDap h = tim(ma);
+        Map<String, Object> duLieuTruoc = snapshot(h);
         h.setNoiDungTraLoi(noiDung.trim());
         h.setNgayTraLoi(LocalDate.now());
         thongBaoService.gui(h.getMaKh(), "Câu hỏi của bạn về sản phẩm đã được trả lời");
+        nhatKyHoatDongService.ghi(HanhDongAudit.ANSWER_QUESTION, LoaiDoiTuongAudit.QUESTION,
+                ma, duLieuTruoc, snapshot(h));
         return toDto(h);
     }
 
     public void xoa(String ma) {
-        hoiDapRepository.delete(tim(ma));
+        HoiDap h = tim(ma);
+        Map<String, Object> duLieuTruoc = snapshot(h);
+        hoiDapRepository.delete(h);
+        nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_QUESTION, LoaiDoiTuongAudit.QUESTION,
+                ma, duLieuTruoc, null);
+    }
+
+    private Map<String, Object> snapshot(HoiDap h) {
+        Map<String, Object> duLieu = new LinkedHashMap<>();
+        duLieu.put("maSanPham", h.getMaSanPham());
+        duLieu.put("noiDungCauHoi", h.getNoiDungCauHoi());
+        duLieu.put("noiDungTraLoi", h.getNoiDungTraLoi());
+        return duLieu;
     }
 
     private HoiDap tim(String ma) {

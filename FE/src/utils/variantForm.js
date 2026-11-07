@@ -2,11 +2,7 @@ import { formatMoneyInput, moneyToNumber } from './money.js';
 
 export const RAM_OPTIONS = [4, 6, 8, 12, 16, 24];
 export const STORAGE_OPTIONS = [64, 128, 256, 512, 1024];
-export const TRANG_THAI_PHIEN_BAN = [
-  'CON_HANG',
-  'HET_HANG',
-  'NGUNG_KINH_DOANH'
-];
+export const TRANG_THAI_PHIEN_BAN = ['DANG_KINH_DOANH', 'NGUNG_KINH_DOANH'];
 
 let keySeq = 0;
 const nextKey = (prefix) => `${prefix}-${Date.now().toString(36)}-${(keySeq += 1)}`;
@@ -17,7 +13,7 @@ export const newColorRow = () => ({
   sku: '',
   mauSac: '',
   soLuongTon: 0,
-  trangThai: 'CON_HANG',
+  trangThai: 'DANG_KINH_DOANH',
 });
 
 export const newConfiguration = () => ({
@@ -79,7 +75,7 @@ export function groupVariantsForForm(phienBans = []) {
       sku: pb.sku || '',
       mauSac: pb.mauSac || '',
       soLuongTon: pb.soLuongTon ?? 0,
-      trangThai: pb.trangThai || (Number(pb.soLuongTon) > 0 ? 'CON_HANG' : 'HET_HANG'),
+      trangThai: pb.trangThai || 'DANG_KINH_DOANH',
     });
   }
 
@@ -120,7 +116,7 @@ export function flattenConfigurations(configurations = []) {
         giaBan,
         giaNiemYet,
         soLuongTon: Number(color.soLuongTon || 0),
-        trangThai: color.trangThai || (Number(color.soLuongTon) > 0 ? 'CON_HANG' : 'HET_HANG'),
+        trangThai: color.trangThai || 'DANG_KINH_DOANH',
       });
     }
   }

@@ -17,7 +17,7 @@ public record SanPhamDto(
         String maSanPham,
         @NotBlank(message = "Vui lòng chọn loại sản phẩm") String maLoai,
         String tenLoai,
-        String maThuongHieu,
+        @NotBlank(message = "Vui lòng chọn thương hiệu") String maThuongHieu,
         String tenThuongHieu,
         @NotBlank(message = "Vui lòng nhập tên máy") String tenMay,
         @NotNull(message = "Vui lòng nhập giá bán") @Min(value = 0, message = "Giá bán không được âm") BigDecimal giaBan,
@@ -38,7 +38,9 @@ public record SanPhamDto(
     public record Anh(
             String maHinhAnh,
             @NotBlank(message = "Đường dẫn ảnh không được để trống") String duongDan,
-            String gocChup) {
+            String gocChup,
+            String mauSac,
+            String maPhienBan) {
     }
 
     public record PhienBan(

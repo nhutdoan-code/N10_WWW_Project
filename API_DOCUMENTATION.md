@@ -2,7 +2,7 @@
 
 ## Cách chạy (MariaDB)
 
-1. **CSDL**: chạy lần lượt `DB/01_schema.sql` rồi `DB/02_data.sql`
+1. **CSDL**: chạy lần lượt `DB/01_schema.sql`, `DB/02_data.sql` và `DB/04_user_tracking.sql`
    (`mysql -u root -p < DB/01_schema.sql`, tương tự với file 02; hoặc mở trong HeidiSQL / DBeaver / Workbench).
    Nếu đã tạo DB từ bản schema cũ, hãy `DROP DATABASE BanDienThoai;` rồi chạy lại (schema đã thêm cột, xem bên dưới).
 2. **Backend** (`BE/phonenest`, Java 21, port 8080): mặc định kết nối `jdbc:mariadb://localhost:3306/BanDienThoai`, user `root`, mật khẩu rỗng.
@@ -58,11 +58,17 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Endpoint chi tiết
 
-**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
+**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `POST /api/tracking/events` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
+
+### Theo dõi hành vi và cá nhân hóa trợ lý
+- Frontend ghi nhận `PAGE_VIEW`, `PRODUCT_VIEW`, `SEARCH`, `ADD_TO_CART` qua `POST /api/tracking/events`; body gồm `visitorId` (UUID), `type` và đúng trường theo loại (`pageType`, `productId` hoặc `searchTerm`). Endpoint công khai; tài khoản Customer được gắn từ JWT phía máy chủ, không nhận mã tài khoản từ client.
+- Mỗi trình duyệt dùng một mã ẩn danh first-party. Chỉ lưu loại trang đã cho phép (không lưu URL/referrer), mã sản phẩm hoặc từ khóa tìm kiếm tối đa 120 ký tự; không thu thập IP/user-agent. Dữ liệu tự xóa sau 90 ngày (`TRACKING_RETENTION_DAYS`).
+- `POST /api/chat` nhận thêm `visitorId` tùy chọn. Trợ lý dùng lượt xem/thêm giỏ và tìm kiếm gần đây (30 ngày, tối đa 100 sự kiện) để ưu tiên sản phẩm liên quan; lịch sử hội thoại không được ghi vào bảng tracking. Khách chưa có lịch sử vẫn nhận gợi ý hiện tại như cũ.
+- Với CSDL đang chạy, chỉ cần thực thi `DB/04_user_tracking.sql`; không cần xóa hoặc tạo lại dữ liệu.
 
 **Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 
-**Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET, `POST /{ma}/import`, `PUT /{ma}`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
+**Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET `?q=&loc=&page=0&size=10`, trả về `content`, `totalElements`, `totalPages`; `GET /stats`, `GET /history`, `GET /{ma}/history`, `POST /{ma}/import`, `POST /batch-import` nhận `{ items: [{ sku, soLuong }], ghiChu }`, `PUT /{ma}/adjust`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
 
 ## Hủy đơn hàng (UC013)
 `PUT /api/customer/orders/{ma}/cancel` body `{ "lyDo": "...", "ghiChu": "..." }` (`lyDo` chọn từ danh sách 7 lý do phổ biến; `ghiChu` bắt buộc khi chọn "Lý do khác"). Chỉ hủy được khi đơn **Chờ xác nhận** hoặc **Đang xử lý**; đơn Đang giao / Đã giao bị từ chối với thông báo "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy." Hệ thống kiểm tra lại trạng thái trong CSDL, đổi sang Đã hủy, lưu vào bảng `HuyDonHang` (lý do, ghi chú, ngày hủy), cộng lại tồn kho và gửi thông báo. Kho được trừ lúc đặt hàng nên hủy (khách hoặc admin) đều hoàn kho.
@@ -70,13 +76,14 @@ Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema
 
 ## Voucher và phí vận chuyển
 - **Phí vận chuyển** tính theo tỉnh/thành của địa chỉ giao hàng (bảng `PhiVanChuyen`, admin quản lý ở `/api/admin/shipping-fees`). Địa chỉ không khớp khu vực nào thì dùng dòng "Khác". Đơn đạt mức `mienPhiTu` của khu vực thì miễn phí giao hàng.
-- **Voucher** (`KhuyenMai`) có hai loại: `DON_HANG` (giảm trên tạm tính) và `VAN_CHUYEN` (giảm trên phí giao hàng). Mỗi đơn dùng tối đa 1 voucher mỗi loại. Có thêm đơn tối thiểu, số lượng giới hạn (`soLuong`/`daDung`), chỉ dành cho khách mua lần đầu (`chiKhachMoi`). Hủy đơn sẽ hoàn lại lượt dùng.
+- **Voucher** (`KhuyenMai`) có hai loại: `DON_HANG` (giảm trên tạm tính) và `VAN_CHUYEN` (giảm trên phí giao hàng). Mỗi đơn dùng tối đa 1 voucher mỗi loại. Mã phải đang hoạt động, trong thời gian hiệu lực, đạt đơn tối thiểu, còn lượt (`soLuong`/`daDung`), không vượt giới hạn mỗi khách (`gioiHanMoiKhach`) và thỏa điều kiện khách mới (`chiKhachMoi`). `soTienGiamToiDa` để trống là không giới hạn; voucher vận chuyển bắt buộc có mức trần. Lượt chỉ tăng khi đặt hàng thành công trong transaction và được hoàn khi đơn bị hủy. Đổi trả sau khi giao không hoàn lượt; tiền hoàn của từng dòng đã phân bổ phần giảm giá theo tỷ lệ vào `soTienHoan`.
 - **Giao diện trang chủ**: header 2 tầng + thanh danh mục, banner tự chuyển mỗi 5 giây (dừng khi rê chuột, có nút/dấu chấm điều hướng), 2 banner phụ, dải dịch vụ, mục Bán chạy / Giá tốt, rồi danh sách có lọc. Bộ lọc hãng/mức giá nằm trên URL (`/?loai=L01&gia=2`).
 - **Ảnh mẫu**: dữ liệu mẫu trỏ tới `/uploads/sp001-1.jpg` ... `sp013-3.jpg` (3 góc mỗi máy: trước, sau, cạnh). Đặt ảnh thật vào thư mục `BE/phonenest/uploads/` (xem README.txt trong đó) hoặc tải lên qua trang Admin. Ảnh thiếu sẽ hiện khung "Chưa có ảnh".
 - **Thống kê** (`GET /api/admin/stats?tu&den`): trả thêm `soConHang`, `doanhThuTheoNgay[{ngay, doanhThu, soDon}]` và `theoHang[{ten, doanhThu, daBan}]` (doanh thu đơn đã giao gộp theo hãng). FE vẽ biểu đồ bằng SVG: xu hướng (đổi Doanh thu/Số đơn, Ngày/Tháng, di chuột xem chi tiết), donut trạng thái đơn, cột theo hãng, bán chạy, tình trạng kho.
 - **Trạng thái tồn kho**: sản phẩm còn hàng nhưng tồn ≤ 10 hiển thị "Sắp hết hàng" (tính ở FE, không lưu DB).
 - **Thông số kỹ thuật**: mỗi sản phẩm có object `thongSo` (kichThuocManHinh, loaiManHinh, tanSoQuet, chip, ram, boNho, cameraSau, cameraTruoc, pin, congSuatSac, heDieuHanh, nfc, ho5G, trongLuong) lưu thành các cột riêng trong bảng `SanPham` (không còn chuỗi ngăn cách bằng `|`).
 - **Ảnh sản phẩm**: admin chọn ảnh từ máy; FE gọi `POST /api/admin/uploads` (multipart, field `file`, JPG/PNG/WEBP ≤ 5MB) nhận `{url}` dạng `/uploads/<uuid>.png`, rồi gửi `hinhAnhs` + `anhChinh` khi lưu sản phẩm. File nằm ở thư mục `uploads/` cạnh nơi chạy BE (cấu hình `app.upload-dir`), phục vụ công khai tại `/uploads/**`.
+- **Ảnh đánh giá**: khách hàng chọn ảnh từ thiết bị; FE gọi `POST /api/customer/reviews/images` (multipart, field `file`, JPG/PNG/WEBP ≤ 5MB), nhận `{url}` dạng `/uploads/<uuid>.png`, rồi lưu URL cùng đánh giá qua `POST /api/customer/reviews`. Chỉ tài khoản Customer đã đăng nhập mới được tải ảnh lên.
 - **Mua ngay**: trang chi tiết sản phẩm (chỉ hiện khi đã đăng nhập Customer) chuyển sang `/checkout?mua={maSanPham}&sl={soLuong}`. `GET /checkout/preview` và `POST /orders` nhận thêm `maSanPham`, `soLuong` (tùy chọn); khi có thì chỉ đặt sản phẩm đó, không đọc và không xóa giỏ hàng.
 - `GET /api/customer/checkout/preview?maDiaChi=...` trả về `items` (dòng hàng), tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
 - `POST /api/customer/orders` nhận thêm `maKmVanChuyen`; BE kiểm tra lại toàn bộ điều kiện và lưu `giamGia`, `phiVanChuyen`, `giamPhiVanChuyen` vào đơn.

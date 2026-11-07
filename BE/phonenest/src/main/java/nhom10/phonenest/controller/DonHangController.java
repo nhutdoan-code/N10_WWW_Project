@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.CheckoutDto;
 import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.dto.GioHangDto;
+import nhom10.phonenest.service.CheckoutIdempotencyService;
 import nhom10.phonenest.service.DonHangService;
 import nhom10.phonenest.service.ThanhToanService;
 import nhom10.phonenest.util.SecurityUtil;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,10 +28,18 @@ public class DonHangController {
 
     private final DonHangService donHangService;
     private final ThanhToanService thanhToanService;
+    private final CheckoutIdempotencyService checkoutIdempotencyService;
 
     @PostMapping("/orders")
-    public DonHangDto datHang(@Valid @RequestBody DonHangDto.Checkout request) {
-        return donHangService.datHang(SecurityUtil.currentUserId(), request);
+    public DonHangDto datHang(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody DonHangDto.Checkout request
+    ) {
+        return checkoutIdempotencyService.executeIdempotentCheckout(
+                SecurityUtil.currentUserId(),
+                idempotencyKey,
+                request
+        );
     }
 
     @GetMapping("/orders")
@@ -45,6 +55,11 @@ public class DonHangController {
     @PutMapping("/orders/{ma}/cancel")
     public DonHangDto huy(@PathVariable String ma, @Valid @RequestBody DonHangDto.HuyRequest req) {
         return donHangService.huy(SecurityUtil.currentUserId(), ma, req);
+    }
+
+    @PutMapping("/orders/{ma}/confirm-received")
+    public DonHangDto xacNhanDaNhan(@PathVariable String ma) {
+        return donHangService.khachXacNhanDaNhan(SecurityUtil.currentUserId(), ma);
     }
 
     @PostMapping("/orders/{ma}/reorder")

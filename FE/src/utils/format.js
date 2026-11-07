@@ -1,5 +1,7 @@
 export const formatPrice = (n) => `${Number(n || 0).toLocaleString('vi-VN')} ₫`;
 
+export const formatNumber = (n) => Number(n || 0).toLocaleString('vi-VN');
+
 export const formatDate = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '');
 
 export const errorMessage = (e) =>

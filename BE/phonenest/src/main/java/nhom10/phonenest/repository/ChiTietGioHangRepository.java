@@ -8,14 +8,15 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface ChiTietGioHangRepository
-        extends JpaRepository<ChiTietGioHang, ChiTietGioHang.Id> {
+public interface ChiTietGioHangRepository extends JpaRepository<ChiTietGioHang, ChiTietGioHang.Id> {
 
     List<ChiTietGioHang> findByGioHangMaGioHang(String maGioHang);
 
+    boolean existsByPhienBanMaPhienBan(String maPhienBan);
+
     boolean existsByPhienBan_SanPham_MaSanPham(String maSanPham);
+
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM ChiTietGioHang c WHERE c.id.maGioHang = :maGioHang")
     int xoaTheoMaGioHang(@Param("maGioHang") String maGioHang);
-
 }

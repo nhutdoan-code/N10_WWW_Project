@@ -2,11 +2,15 @@ package nhom10.phonenest.service;
 
 import nhom10.phonenest.dto.LoaiSanPhamDto;
 import nhom10.phonenest.entity.LoaiSanPham;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.LoaiSanPhamRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.util.IdGenerator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +23,7 @@ public class LoaiSanPhamService {
 
     private final LoaiSanPhamRepository loaiSanPhamRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     @Transactional(readOnly = true)
     public List<LoaiSanPhamDto> list() {
@@ -27,6 +32,7 @@ public class LoaiSanPhamService {
 
     public LoaiSanPhamDto save(String ma, LoaiSanPhamDto d) {
         LoaiSanPham l = ma == null ? new LoaiSanPham() : find(ma);
+        Map<String, Object> duLieuTruoc = ma == null ? null : snapshot(l);
         String cha = d.maLoaiCha() == null || d.maLoaiCha().isBlank() ? null : d.maLoaiCha();
         kiemTraCha(ma, cha);
         if (ma == null) {
@@ -35,7 +41,16 @@ public class LoaiSanPhamService {
         l.setTenLoai(d.tenLoai().trim());
         l.setMoTa(d.moTa());
         l.setMaLoaiCha(cha);
-        return toDto(loaiSanPhamRepository.save(l));
+        LoaiSanPham daLuu = loaiSanPhamRepository.save(l);
+        Map<String, Object> duLieuSau = snapshot(daLuu);
+        if (ma == null) {
+            nhatKyHoatDongService.ghi(HanhDongAudit.CREATE_CATEGORY, LoaiDoiTuongAudit.CATEGORY,
+                    daLuu.getMaLoai(), null, duLieuSau);
+        } else {
+            nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_CATEGORY, LoaiDoiTuongAudit.CATEGORY,
+                    daLuu.getMaLoai(), duLieuTruoc, duLieuSau);
+        }
+        return toDto(daLuu);
     }
 
     public void delete(String ma) {
@@ -45,7 +60,11 @@ public class LoaiSanPhamService {
         if (loaiSanPhamRepository.existsByMaLoaiCha(ma)) {
             throw new AppException(HttpStatus.CONFLICT, "Loại sản phẩm đang có danh mục con, không thể xóa");
         }
-        loaiSanPhamRepository.delete(find(ma));
+        LoaiSanPham l = find(ma);
+        Map<String, Object> duLieuTruoc = snapshot(l);
+        loaiSanPhamRepository.delete(l);
+        nhatKyHoatDongService.ghi(HanhDongAudit.DELETE_CATEGORY, LoaiDoiTuongAudit.CATEGORY,
+                ma, duLieuTruoc, null);
     }
 
     private void kiemTraCha(String ma, String cha) {
@@ -67,5 +86,13 @@ public class LoaiSanPhamService {
 
     private LoaiSanPhamDto toDto(LoaiSanPham l) {
         return new LoaiSanPhamDto(l.getMaLoai(), l.getTenLoai(), l.getMoTa(), l.getMaLoaiCha());
+    }
+
+    private Map<String, Object> snapshot(LoaiSanPham l) {
+        Map<String, Object> duLieu = new LinkedHashMap<>();
+        duLieu.put("tenLoai", l.getTenLoai());
+        duLieu.put("moTa", l.getMoTa());
+        duLieu.put("maLoaiCha", l.getMaLoaiCha());
+        return duLieu;
     }
 }

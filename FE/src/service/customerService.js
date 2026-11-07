@@ -12,6 +12,11 @@ export const customerService = {
 
   orderReviews: (maDonHang) => api.get(`/customer/reviews/order/${maDonHang}`),
   review: (data) => api.post('/customer/reviews', data),
+  uploadReviewImage: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return api.post('/customer/reviews/images', body);
+  },
   ask: (maSanPham, noiDung) => api.post('/customer/questions', { maSanPham, noiDung }),
 
   returns: () => api.get('/customer/returns'),

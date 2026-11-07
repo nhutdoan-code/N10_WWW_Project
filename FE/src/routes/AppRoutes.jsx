@@ -25,52 +25,58 @@ import ProductDetailPage from '../pages/ProductDetailPage';
 import RegisterPage from '../pages/RegisterPage';
 import WishlistPage from '../pages/WishlistPage';
 import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
+import AdminAuditLogsPage from '../pages/admin/AdminAuditLogsPage';
 import AdminCategoriesPage from '../pages/admin/AdminCategoriesPage';
 import AdminShippingPage from '../pages/admin/AdminShippingPage';
 import AdminOrdersPage from '../pages/admin/AdminOrdersPage';
 import AdminProductsPage from '../pages/admin/AdminProductsPage';
 import ProtectedRoute from './ProtectedRoute';
+import ActivityTracker from '../components/ActivityTracker';
 
 export default function AppRoutes() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route index element={<HomePage />} />
-        <Route path="products/:ma" element={<ProductDetailPage />} />
-        <Route path="cart" element={<CartPage />} />
-        <Route path="login" element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
-        <Route path="forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="reset-password" element={<ResetPasswordPage />} />
-        <Route path="compare" element={<ComparePage />} />
-        <Route element={<ProtectedRoute role="CUSTOMER" />}>
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="orders/:ma" element={<OrderDetailPage />} />
-          <Route path="orders/:ma/invoice" element={<InvoicePage />} />
-          <Route path="wishlist" element={<WishlistPage />} />
-          <Route path="account" element={<ProfilePage />} />
-          <Route path="account/addresses" element={<AddressesPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="returns" element={<ReturnsPage />} />
+    <>
+      <ActivityTracker />
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="products/:ma" element={<ProductDetailPage />} />
+          <Route path="cart" element={<CartPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route path="compare" element={<ComparePage />} />
+          <Route element={<ProtectedRoute role="CUSTOMER" />}>
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="orders/:ma" element={<OrderDetailPage />} />
+            <Route path="orders/:ma/invoice" element={<InvoicePage />} />
+            <Route path="wishlist" element={<WishlistPage />} />
+            <Route path="account" element={<ProfilePage />} />
+            <Route path="account/addresses" element={<AddressesPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="returns" element={<ReturnsPage />} />
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-      <Route path="admin" element={<ProtectedRoute role="ADMIN" />}>
-        <Route element={<AdminLayout />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="products" element={<AdminProductsPage />} />
-          <Route path="inventory" element={<AdminInventoryPage />} />
-          <Route path="promotions" element={<AdminPromotionsPage />} />
-          <Route path="shipping" element={<AdminShippingPage />} />
-          <Route path="returns" element={<AdminReturnsPage />} />
-          <Route path="feedback" element={<AdminFeedbackPage />} />
-          <Route path="categories" element={<AdminCategoriesPage />} />
-          <Route path="orders" element={<AdminOrdersPage />} />
-          <Route path="accounts" element={<AdminAccountsPage />} />
+        <Route path="admin" element={<ProtectedRoute role="ADMIN" />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="products" element={<AdminProductsPage />} />
+            <Route path="inventory" element={<AdminInventoryPage />} />
+            <Route path="promotions" element={<AdminPromotionsPage />} />
+            <Route path="shipping" element={<AdminShippingPage />} />
+            <Route path="returns" element={<AdminReturnsPage />} />
+            <Route path="feedback" element={<AdminFeedbackPage />} />
+            <Route path="categories" element={<AdminCategoriesPage />} />
+            <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="accounts" element={<AdminAccountsPage />} />
+            <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </>
   );
 }
