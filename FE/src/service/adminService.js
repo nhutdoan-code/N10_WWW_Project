@@ -11,8 +11,18 @@ export const adminService = {
   },
   saveProduct: save('/admin/products'),
   deleteProduct: (ma) => api.delete(`/admin/products/${ma}`),
+  productImpact: (ma) => api.get(`/admin/products/${ma}/impact`),
+  archiveProduct: (ma) => api.put(`/admin/products/${ma}/archive`),
+  restoreProduct: (ma) => api.put(`/admin/products/${ma}/restore`),
+  reindexProducts: () => api.post('/admin/products/reindex'),
+
   saveCategory: save('/admin/categories'),
   deleteCategory: (ma) => api.delete(`/admin/categories/${ma}`),
+
+  brands: () => api.get('/admin/brands'),
+  brandImpact: (ma) => api.get(`/admin/brands/${ma}/impact`),
+  archiveBrand: (ma) => api.put(`/admin/brands/${ma}/archive`),
+  restoreBrand: (ma) => api.put(`/admin/brands/${ma}/restore`),
 
   orders: () => api.get('/admin/orders'),
 
@@ -28,16 +38,23 @@ export const adminService = {
   deleteAccount: (ma) => api.delete(`/admin/accounts/${ma}`),
   toggleLock: (ma) => api.put(`/admin/accounts/${ma}/toggle-lock`),
 
-  inventory: (loc) => api.get('/admin/inventory', { params: { loc } }),
-  importStock: (ma, soLuong) => api.post(`/admin/inventory/${ma}/import`, { soLuong }),
-  setStock: (ma, soLuong) => api.put(`/admin/inventory/${ma}`, { soLuong }),
+  inventory: (q, loc, page, size) => api.get('/admin/inventory', { params: { q: q || undefined, loc: loc || undefined, page, size } }),
+  inventoryStats: () => api.get('/admin/inventory/stats'),
+  inventoryHistory: (ma) => api.get(ma ? `/admin/inventory/${ma}/history` : '/admin/inventory/history'),
+  importStock: (ma, soLuong, ghiChu) => api.post(`/admin/inventory/${ma}/import`, { soLuong, ghiChu }),
+  importStockBatch: (items, ghiChu) => api.post('/admin/inventory/batch-import', { items, ghiChu }),
+  adjustStock: (ma, soLuongThucTe, lyDo) => api.put(`/admin/inventory/${ma}/adjust`, { soLuongThucTe, lyDo }),
 
   promotions: () => api.get('/admin/promotions'),
   savePromotion: (ma, data) => (ma ? api.put(`/admin/promotions/${ma}`, data) : api.post('/admin/promotions', data)),
+  deletePromotion: (ma) => api.delete(`/admin/promotions/${ma}`),
+  promotionImpact: (ma) => api.get(`/admin/promotions/${ma}/impact`),
+  archivePromotion: (ma) => api.put(`/admin/promotions/${ma}/archive`),
+  restorePromotion: (ma) => api.put(`/admin/promotions/${ma}/restore`),
+
   shippingFees: () => api.get('/admin/shipping-fees'),
   saveShippingFee: (ma, data) => (ma ? api.put(`/admin/shipping-fees/${ma}`, data) : api.post('/admin/shipping-fees', data)),
   deleteShippingFee: (ma) => api.delete(`/admin/shipping-fees/${ma}`),
-  deletePromotion: (ma) => api.delete(`/admin/promotions/${ma}`),
 
   reviews: () => api.get('/admin/reviews'),
   deleteReview: (ma) => api.delete(`/admin/reviews/${ma}`),

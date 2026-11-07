@@ -21,7 +21,41 @@ public record KhuyenMaiDto(
         Integer soLuong,
         int daDung,
         boolean chiKhachMoi,
+        int gioiHanMoiKhach,
         @NotNull(message = "Vui lòng chọn ngày bắt đầu") LocalDate ngayBatDau,
         @NotNull(message = "Vui lòng chọn ngày kết thúc") LocalDate ngayKetThuc,
-        String dieuKienApDung) {
+        String dieuKienApDung,
+        Boolean trangThaiHoatDong) {
+
+    public KhuyenMaiDto(
+            String maKm,
+            String tenKm,
+            LoaiKhuyenMai loai,
+            BigDecimal phanTramGiam,
+            BigDecimal soTienGiamToiDa,
+            BigDecimal donToiThieu,
+            Integer soLuong,
+            int daDung,
+            boolean chiKhachMoi,
+            LocalDate ngayBatDau,
+            LocalDate ngayKetThuc,
+            String dieuKienApDung) {
+
+        this(
+                maKm,
+                tenKm,
+                loai,
+                phanTramGiam,
+                soTienGiamToiDa,
+                donToiThieu,
+                soLuong,
+                daDung,
+                chiKhachMoi,
+                1,
+                ngayBatDau,
+                ngayKetThuc,
+                dieuKienApDung,
+                true
+        );
+    }
 }

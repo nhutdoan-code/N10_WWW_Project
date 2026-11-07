@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import ReviewForm from '../components/ReviewForm';
@@ -16,12 +16,18 @@ import { errorMessage, formatDate, formatPrice } from '../utils/format';
 
 export default function OrderDetailPage() {
   const { ma } = useParams();
+  const [searchParams] = useSearchParams();
   const { data: o, loading, error, reload } = useFetch(() => orderService.get(ma), [ma]);
+  const { data: paymentStatus } = useFetch(
+    () => (o?.phuongThucTt === 'VI_DIEN_TU' ? orderService.paymentStatus(ma) : Promise.resolve(null)),
+    [ma, o?.phuongThucTt]
+  );
   const [returnForm, setReturnForm] = useState(null);
   const [cancelForm, setCancelForm] = useState(null);
   const [reviewing, setReviewing] = useState(null);
   const [confirmReceive, setConfirmReceive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [paying, setPaying] = useState(false);
   const { data: reviewStates, loading: reviewsLoading, error: reviewsError, reload: reloadReviews } = useFetch(
     () => (o?.trangThai === 'DA_GIAO' ? customerService.orderReviews(ma) : Promise.resolve([])),
     [ma, o?.trangThai]
@@ -29,6 +35,29 @@ export default function OrderDetailPage() {
   const { replace } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
+
+  const payWithMomo = async () => {
+    setPaying(true);
+    try {
+      const payment = await orderService.createMomoPayment(ma);
+      window.location.assign(payment.payUrl);
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  useEffect(() => {
+    const resultCode = searchParams.get('resultCode');
+    if (resultCode === null) return;
+    if (resultCode === '0') {
+      toast('MoMo đã tiếp nhận thanh toán. Trạng thái sẽ được cập nhật sau ít giây.');
+      reload();
+    } else {
+      toast(`Thanh toán MoMo chưa thành công: ${searchParams.get('message') || 'Giao dịch bị hủy'}`, 'error');
+    }
+  }, [searchParams]);
 
   const run = async (action, message) => {
     try {
@@ -92,6 +121,33 @@ export default function OrderDetailPage() {
               </>
             )}
           </div>
+
+          {o.phuongThucTt === 'VI_DIEN_TU' && o.trangThai !== 'DA_HUY' && paymentStatus?.status !== 'DA_THANH_TOAN' && paymentStatus?.status !== 'CAN_HOAN_TIEN' && (
+            <div className="section">
+              <h3>Thanh toán MoMo</h3>
+              <p className="muted">Trạng thái: {paymentStatus?.status === 'THAT_BAI' ? 'Chưa thành công' : 'Chờ thanh toán'}</p>
+              <p className="muted">Thanh toán trực tuyến an toàn qua ví MoMo.</p>
+              <button type="button" className="btn btn-primary" onClick={payWithMomo} disabled={paying}>
+                {paying ? 'Đang chuyển đến MoMo...' : 'Thanh toán lại với MoMo'}
+              </button>
+            </div>
+          )}
+
+          {paymentStatus?.status === 'CAN_HOAN_TIEN' && (
+            <div className="section" style={{ borderLeft: '4px solid #f59e0b', background: '#fffbeb', padding: '1rem', borderRadius: 8 }}>
+              <h3 style={{ color: '#b45309', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán MoMo</h3>
+              <p style={{ margin: 0, color: '#92400e' }}>
+                Đơn hàng đã hủy nhưng hệ thống ghi nhận bạn đã thanh toán MoMo thành công. Cửa hàng đang tiếp nhận để xử lý hoàn tiền hoặc đối soát cho bạn.
+              </p>
+            </div>
+          )}
+
+          {o.phuongThucTt === 'VI_DIEN_TU' && paymentStatus?.status === 'DA_THANH_TOAN' && (
+            <div className="section">
+              <h3>Thanh toán MoMo</h3>
+              <p style={{ color: '#16a34a', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công qua ví MoMo</p>
+            </div>
+          )}
 
           <div className="section">
             <h3>Sản phẩm</h3>

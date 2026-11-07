@@ -20,6 +20,9 @@ public record ChatDto() {
     public record AiReply(String reply, List<String> maSanPham) {
     }
 
-    public record Response(String reply, List<SanPhamDto> products) {
+    public record Response(String reply, List<SanPhamDto> products, String mode) {
+        public Response(String reply, List<SanPhamDto> products) {
+            this(reply, products, "KEYWORD_FALLBACK");
+        }
     }
 }

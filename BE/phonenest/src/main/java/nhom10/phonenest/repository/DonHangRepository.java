@@ -33,6 +33,15 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>  , Jpa
     @Query("select count(d)>0 from DonHang d join d.chiTiet c where c.phienBan.sanPham.maSanPham=:ma")
     boolean daCoTrongDonHang(@Param("ma") String ma);
 
+    @Query("select count(distinct d) from DonHang d join d.chiTiet c where c.phienBan.sanPham.maSanPham = :ma and d.trangThai not in (nhom10.phonenest.enums.TrangThaiDonHang.DA_GIAO, nhom10.phonenest.enums.TrangThaiDonHang.DA_HUY)")
+    long countActiveOrdersBySanPham(@Param("ma") String ma);
+
+    @Query("select count(distinct d) from DonHang d join d.chiTiet c where c.phienBan.sanPham.maSanPham = :ma")
+    long countAllOrdersBySanPham(@Param("ma") String ma);
+
+    @Query("select count(d) from DonHang d where d.khuyenMai.maKm = :ma or d.khuyenMaiVanChuyen.maKm = :ma")
+    long countOrdersByKhuyenMai(@Param("ma") String ma);
+
     // ==========================================
     // Phase 3: Optimized Dashboard & Search Queries
     // ==========================================

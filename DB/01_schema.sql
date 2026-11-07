@@ -5,6 +5,7 @@ CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
 USE BanDienThoai;
+SET NAMES utf8mb4;
 
 -- PhoneNest Database FINAL V2
 -- Chốt nghiệp vụ: Product -> ProductVariant (SKU); stock theo variant; payment tách order;
@@ -176,7 +177,8 @@ CREATE TABLE KhuyenMai (
     ngayBatDau DATETIME NOT NULL,
     ngayKetThuc DATETIME NOT NULL,
     dieuKienApDung TEXT,
-    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE
+    trangThaiHoatDong BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT CK_KhuyenMai_DaDungNonNegative CHECK (daDung >= 0)
 );
 
 CREATE TABLE SuDungKhuyenMai (
@@ -188,7 +190,9 @@ CREATE TABLE SuDungKhuyenMai (
     CONSTRAINT FK_SuDungKhuyenMai_KhuyenMai FOREIGN KEY (maKm) REFERENCES KhuyenMai(maKm) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT FK_SuDungKhuyenMai_KhachHang FOREIGN KEY (maKh) REFERENCES KhachHang(maKh) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT UQ_SuDungKhuyenMai_DonHang UNIQUE (maKm, maDonHang),
-    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm)
+    INDEX IDX_SuDungKhuyenMai_KhachHang (maKh, maKm),
+    INDEX IDX_SuDungKhuyenMai_DonHang (maDonHang),
+    INDEX IDX_SuDungKhuyenMai_Km_Kh (maKm, maKh)
 );
 
 CREATE TABLE PhiVanChuyen (
@@ -268,8 +272,9 @@ CREATE TABLE ThanhToan (
     maDonHang VARCHAR(50) NOT NULL,
     phuongThuc ENUM('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
     soTien DECIMAL(15,2) NOT NULL,
-    trangThai ENUM('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY') NOT NULL DEFAULT 'CHO_THANH_TOAN',
+    trangThai ENUM('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
     maGiaoDich VARCHAR(150) UNIQUE,
+    maGiaoDichMoMo VARCHAR(100),
     ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ngayThanhToan DATETIME,
     CONSTRAINT FK_ThanhToan_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -405,3 +410,41 @@ CREATE TABLE HanhViNguoiDung (
     INDEX IDX_HanhViNguoiDung_Product_Time (productId, thoiGian),
     INDEX IDX_HanhViNguoiDung_Time (thoiGian)
 );
+
+-- Quản lý mã OTP đặt lại mật khẩu
+CREATE TABLE IF NOT EXISTS password_reset_otp (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    maTk VARCHAR(50) NOT NULL,
+    otpHash VARCHAR(255) NOT NULL,
+    createdAt DATETIME NOT NULL,
+    otpExpiresAt DATETIME NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    otpVerified BOOLEAN NOT NULL DEFAULT FALSE,
+    resetTokenHash VARCHAR(255) DEFAULT NULL,
+    resetExpiresAt DATETIME DEFAULT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    KEY idx_reset_otp_account (maTk),
+    KEY idx_reset_otp_token (resetTokenHash),
+    CONSTRAINT fk_reset_otp_taikhoan FOREIGN KEY (maTk) REFERENCES TaiKhoan(maTk) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Quản lý Idempotency cho Checkout (PNE-004)
+CREATE TABLE IF NOT EXISTS checkout_idempotency (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id VARCHAR(50) NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    order_id VARCHAR(50) DEFAULT NULL,
+    response_payload LONGTEXT DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_idempotency (user_id, idempotency_key),
+    KEY idx_idempotency_order (order_id),
+    KEY idx_idempotency_created (created_at),
+    CONSTRAINT fk_idempotency_user FOREIGN KEY (user_id) REFERENCES TaiKhoan(maTk) ON DELETE CASCADE,
+    CONSTRAINT fk_idempotency_order FOREIGN KEY (order_id) REFERENCES DonHang(maDonHang) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
