@@ -1,5 +1,5 @@
 import api from '../config/api';
 
 export const chatService = {
-  send: (message, history) => api.post('/chat', { message, history }),
+  send: (message, history, visitorId) => api.post('/chat', { message, history, visitorId }),
 };

@@ -3,6 +3,7 @@ import { STORAGE_KEYS } from '../config/constants';
 import { cartService } from '../service/cartService';
 import { storage } from '../utils/storage';
 import useAuth from '../hooks/useAuth';
+import { recordActivity } from '../utils/activityTracking';
 
 export const CartContext = createContext(null);
 const KEY = STORAGE_KEYS.guestCart;
@@ -24,13 +25,18 @@ export function CartProvider({ children }) {
 
   const add = async (sp, phienBan, soLuong = 1) => {
     if (!phienBan) throw new Error('Vui lòng chọn phiên bản sản phẩm');
-    if (isCustomer) { setItems((await cartService.add(phienBan.maPhienBan, soLuong)).items); return; }
+    if (isCustomer) {
+      setItems((await cartService.add(phienBan.maPhienBan, soLuong)).items);
+      recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
+      return;
+    }
     const current = items.find((i) => i.phienBan.maPhienBan === phienBan.maPhienBan);
     const total = (current?.soLuong || 0) + soLuong;
     if (total > phienBan.soLuongTon) throw new Error(`Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`);
     saveGuest(current
       ? items.map((i) => i === current ? { ...i, soLuong: total } : i)
       : [...items, { sanPham: sp, phienBan, soLuong }]);
+    recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
   };
 
   const setQuantity = async (item, soLuong) => {

@@ -4,6 +4,7 @@ import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { chatService } from '../service/chatService';
 import { formatPrice } from '../utils/format';
+import { getVisitorId } from '../utils/activityTracking';
 
 const KEY = 'phonenest-chat';
 const GOI_Y = ['Điện thoại pin trâu dưới 10 triệu', 'Máy chụp ảnh đẹp giá tốt', 'Phí giao hàng thế nào?', 'Hiện có voucher nào?'];
@@ -41,7 +42,7 @@ export default function ChatWidget() {
     setText('');
     setSending(true);
     try {
-      const res = await chatService.send(message, history.slice(1));
+      const res = await chatService.send(message, history.slice(1), getVisitorId());
       setMessages((m) => [...m, { role: 'assistant', content: res.reply, products: res.products }]);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'Xin lỗi, mình chưa trả lời được lúc này. Bạn thử lại sau ít phút nhé.' }]);
