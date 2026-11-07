@@ -68,6 +68,9 @@ public class DonHangService {
     @Autowired(required = false)
     private ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private HanhViNguoiDungService hanhViNguoiDungService;
+
     public DonHangDto datHang(String maKh, DonHangDto.Checkout req) {
         return datHang(maKh, req, null);
     }
@@ -199,6 +202,8 @@ public class DonHangService {
         if (!muaNgay) {
             gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(g -> g.getChiTiet().clear());
         }
+
+        ghiNhanHanhViMuaHang(luu);
 
         DonHangDto dto = mapper.toDto(luu);
 
@@ -722,5 +727,51 @@ public class DonHangService {
         }
 
         return k;
+    }
+
+    private void ghiNhanHanhViMuaHang(DonHang d) {
+        if (hanhViNguoiDungService == null || d == null || d.getKhachHang() == null || d.getChiTiet() == null) {
+            return;
+        }
+        String maKh = d.getKhachHang().getMaKh();
+        String maDonHang = d.getMaDonHang();
+
+        record ItemData(String maSp, String maPb, BigDecimal donGia) {}
+        List<ItemData> items = new ArrayList<>();
+        for (ChiTietDonHang c : d.getChiTiet()) {
+            String maSp = (c.getPhienBan() != null && c.getPhienBan().getSanPham() != null)
+                    ? c.getPhienBan().getSanPham().getMaSanPham()
+                    : null;
+            String maPb = c.getPhienBan() != null ? c.getPhienBan().getMaPhienBan() : null;
+            items.add(new ItemData(maSp, maPb, c.getDonGia()));
+        }
+
+        Runnable trackingTask = () -> {
+            for (ItemData item : items) {
+                try {
+                    hanhViNguoiDungService.ghiNhanPurchase(maKh, item.maSp(), item.maPb(), maDonHang, item.donGia());
+                } catch (Exception e) {
+                    log.warn("Không thể ghi nhận hành vi PURCHASE cho đơn hàng {}: {}", maDonHang, e.getMessage());
+                }
+            }
+        };
+
+        // Ghi tracking sau khi transaction đặt hàng đã commit thành công:
+        // 1. Nếu đơn hàng rollback, afterCommit không chạy => không bao giờ lưu PURCHASE rác.
+        // 2. Lỗi tracking xảy ra sau commit => không bao giờ làm rollback đơn hàng.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        trackingTask.run();
+                    } catch (Exception e) {
+                        log.warn("Lỗi khi chạy tracking task sau commit cho đơn hàng {}: {}", maDonHang, e.getMessage());
+                    }
+                }
+            });
+        } else {
+            trackingTask.run();
+        }
     }
 }

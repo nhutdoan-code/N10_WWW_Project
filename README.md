@@ -47,3 +47,20 @@ Mở project trong thư mục `BE/phonenest` và chạy Spring Boot.
 cd FE
 npm install
 npm run dev
+```
+
+## Cấu hình AI (Ollama Local)
+
+PhoneNest sử dụng nền tảng AI nội bộ chạy hoàn toàn cục bộ qua **Ollama**, không phụ thuộc vào bất kỳ dịch vụ cloud bên thứ ba nào (như Gemini, OpenAI hay Groq):
+- **Embedding Model:** `bge-m3` (BAAI BGE-M3 Multilingual Embedding, 1024 dimensions)
+- **Base URL:** `http://127.0.0.1:11434`
+- **Chức năng:** Tìm kiếm ngữ nghĩa (Semantic Product Search), trích xuất đặc tả kỹ thuật và tư vấn bán hàng thông minh kèm hồ sơ sở thích khách hàng (User Preference Context).
+
+### Cài đặt Ollama cho môi trường mới:
+1. Tải và cài đặt Ollama từ [https://ollama.com](https://ollama.com).
+2. Tải model embedding `bge-m3`:
+   ```bash
+   ollama pull bge-m3
+   ```
+3. Đảm bảo Ollama server đang chạy (mặc định cổng `11434`).
+4. Khi khởi động PhoneNest Backend, hệ thống sẽ tự động kết nối và lập chỉ mục Vector Store. Nếu Ollama chưa bật, hệ thống tự động kích hoạt chế độ fallback từ khóa thông minh mà không gây lỗi ứng dụng.

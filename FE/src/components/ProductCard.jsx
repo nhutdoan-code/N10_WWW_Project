@@ -3,6 +3,7 @@ import useCart from '../hooks/useCart';
 import useCompare from '../hooks/useCompare';
 import useToast from '../hooks/useToast';
 import { errorMessage, formatPrice } from '../utils/format';
+import { trackingService } from '../service/trackingService';
 import Icon from './Icon';
 import ProductImage from './ProductImage';
 import StatusBadge from './StatusBadge';
@@ -30,7 +31,7 @@ export default function ProductCard({ sp }) {
 
   return (
     <div className="card product-card">
-      <Link to={`/products/${sp.maSanPham}`}>
+      <Link to={`/products/${sp.maSanPham}`} onClick={() => trackingService.trackClick(sp.maSanPham)}>
         <span className="thumb-wrap">
           <ProductImage src={sp.anhChinh} alt={sp.tenMay} loading="lazy" />
           {hetHang && <span className="sold-out"><StatusBadge status={productStatus(sp)} /></span>}
@@ -44,7 +45,7 @@ export default function ProductCard({ sp }) {
         {productStatus(sp) === 'SAP_HET' && <span className="low-stock">Chỉ còn {sp.soLuongTon} máy</span>}
       </div>
       <div className="actions-row">
-        <Link className={`btn btn-primary ${hetHang ? 'disabled' : ''}`} to={`/products/${sp.maSanPham}`} onClick={(e) => { if (hetHang) e.preventDefault(); }}>
+        <Link className={`btn btn-primary ${hetHang ? 'disabled' : ''}`} to={`/products/${sp.maSanPham}`} onClick={(e) => { trackingService.trackClick(sp.maSanPham); if (hetHang) e.preventDefault(); }}>
           {hetHang ? 'Hết hàng' : 'Chọn phiên bản'}
         </Link>
         <button

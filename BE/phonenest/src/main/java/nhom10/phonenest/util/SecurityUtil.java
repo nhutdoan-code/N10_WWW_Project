@@ -22,4 +22,15 @@ public final class SecurityUtil {
         }
         return auth.getName();
     }
+
+    /**
+     * Identity of the current caller, or null if unauthenticated / anonymous.
+     */
+    public static String currentUserIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return auth.getName();
+    }
 }

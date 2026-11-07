@@ -60,7 +60,7 @@ class TrackingServiceTest {
         assertThat(saved.getValue().getMaHanhVi()).isNotBlank();
         assertThat(saved.getValue().getVisitorId()).isEqualTo(VISITOR_ID);
         assertThat(saved.getValue().getMaTk()).isEqualTo("customer-1");
-        assertThat(saved.getValue().getLoaiHanhVi()).isEqualTo(LoaiHanhVi.ADD_TO_CART);
+        assertThat(saved.getValue().getLoaiHanhVi().name()).isEqualTo(LoaiHanhVi.ADD_TO_CART.name());
         assertThat(saved.getValue().getProductId()).isEqualTo("SP001");
         assertThat(saved.getValue().getThoiGian()).isNotNull();
     }

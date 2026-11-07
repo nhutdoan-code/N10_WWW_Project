@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { recordActivity } from '../utils/activityTracking';
+import { trackingService } from '../service/trackingService';
 
 function pageType(pathname, search) {
   if (pathname === '/') return search ? 'PRODUCT_LIST' : 'HOME';
@@ -14,20 +14,17 @@ function pageType(pathname, search) {
 
 export default function ActivityTracker() {
   const { pathname, search } = useLocation();
-  const lastSearch = useRef('');
 
   useEffect(() => {
     const page = pageType(pathname, search);
-    if (page) recordActivity({ type: 'PAGE_VIEW', pageType: page });
-  }, [pathname]);
-
-  useEffect(() => {
-    const query = pathname === '/' ? new URLSearchParams(search).get('q')?.trim() || '' : '';
-    if (query && query !== lastSearch.current) {
-      recordActivity({ type: 'SEARCH', searchTerm: query.slice(0, 120) });
+    // Chỉ track các trang chung (HOME, CART, LOGIN, v.v.), tránh trùng với trackView tại ProductDetailPage
+    if (page && page !== 'PRODUCT_DETAIL') {
+      trackingService.track({
+        loaiHanhVi: 'PAGE_VIEW',
+        nguonSuKien: page,
+      });
     }
-    lastSearch.current = query;
-  }, [pathname, search]);
+  }, [pathname]);
 
   return null;
 }

@@ -13,6 +13,7 @@ import nhom10.phonenest.repository.PhiVanChuyenRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.repository.TinhThanhRepository;
 import nhom10.phonenest.service.ai.SemanticSearchService;
+import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -71,6 +72,7 @@ public class ChatService {
     private final TrackingService trackingService;
     private final ChatClient chatClient;
     private final SemanticSearchService semanticSearchService;
+    private final UserPreferenceAggregationService userPreferenceService;
 
     @Value("${spring.ai.openai.api-key:}")
     private String apiKey;
@@ -81,8 +83,18 @@ public class ChatService {
         List<SanPhamDto> sanPhamQuanTam = sanPhamQuanTam(preferences);
         if (coKhoaAi()) {
             try {
+                String systemPrompt = PROMPT;
+                String currentUserId = SecurityUtil.currentUserIdOrNull();
+                if (currentUserId != null) {
+                    String userContext = userPreferenceService.buildAiPromptContext(currentUserId);
+                    if (!userContext.isBlank()) {
+                        systemPrompt += "\n\n" + userContext;
+                    }
+                }
+
+                final String finalPrompt = systemPrompt;
                 ChatDto.AiReply kq = chatClient.prompt()
-                        .system(s -> s.text(PROMPT).param("sanPham", sanPhamText())
+                        .system(s -> s.text(finalPrompt).param("sanPham", sanPhamText())
                                 .param("voucher", voucherText()).param("phiShip", phiShipText())
                                 .param("hanhVi", sanPhamQuanTam.isEmpty()
                                         ? "Chưa có lịch sử quan tâm phù hợp."
