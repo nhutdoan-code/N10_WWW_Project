@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { chatService } from '../service/chatService';
+import { trackingService } from '../service/trackingService';
 import { formatPrice } from '../utils/format';
 
 const KEY = 'phonenest-chat';
@@ -67,7 +68,15 @@ export default function ChatWidget() {
               <div key={i} className={`chat-msg ${m.role}`}>
                 <p>{m.content}</p>
                 {m.products?.map((p) => (
-                  <Link key={p.maSanPham} className="chat-product" to={`/products/${p.maSanPham}`} onClick={() => setOpen(false)}>
+                  <Link
+                    key={p.maSanPham}
+                    className="chat-product"
+                    to={`/products/${p.maSanPham}`}
+                    onClick={() => {
+                      trackingService.trackRecommendationClick(p.maSanPham, 'AI_CHATBOT');
+                      setOpen(false);
+                    }}
+                  >
                     <ProductImage src={p.anhChinh} alt="" />
                     <span>{p.tenMay}<b>{formatPrice(p.giaBan)}</b></span>
                   </Link>

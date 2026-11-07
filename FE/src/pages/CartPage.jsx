@@ -5,6 +5,7 @@ import useCart from '../hooks/useCart';
 import useToast from '../hooks/useToast';
 import ProductImage from '../components/ProductImage';
 import { wishlistService } from '../service/wishlistService';
+import { trackingService } from '../service/trackingService';
 import { errorMessage, formatPrice } from '../utils/format';
 import { anhTheoPhienBan } from '../utils/image';
 
@@ -160,7 +161,10 @@ export default function CartPage() {
                     <button
                       type="button"
                       className="link-btn"
-                      onClick={() => run(() => remove(item))}
+                      onClick={() => run(async () => {
+                        await remove(item);
+                        trackingService.trackRemoveFromCart(sp?.maSanPham, pb?.maPhienBan);
+                      })}
                     >
                       Xóa
                     </button>

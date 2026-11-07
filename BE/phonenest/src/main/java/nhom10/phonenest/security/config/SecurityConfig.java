@@ -55,6 +55,8 @@ public class SecurityConfig {
                                 "/api/locations", "/api/locations/**").permitAll()
                         // Public AI assistant: exposes only catalogue/voucher/shipping data.
                         .requestMatchers(HttpMethod.POST, "/api/chat").permitAll()
+                        // Public tracking endpoint (records anonymous and authenticated user behavior).
+                        .requestMatchers(HttpMethod.POST, "/api/tracking/events").permitAll()
                         // Management surface.
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Customer self-service surface (identity always comes from the JWT subject).
