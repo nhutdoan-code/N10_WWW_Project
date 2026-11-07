@@ -18,6 +18,7 @@ import { errorMessage, formatPrice } from '../utils/format';
 import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
 import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
+import { recordActivity } from '../utils/activityTracking';
 
 const COMMITS = [
   { icon: 'shield', title: 'Hàng chính hãng', text: 'Nguyên seal, bảo hành theo chính sách của hãng.' },
@@ -62,6 +63,10 @@ export default function ProductDetailPage() {
   useEffect(() => {
     setImage(null);
   }, [maPhienBan]);
+
+  useEffect(() => {
+    if (sp?.maSanPham) recordActivity({ type: 'PRODUCT_VIEW', productId: sp.maSanPham });
+  }, [sp?.maSanPham]);
 
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;

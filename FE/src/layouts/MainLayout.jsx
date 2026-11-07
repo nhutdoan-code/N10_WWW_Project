@@ -216,7 +216,10 @@ export default function MainLayout() {
             <span>Hỏi đáp: dùng khung chat góc phải</span>
           </div>
         </div>
-        <div className="container footer-bottom">© 2026 PhoneNest · Đồ án Lập trình WWW (Java) · Nhóm 10</div>
+        <div className="container footer-bottom">
+          <span>© 2026 PhoneNest · Đồ án Lập trình WWW (Java) · Nhóm 10</span>
+          <small>Dữ liệu lượt xem, tìm kiếm và thêm giỏ được lưu tối đa 90 ngày để cá nhân hóa gợi ý.</small>
+        </div>
       </footer>
       <ChatWidget />
     </>

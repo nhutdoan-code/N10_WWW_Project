@@ -2,7 +2,7 @@
 
 ## Cách chạy (MariaDB)
 
-1. **CSDL**: chạy lần lượt `DB/01_schema.sql` rồi `DB/02_data.sql`
+1. **CSDL**: chạy lần lượt `DB/01_schema.sql`, `DB/02_data.sql` và `DB/04_user_tracking.sql`
    (`mysql -u root -p < DB/01_schema.sql`, tương tự với file 02; hoặc mở trong HeidiSQL / DBeaver / Workbench).
    Nếu đã tạo DB từ bản schema cũ, hãy `DROP DATABASE BanDienThoai;` rồi chạy lại (schema đã thêm cột, xem bên dưới).
 2. **Backend** (`BE/phonenest`, Java 21, port 8080): mặc định kết nối `jdbc:mariadb://localhost:3306/BanDienThoai`, user `root`, mật khẩu rỗng.
@@ -58,7 +58,13 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Endpoint chi tiết
 
-**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
+**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `POST /api/tracking/events` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
+
+### Theo dõi hành vi và cá nhân hóa trợ lý
+- Frontend ghi nhận `PAGE_VIEW`, `PRODUCT_VIEW`, `SEARCH`, `ADD_TO_CART` qua `POST /api/tracking/events`; body gồm `visitorId` (UUID), `type` và đúng trường theo loại (`pageType`, `productId` hoặc `searchTerm`). Endpoint công khai; tài khoản Customer được gắn từ JWT phía máy chủ, không nhận mã tài khoản từ client.
+- Mỗi trình duyệt dùng một mã ẩn danh first-party. Chỉ lưu loại trang đã cho phép (không lưu URL/referrer), mã sản phẩm hoặc từ khóa tìm kiếm tối đa 120 ký tự; không thu thập IP/user-agent. Dữ liệu tự xóa sau 90 ngày (`TRACKING_RETENTION_DAYS`).
+- `POST /api/chat` nhận thêm `visitorId` tùy chọn. Trợ lý dùng lượt xem/thêm giỏ và tìm kiếm gần đây (30 ngày, tối đa 100 sự kiện) để ưu tiên sản phẩm liên quan; lịch sử hội thoại không được ghi vào bảng tracking. Khách chưa có lịch sử vẫn nhận gợi ý hiện tại như cũ.
+- Với CSDL đang chạy, chỉ cần thực thi `DB/04_user_tracking.sql`; không cần xóa hoặc tạo lại dữ liệu.
 
 **Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 
