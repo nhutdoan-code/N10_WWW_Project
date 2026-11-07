@@ -2,6 +2,7 @@ package nhom10.phonenest.service;
 
 import nhom10.phonenest.dto.ChatDto;
 import nhom10.phonenest.dto.SanPhamDto;
+import nhom10.phonenest.service.ai.SemanticSearchService;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.repository.KhuyenMaiRepository;
 import nhom10.phonenest.repository.PhiVanChuyenRepository;
@@ -48,6 +49,9 @@ class ChatServicePersonalizationTest {
     @Mock
     private ChatClient chatClient;
 
+    @Mock
+    private SemanticSearchService semanticSearchService;
+
     @InjectMocks
     private ChatService chatService;
 
@@ -57,6 +61,7 @@ class ChatServicePersonalizationTest {
         SanPhamDto popularProduct = product("SP002", "Xiaomi Redmi");
         when(trackingService.preferences(VISITOR_ID))
                 .thenReturn(new TrackingService.Preferences(List.of(), List.of("Samsung")));
+        when(semanticSearchService.search(anyString(), anyInt())).thenReturn(List.of());
         when(sanPhamService.list(
                 nullable(String.class), nullable(String.class), nullable(BigDecimal.class),
                 nullable(BigDecimal.class), nullable(String.class), eq(false)))
