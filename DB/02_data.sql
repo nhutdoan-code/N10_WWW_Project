@@ -3617,8 +3617,8 @@ INSERT INTO `thongbao` (`maThongBao`, `maTk`, `noiDung`, `daDoc`, `ngayTao`) VAL
 -- Dumping data for table bandienthoai.tinhthanh: ~34 rows (approximately)
 INSERT INTO `tinhthanh` (`maTinh`, `tenTinh`) VALUES
                                                   ('01', 'Thành phố Hà Nội'),
-                                                  ('04', 'Cao Bằng'),
-                                                  ('08', 'Tuyên Quang'),
+                                                   ('04', 'Cao Bằng'),
+                                                 ('08', 'Tuyên Quang'),
                                                   ('11', 'Điện Biên'),
                                                   ('12', 'Lai Châu'),
                                                   ('14', 'Sơn La'),
