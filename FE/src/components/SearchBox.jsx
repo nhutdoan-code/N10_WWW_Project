@@ -4,6 +4,7 @@ import useDebounce from '../hooks/useDebounce';
 import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { productService } from '../service/productService';
+import { trackingService } from '../service/trackingService';
 import { formatPrice } from '../utils/format';
 
 export default function SearchBox() {
@@ -39,8 +40,12 @@ export default function SearchBox() {
 
   const submit = (e) => {
     e.preventDefault();
+    const query = text.trim();
+    if (query) {
+      trackingService.trackSearch(query, 'SEARCH_SUBMIT');
+    }
     setOpen(false);
-    navigate(`/?q=${encodeURIComponent(text.trim())}`);
+    navigate(`/?q=${encodeURIComponent(query)}`);
   };
 
   return (
@@ -62,7 +67,14 @@ export default function SearchBox() {
           {loading && <div className="muted pad">Đang tìm...</div>}
           {!loading && results.length === 0 && <div className="muted pad">Không tìm thấy sản phẩm</div>}
           {results.map((sp) => (
-            <Link key={sp.maSanPham} to={`/products/${sp.maSanPham}`} onClick={() => setOpen(false)}>
+            <Link
+              key={sp.maSanPham}
+              to={`/products/${sp.maSanPham}`}
+              onClick={() => {
+                trackingService.trackClick(sp.maSanPham, 'SEARCH_DROPDOWN');
+                setOpen(false);
+              }}
+            >
               <ProductImage src={sp.anhChinh} alt="" />
               <span>{sp.tenMay}</span>
               <b>{formatPrice(sp.giaBan)}</b>

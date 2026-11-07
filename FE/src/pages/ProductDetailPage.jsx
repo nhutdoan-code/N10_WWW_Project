@@ -13,6 +13,7 @@ import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
 import { productService } from '../service/productService';
 import { wishlistService } from '../service/wishlistService';
+import { trackingService } from '../service/trackingService';
 import { errorMessage, formatPrice } from '../utils/format';
 
 import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
@@ -36,6 +37,7 @@ export default function ProductDetailPage() {
   const [image, setImage] = useState(null);
   const [soLuong, setSoLuong] = useState(1);
   const [maPhienBan, setMaPhienBan] = useState('');
+  const lastTrackedProductRef = useRef(null);
   const { data: sp, loading, error } = useFetch(() => productService.get(ma), [ma]);
   const { data: related } = useFetch(() => productService.related(ma), [ma]);
 
@@ -56,6 +58,10 @@ export default function ProductDetailPage() {
       const first = active.find((p) => p.soLuongTon > 0) || active[0];
       setMaPhienBan(first?.maPhienBan || '');
       setSoLuong(1);
+    }
+    if (sp?.maSanPham && lastTrackedProductRef.current !== sp.maSanPham) {
+      lastTrackedProductRef.current = sp.maSanPham;
+      trackingService.trackView(sp.maSanPham);
     }
   }, [sp?.maSanPham]);
   // Đổi phiên bản/màu thì bỏ ảnh đang chọn tay để hiện ảnh đúng màu mới
@@ -81,7 +87,13 @@ export default function ProductDetailPage() {
   const phienBan = pbs.find((p) => p.maPhienBan === maPhienBan) || pbs[0] || null;
   const conHang = phienBan?.trangThai === 'DANG_KINH_DOANH' && phienBan.soLuongTon > 0;
   const giaBan = Number(phienBan?.giaBan ?? sp.giaBan);
-  const themVaoGio = () => { if(!phienBan || !conHang) return; return run(() => add(sp, phienBan, soLuong), 'Đã thêm vào giỏ hàng'); };
+  const themVaoGio = () => {
+    if (!phienBan || !conHang) return;
+    return run(async () => {
+      await add(sp, phienBan, soLuong);
+      trackingService.trackAddToCart(sp.maSanPham, phienBan.maPhienBan);
+    }, 'Đã thêm vào giỏ hàng');
+  };
   // Buy Now: truyền variant qua React Router state (không lộ ID trên URL).
   // state nằm trong history nên vẫn còn khi refresh; query vẫn được CheckoutPage
   // chấp nhận để tương thích link cũ.
