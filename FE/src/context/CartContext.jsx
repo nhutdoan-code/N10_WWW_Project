@@ -3,7 +3,6 @@ import { STORAGE_KEYS } from '../config/constants';
 import { cartService } from '../service/cartService';
 import { storage } from '../utils/storage';
 import useAuth from '../hooks/useAuth';
-import { recordActivity } from '../utils/activityTracking';
 
 export const CartContext = createContext(null);
 const KEY = STORAGE_KEYS.guestCart;
@@ -51,7 +50,6 @@ export function CartProvider({ children }) {
     if (isCustomer) {
       const cart = await cartService.add(phienBan.maPhienBan, qty);
       setItems(cart.items || []);
-      recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
       return;
     }
     const current = items.find((i) => i.phienBan.maPhienBan === phienBan.maPhienBan);
@@ -68,7 +66,6 @@ export function CartProvider({ children }) {
           )
         : [...items, { sanPham: sp, phienBan, soLuong: qty }]
     );
-    recordActivity({ type: 'ADD_TO_CART', productId: sp.maSanPham });
   };
 
   // Cập nhật số lượng

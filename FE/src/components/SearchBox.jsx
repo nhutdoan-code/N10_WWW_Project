@@ -4,8 +4,8 @@ import useDebounce from '../hooks/useDebounce';
 import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { productService } from '../service/productService';
+import { trackingService } from '../service/trackingService';
 import { formatPrice } from '../utils/format';
-import { recordActivity } from '../utils/activityTracking';
 
 export default function SearchBox() {
   const [text, setText] = useState('');
@@ -40,8 +40,12 @@ export default function SearchBox() {
 
   const submit = (e) => {
     e.preventDefault();
+    const query = text.trim();
+    if (query) {
+      trackingService.trackSearch(query, 'SEARCH_SUBMIT');
+    }
     setOpen(false);
-    navigate(`/?q=${encodeURIComponent(text.trim())}`);
+    navigate(`/?q=${encodeURIComponent(query)}`);
   };
 
   return (
@@ -67,7 +71,7 @@ export default function SearchBox() {
               key={sp.maSanPham}
               to={`/products/${sp.maSanPham}`}
               onClick={() => {
-                recordActivity({ type: 'SEARCH', searchTerm: debounced.slice(0, 120) });
+                trackingService.trackClick(sp.maSanPham, 'SEARCH_DROPDOWN');
                 setOpen(false);
               }}
             >

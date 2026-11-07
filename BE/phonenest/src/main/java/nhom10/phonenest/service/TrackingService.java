@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.TrackingDto;
 import nhom10.phonenest.entity.HanhViNguoiDung;
 import nhom10.phonenest.enums.LoaiHanhVi;
+import nhom10.phonenest.enums.LoaiHanhViNguoiDung;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.HanhViNguoiDungRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
@@ -80,9 +81,9 @@ public class TrackingService {
         LinkedHashSet<String> searchTerms = new LinkedHashSet<>();
         for (HanhViNguoiDung event : events) {
             if (event.getProductId() != null) {
-                int weight = event.getLoaiHanhVi() == LoaiHanhVi.ADD_TO_CART ? 4 : 2;
+                int weight = event.getLoaiHanhVi() == LoaiHanhViNguoiDung.ADD_TO_CART ? 4 : 2;
                 productScores.merge(event.getProductId(), weight, Integer::sum);
-            } else if (event.getLoaiHanhVi() == LoaiHanhVi.SEARCH
+            } else if (event.getLoaiHanhVi() == LoaiHanhViNguoiDung.SEARCH
                     && event.getSearchTerm() != null && !event.getSearchTerm().isBlank()) {
                 searchTerms.add(event.getSearchTerm());
             }
