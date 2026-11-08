@@ -17,7 +17,9 @@ public class ChatController {
     private final ChatService chatService;
 
     @PostMapping
-    public ChatDto.Response chat(@Valid @RequestBody ChatDto.Request request) {
+    public ChatDto.Response chat(
+            @Valid @RequestBody ChatDto.Request request
+    ) {
         return chatService.chat(request);
     }
 }
