@@ -12,4 +12,7 @@ CREATE INDEX IF NOT EXISTS IDX_SuDungKhuyenMai_Km_Kh
 
 -- 3. Ràng buộc daDung không âm
 ALTER TABLE KhuyenMai
+DROP CONSTRAINT IF EXISTS CK_KhuyenMai_DaDungNonNegative;
+
+ALTER TABLE KhuyenMai
     ADD CONSTRAINT CK_KhuyenMai_DaDungNonNegative CHECK (daDung >= 0);
