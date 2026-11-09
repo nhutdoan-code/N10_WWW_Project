@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PhoneNestVectorStore implements VectorStore {
 
     private final EmbeddingModel embeddingModel;
-    private final Map<String, VectorEntry> store = new ConcurrentHashMap<>();
+    private final Map<String, VectorEntry> store = new ConcurrentHashMap<>(); //lưu các vector trực tiếp trong RAM của ứng dụng Spring Boot.
 
     public PhoneNestVectorStore(EmbeddingModel embeddingModel) {
         this.embeddingModel = Objects.requireNonNull(embeddingModel);
@@ -28,8 +28,8 @@ public class PhoneNestVectorStore implements VectorStore {
     public void add(List<Document> documents) {
         if (documents == null) return;
         for (Document doc : documents) {
-            float[] vec = embeddingModel.embed(doc);
-            store.put(doc.getId(), new VectorEntry(doc, vec));
+            float[] vec = embeddingModel.embed(doc); //tạo vector từ tài liệu bằng mô hình embedding
+            store.put(doc.getId(), new VectorEntry(doc, vec)); //lưu vector cùng tài liệu vào ConcurrentHashMap.
         }
     }
 
@@ -49,7 +49,7 @@ public class PhoneNestVectorStore implements VectorStore {
         if (request == null || request.getQuery() == null || request.getQuery().isBlank()) {
             return List.of();
         }
-        float[] queryVec = embeddingModel.embed(request.getQuery());
+        float[] queryVec = embeddingModel.embed(request.getQuery()); //Chuyển câu hỏi của KH sang vector
         List<Document> results = new ArrayList<>();
 
         for (VectorEntry entry : store.values()) {
@@ -78,7 +78,7 @@ public class PhoneNestVectorStore implements VectorStore {
         store.clear();
     }
 
-    private double cosineSimilarity(float[] a, float[] b) {
+    private double cosineSimilarity(float[] a, float[] b) { // so sánh vector
         if (a == null || b == null || a.length != b.length) return 0.0;
         double dot = 0.0;
         double normA = 0.0;
