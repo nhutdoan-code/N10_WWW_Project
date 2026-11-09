@@ -163,7 +163,7 @@ public class SemanticSearchService {
             if (opt.isEmpty()) continue; // Anti-hallucination check: product must exist in MariaDB
 
             SanPham sp = opt.get();
-            if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) continue;
+            if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH || sp.getSoLuongTon() <= 0) continue;
 
             double vectorScore = doc.getScore() != null ? doc.getScore() : 0.5;
             double fitScore = evaluateConstraintFit(sp, constraints);
@@ -177,8 +177,25 @@ public class SemanticSearchService {
             }
 
             // Hard pruning for strict upper bound budget if clearly specified
-            if (constraints.maxBudget != null && sp.getGiaBan().compareTo(constraints.maxBudget.multiply(BigDecimal.valueOf(1.25))) > 0) {
-                continue; // Exceeds budget ceiling
+            if (constraints.maxBudget != null) {
+                if (constraints.strictMax) {
+                    int cmp = sp.getGiaBan().compareTo(constraints.maxBudget);
+                    if (constraints.maxInclusive ? cmp > 0 : cmp >= 0) {
+                        continue; // Exceeds strict budget ceiling
+                    }
+                } else {
+                    BigDecimal ceiling = constraints.maxBudget.multiply(BigDecimal.valueOf(1.15));
+                    if (sp.getGiaBan().compareTo(ceiling) > 0) {
+                        continue; // Exceeds fuzzy budget ceiling
+                    }
+                }
+            }
+
+            if (constraints.minBudget != null) {
+                int cmp = sp.getGiaBan().compareTo(constraints.minBudget);
+                if (constraints.minInclusive ? cmp < 0 : cmp <= 0) {
+                    continue; // Below budget floor
+                }
             }
 
             double finalScore = (vectorScore * 0.70) + (fitScore * 0.30);
@@ -228,7 +245,15 @@ public class SemanticSearchService {
         String lower = query.toLowerCase(Locale.ROOT);
         StructuredConstraints sc = new StructuredConstraints();
 
-        // 1. Deterministic Brand detection
+        // 1. Explicit unconstrained budget check
+        if (lower.contains("giá bao nhiêu cũng được") || lower.contains("bao nhiêu tiền cũng được")
+                || lower.contains("giá nào cũng được") || lower.contains("không quan trọng giá")
+                || lower.contains("không giới hạn giá") || lower.contains("thoải mái giá")
+                || lower.contains("bất kỳ giá nào")) {
+            sc.unlimitedBudget = true;
+        }
+
+        // 2. Deterministic Brand detection
         if (lower.contains("iphone") || lower.contains("apple")) {
             sc.requiredBrand = "Apple";
         } else if (lower.contains("samsung") || lower.contains("galaxy")) {
@@ -241,24 +266,44 @@ public class SemanticSearchService {
             sc.requiredBrand = "Vivo";
         }
 
-        // 2. Deterministic Budget extraction
-        Matcher m = PATTERN_BUDGET.matcher(lower);
-        if (m.find()) {
-            try {
-                double val = Double.parseDouble(m.group(1).replace(',', '.'));
-                BigDecimal amount = BigDecimal.valueOf((long) (val * 1_000_000));
-                if (lower.contains("dưới") || lower.contains("tối đa") || lower.contains("không quá")) {
-                    sc.maxBudget = amount;
-                } else if (lower.contains("khoảng") || lower.contains("tầm") || lower.contains("tầm giá")) {
-                    sc.targetBudget = amount;
-                    sc.minBudget = amount.multiply(BigDecimal.valueOf(0.7));
-                    sc.maxBudget = amount.multiply(BigDecimal.valueOf(1.25));
-                } else {
-                    sc.targetBudget = amount;
+        // 3. Deterministic Budget extraction (only if budget is not explicitly unlimited)
+        if (!sc.unlimitedBudget) {
+            Matcher m = PATTERN_BUDGET.matcher(lower);
+            if (m.find()) {
+                try {
+                    double val = Double.parseDouble(m.group(1).replace(',', '.'));
+                    BigDecimal amount = BigDecimal.valueOf((long) (val * 1_000_000));
+                    if (lower.contains("dưới") || lower.contains("nhỏ hơn") || lower.contains("thấp hơn") || lower.contains("ít hơn")) {
+                        sc.maxBudget = amount;
+                        sc.strictMax = true;
+                        sc.maxInclusive = false;
+                    } else if (lower.contains("tối đa") || lower.contains("không quá") || lower.contains("không vượt quá")) {
+                        sc.maxBudget = amount;
+                        sc.strictMax = true;
+                        sc.maxInclusive = true;
+                    } else if (lower.contains("trên") || lower.contains("lớn hơn") || lower.contains("cao hơn") || lower.contains("hơn")) {
+                        sc.minBudget = amount;
+                        sc.minInclusive = false;
+                    } else if (lower.contains("từ") || lower.contains("tối thiểu") || lower.contains("ít nhất") || lower.contains("trở lên")) {
+                        sc.minBudget = amount;
+                        sc.minInclusive = true;
+                    } else if (lower.contains("khoảng") || lower.contains("tầm") || lower.contains("quanh")) {
+                        sc.targetBudget = amount;
+                        sc.minBudget = amount.multiply(BigDecimal.valueOf(0.8));
+                        sc.maxBudget = amount.multiply(BigDecimal.valueOf(1.2));
+                    } else {
+                        sc.targetBudget = amount;
+                    }
+                } catch (Exception ignored) {
                 }
-            } catch (Exception ignored) {
             }
         }
+
+        // 4. Soft preferences
+        sc.hasCamera = lower.contains("chụp") || lower.contains("ảnh") || lower.contains("camera") || lower.contains("selfie") || lower.contains("quay video");
+        sc.hasGaming = lower.contains("game") || lower.contains("gaming") || lower.contains("cấu hình") || lower.contains("hiệu năng") || lower.contains("chip");
+        sc.hasBattery = lower.contains("pin") || lower.contains("pin trâu") || lower.contains("pin khủng") || lower.contains("pin lâu");
+        sc.hasValue = lower.contains("giá tốt") || lower.contains("giá rẻ") || lower.contains("ngon bổ rẻ") || lower.contains("tiết kiệm") || lower.contains("hợp lý");
 
         return sc;
     }
@@ -290,7 +335,52 @@ public class SemanticSearchService {
             score += 0.3;
         }
 
+        // Feature-specific boosts based on user soft preferences
+        if (sc.hasCamera) {
+            int mp = extractMainCameraMp(sp.getCameraSau());
+            if (mp >= 108) score += 1.5;
+            else if (mp >= 50) score += 1.0;
+            else if (mp >= 48) score += 0.8;
+            else if (mp > 0) score += 0.4;
+        }
+
+        if (sc.hasGaming) {
+            String chip = sp.getChip() != null ? sp.getChip().toLowerCase(Locale.ROOT) : "";
+            if (chip.contains("snapdragon 8") || chip.contains("a17") || chip.contains("a18")
+                    || chip.contains("dimensity 9") || chip.contains("dimensity 8300")) {
+                score += 1.5;
+            } else if (chip.contains("snapdragon") || chip.contains("dimensity") || chip.contains("exynos 1480") || chip.contains("apple")) {
+                score += 0.8;
+            }
+            if (sp.getTanSoQuet() != null && sp.getTanSoQuet() >= 120) {
+                score += 0.5;
+            }
+        }
+
+        if (sc.hasBattery) {
+            if (sp.getPin() != null) {
+                if (sp.getPin() >= 5500) score += 1.5;
+                else if (sp.getPin() >= 5000) score += 1.0;
+                else if (sp.getPin() >= 4500) score += 0.5;
+            }
+        }
+
+        if (sc.hasValue) {
+            if (sp.getDiemDanhGiaTb() != null && sp.getDiemDanhGiaTb().compareTo(BigDecimal.valueOf(4.0)) >= 0) {
+                score += 0.8;
+            }
+            if (price != null && price.compareTo(BigDecimal.valueOf(15_000_000)) <= 0) {
+                score += 0.5;
+            }
+        }
+
         return Math.max(score, 0.0);
+    }
+
+    private int extractMainCameraMp(String cameraSau) {
+        if (cameraSau == null || cameraSau.isBlank()) return 0;
+        Matcher m = Pattern.compile("(\\d+)\\s*mp", Pattern.CASE_INSENSITIVE).matcher(cameraSau);
+        return m.find() ? Integer.parseInt(m.group(1)) : 0;
     }
 
     /**
@@ -330,17 +420,57 @@ public class SemanticSearchService {
     }
 
     private List<SemanticSearchResultDto> fallbackSearch(String query, int limit) {
-        log.info("Thực hiện fallback keyword search cho query: '{}'", query);
-        return sanPhamRepository.findAll().stream()
-                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
-                .filter(s -> s.getTenMay().toLowerCase().contains(query.toLowerCase())
-                        || (s.getThuongHieu() != null && s.getThuongHieu().getTenThuongHieu().toLowerCase().contains(query.toLowerCase())))
+        log.info("Thực hiện fallback search cho query: '{}'", query);
+        StructuredConstraints sc = parseConstraints(query);
+
+        List<SanPham> active = sanPhamRepository.findAll().stream()
+                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH && s.getSoLuongTon() > 0)
+                .filter(s -> {
+                    // Check required brand
+                    if (sc.requiredBrand != null) {
+                        String brand = s.getThuongHieu() != null ? s.getThuongHieu().getTenThuongHieu().toLowerCase() : "";
+                        if (!brand.contains(sc.requiredBrand.toLowerCase())) return false;
+                    }
+                    // Check budget constraints
+                    if (sc.maxBudget != null) {
+                        int cmp = s.getGiaBan().compareTo(sc.maxBudget);
+                        if (sc.maxInclusive ? cmp > 0 : cmp >= 0) return false;
+                    }
+                    if (sc.minBudget != null) {
+                        int cmp = s.getGiaBan().compareTo(sc.minBudget);
+                        if (sc.minInclusive ? cmp < 0 : cmp <= 0) return false;
+                    }
+                    return true;
+                })
+                .toList();
+
+        if (active.isEmpty()) {
+            return List.of();
+        }
+
+        // Rank active products by how well they match the query intent
+        List<ScoredCandidate> scored = new ArrayList<>();
+        for (SanPham sp : active) {
+            double fitScore = evaluateConstraintFit(sp, sc);
+
+            // Text match boost if model name or brand is mentioned in query
+            String lowerQuery = query.toLowerCase(Locale.ROOT);
+            if (sp.getTenMay() != null && lowerQuery.contains(sp.getTenMay().toLowerCase())) {
+                fitScore += 2.0;
+            }
+
+            scored.add(new ScoredCandidate(sp, fitScore, 0.5, explainFit(sp, 0.5)));
+        }
+
+        scored.sort(Comparator.comparingDouble(ScoredCandidate::finalScore).reversed());
+
+        return scored.stream()
                 .limit(limit)
-                .map(s -> new SemanticSearchResultDto(
-                        SanPhamMapper.toDto(s),
-                        0.5,
-                        "Kết quả tìm kiếm phù hợp từ kho PhoneNest",
-                        extractKeyHighlights(s),
+                .map(c -> new SemanticSearchResultDto(
+                        SanPhamMapper.toDto(c.product),
+                        Math.round(c.finalScore * 1000.0) / 1000.0,
+                        c.explanation,
+                        extractKeyHighlights(c.product),
                         "KEYWORD_FALLBACK"
                 ))
                 .toList();
@@ -351,6 +481,14 @@ public class SemanticSearchService {
         BigDecimal targetBudget;
         BigDecimal minBudget;
         BigDecimal maxBudget;
+        boolean strictMax = false;
+        boolean maxInclusive = true;
+        boolean minInclusive = true;
+        boolean unlimitedBudget = false;
+        boolean hasCamera = false;
+        boolean hasGaming = false;
+        boolean hasBattery = false;
+        boolean hasValue = false;
     }
 
     private record ScoredCandidate(SanPham product, double finalScore, double vectorScore, String explanation) {}

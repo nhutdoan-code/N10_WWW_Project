@@ -79,7 +79,7 @@ class SemanticSearchServiceTest {
                 "Kháng va đập chuẩn độ bền quân đội, sạc nhanh SuperVOOC 45W.");
 
         List<SanPham> all = List.of(s24Ultra, iphone15ProMax, galaxyA55, pocoX6Pro, redmi13C, oppoA3);
-        when(sanPhamRepository.findAll()).thenReturn(all);
+        lenient().when(sanPhamRepository.findAll()).thenReturn(all);
         for (SanPham s : all) {
             lenient().when(sanPhamRepository.findById(s.getMaSanPham())).thenReturn(Optional.of(s));
         }
@@ -261,5 +261,20 @@ class SemanticSearchServiceTest {
         assertThat(results).isNotEmpty();
         assertThat(results.get(0).retrievalMode()).isEqualTo("KEYWORD_FALLBACK");
         assertThat(results.get(0).sanPham().tenMay()).contains("Samsung");
+    }
+
+    @Test
+    @DisplayName("Inventory: Fallback search excludes products where soLuongTon <= 0")
+    void testFallbackExcludesOutOfStock() {
+        SanPham outOfStock = taoSanPham("SP_OOS_TEST", "Samsung Galaxy Hết Hàng", taoThuongHieu("TH_SS", "Samsung"), s24Ultra.getLoai(),
+                new BigDecimal("5000000"), 5000, "Snapdragon", 90, "50MP", "8MP", "Máy hết hàng");
+        outOfStock.getPhienBans().get(0).setSoLuongTon(0); // SO LUONG TON = 0
+
+        List<SanPham> allWithOos = new java.util.ArrayList<>(List.of(s24Ultra, iphone15ProMax, galaxyA55, pocoX6Pro, redmi13C, oppoA3, outOfStock));
+        lenient().when(sanPhamRepository.findAll()).thenReturn(allWithOos);
+
+        List<SemanticSearchResultDto> results = semanticSearchService.search("Samsung", 10);
+        assertThat(results).extracting(r -> r.sanPham().maSanPham())
+                .doesNotContain("SP_OOS_TEST");
     }
 }

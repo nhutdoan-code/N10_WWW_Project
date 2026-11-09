@@ -44,7 +44,8 @@ public class ChatService {
     private static final Pattern TRIEU = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(triệu|tr)\\b");
     private static final Pattern RANGE = Pattern.compile("(?:từ\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:(?:triệu|tr)\\s*)?(?:đến|tới|-)\\s*(\\d+(?:[.,]\\d+)?)\\s*(triệu|tr)\\b");
 
-    private record DieuKienGia(BigDecimal min, boolean minInclusive, BigDecimal max, boolean maxInclusive, boolean active) {
+    private record DieuKienGia(BigDecimal min, boolean minInclusive, BigDecimal max, boolean maxInclusive,
+                               boolean active) {
         public boolean hopLe(BigDecimal gia) {
             if (gia == null) return false;
             if (min != null) {
@@ -67,14 +68,16 @@ public class ChatService {
             - Chỉ sử dụng thông tin trong phần DỮ LIỆU CỬA HÀNG.
             - Không tự bịa thông số, giá bán hoặc chính sách.
             - Nếu không có thông tin, hãy nói rõ.
-            - Khi tư vấn điện thoại, ưu tiên nhu cầu của khách: ngân sách, chụp ảnh, chơi game, pin, màn hình...
+            - Khi khách hỏi mở (như chụp ảnh đẹp, chơi game, pin trâu, máy đáng mua, giá tốt...), hãy đề xuất ngay các sản phẩm phù hợp nhất từ danh sách SẢN PHẨM.
+            - Khách KHÔNG bắt buộc phải cung cấp ngân sách, hãng hay thông số chi tiết. Nếu khách nói "giá bao nhiêu cũng được", hãy tư vấn các sản phẩm tốt nhất mà không giới hạn mức giá.
+            - Giải thích ngắn gọn lý do từng sản phẩm phù hợp với nhu cầu của khách dựa trên thông số thực tế (camera, chip, pin, màn hình, giá bán...).
+            - Sau khi đã gợi ý sản phẩm, có thể hỏi thêm câu hỏi gợi mở (nếu cần), tuyệt đối không từ chối tư vấn để hỏi thêm.
             - Không gợi ý sản phẩm hết hàng.
-            - Nếu khách chưa nói rõ nhu cầu, hãy hỏi thêm.
 
             QUY TẮC SẢN PHẨM:
             - Danh sách SẢN PHẨM được backend tìm trực tiếp từ database.
-            - Sản phẩm xuất hiện trong danh sách là sản phẩm có thật.
-            - Không được nói cửa hàng không có sản phẩm đã xuất hiện trong danh sách.
+            - Sản phẩm xuất hiện trong danh sách là sản phẩm có thật và còn hàng.
+            - Không được nói cửa hàng không có sản phẩm khi danh sách SẢN PHẨM có sản phẩm.
             - Chỉ sử dụng mã sản phẩm có trong danh sách SẢN PHẨM.
             - Không tự tạo mã sản phẩm.
             - Không tự suy luận RAM, bộ nhớ, màu sắc hoặc thông số không được cung cấp.
@@ -88,8 +91,8 @@ public class ChatService {
                 "maSanPham": ["Mã sản phẩm 1", "Mã sản phẩm 2"]
             }
 
-            - Chỉ đề xuất tối đa 3 sản phẩm.
-            - Nếu không đề xuất sản phẩm thì maSanPham phải là [].
+            - Đề xuất tối đa 3 sản phẩm phù hợp nhất.
+            - Nếu không có sản phẩm nào trong danh sách SẢN PHẨM thì maSanPham phải là [].
             - Mã sản phẩm phải nằm trong danh sách SẢN PHẨM.
 
             DỮ LIỆU CỬA HÀNG
@@ -125,6 +128,18 @@ public class ChatService {
     public ChatDto.Response chat(ChatDto.Request req) {
         String cauHoi = req.message().trim();
 
+        if (laCauHoiChaoHoi(cauHoi)) {
+            return new ChatDto.Response(
+                    "Xin chào! Mình là trợ lý AI của PhoneNest. " +
+                            "Mình có thể giúp bạn tìm kiếm và tư vấn điện thoại, " +
+                            "so sánh sản phẩm, kiểm tra giá bán, " +
+                            "thông tin khuyến mãi và phí vận chuyển. " +
+                            "Bạn cần mình hỗ trợ gì hôm nay?",
+                    List.of(),
+                    "GREETING"
+            );
+        }
+
         List<SanPhamDto> sanPhamChinhXac = timSanPhamChinhXac(cauHoi);
         if (!sanPhamChinhXac.isEmpty() && sanPhamChinhXac.stream().noneMatch(this::coHang) && laCauHoiTonTaiSanPham(cauHoi)) {
             return new ChatDto.Response(
@@ -133,12 +148,52 @@ public class ChatService {
             );
         }
 
-        DieuKienGia dieuKienGia = phanTichDieuKienGia(cauHoi);
-        if (dieuKienGia.active()) return traLoiTheoGia(dieuKienGia);
+        boolean khongGioiHanGia = laGiaBaoNhieuCungDuoc(cauHoi);
+        DieuKienGia dieuKienGia = khongGioiHanGia ? new DieuKienGia(null, false, null, false, false) : phanTichDieuKienGia(cauHoi);
+        String brand = detectBrand(cauHoi.toLowerCase(Locale.ROOT));
+
+        // Check if store inventory has any in-stock products
+        List<SanPhamDto> tatCaKhaDung = sanPhamService.list(null, null, null, null, null, false)
+                .stream().filter(this::coHang).toList();
+        if (tatCaKhaDung.isEmpty()) {
+            if (laCauHoiPhiShip(cauHoi)) {
+                return new ChatDto.Response(
+                        "Phí vận chuyển của PhoneNest:\n" + phiShipText() + "\nPhí được tính theo tỉnh/thành của địa chỉ nhận hàng và hiển thị rõ ở bước thanh toán.",
+                        List.of(),
+                        "KEYWORD_FALLBACK"
+                );
+            }
+            if (laCauHoiVoucher(cauHoi)) {
+                return new ChatDto.Response(
+                        "Hiện cửa hàng có các voucher:\n" + voucherText() + "\nVoucher tốt nhất sẽ được chọn sẵn ở bước thanh toán.",
+                        List.of(),
+                        "KEYWORD_FALLBACK"
+                );
+            }
+            return new ChatDto.Response(
+                    "Hiện tại PhoneNest tạm hết hàng các sản phẩm điện thoại trong kho. Bạn vui lòng quay lại sau ít ngày hoặc liên hệ hotline để được hỗ trợ nhé!",
+                    List.of(),
+                    "OUT_OF_STOCK"
+            );
+        }
 
         TrackingService.Preferences preferences = trackingService.preferences(req.visitorId());
         List<SanPhamDto> sanPhamQuanTam = sanPhamQuanTam(preferences);
-        List<SanPhamDto> ungVien = timSanPhamChoChatbot(cauHoi, sanPhamChinhXac);
+        if (brand != null) {
+            sanPhamQuanTam = sanPhamQuanTam.stream()
+                    .filter(s -> s.tenThuongHieu() != null && s.tenThuongHieu().equalsIgnoreCase(brand))
+                    .toList();
+        }
+        List<SanPhamDto> ungVien = timSanPhamChoChatbot(cauHoi, sanPhamChinhXac, dieuKienGia, brand);
+
+        // When a budget constraint was specified but no products fit that range
+        if (ungVien.isEmpty() && dieuKienGia.active()) {
+            return new ChatDto.Response(
+                    "PhoneNest chưa tìm thấy điện thoại còn hàng phù hợp với khoảng giá bạn yêu cầu.",
+                    List.of(),
+                    "PRICE_FILTER"
+            );
+        }
 
         if (!ungVien.isEmpty() && laCauHoiTonTaiSanPham(cauHoi) && !coCauHoiTuVan(cauHoi)) {
             SanPhamDto sanPham = ungVien.get(0);
@@ -171,11 +226,18 @@ public class ChatService {
 
                 ChatDto.AiReply kq = chatClient.prompt().messages(messages).call().entity(ChatDto.AiReply.class);
                 if (kq != null && kq.reply() != null && !kq.reply().isBlank()) {
-                    List<SanPhamDto> sanPhamDuocChon = sanPhamGoiY(kq.maSanPham(), ungVien);
+                    List<SanPhamDto> sanPhamDuocChon =
+                            sanPhamGoiY(kq.maSanPham(), ungVien);
+
                     if (sanPhamDuocChon.isEmpty() && !ungVien.isEmpty()) {
                         sanPhamDuocChon = ungVien.stream().limit(3).toList();
                     }
-                    return new ChatDto.Response(kq.reply(), sanPhamDuocChon, "GEMINI_AI");
+
+                    return new ChatDto.Response(
+                            kq.reply(),
+                            sanPhamDuocChon,
+                            "GEMINI_AI"
+                    );
                 }
                 log.warn("Gemini không trả về nội dung hợp lệ.");
             } catch (Exception e) {
@@ -185,7 +247,7 @@ public class ChatService {
             log.warn("Chưa cấu hình GEMINI_API_KEY. Chuyển sang chế độ dự phòng.");
         }
 
-        return traLoiTheoTuKhoa(cauHoi, preferences, sanPhamQuanTam);
+        return traLoiTuDongTheoNhuCau(cauHoi, ungVien, dieuKienGia, preferences, sanPhamQuanTam, brand);
     }
 
     private List<SanPhamDto> timSanPhamChinhXac(String cauHoi) {
@@ -204,26 +266,183 @@ public class ChatService {
                 .limit(10).toList();
     }
 
-    private List<SanPhamDto> timSanPhamChoChatbot(String cauHoi, List<SanPhamDto> sanPhamChinhXac) {
+    private List<SanPhamDto> timSanPhamChoChatbot(String cauHoi, List<SanPhamDto> sanPhamChinhXac, DieuKienGia dieuKienGia, String brand) {
         Map<String, SanPhamDto> ketQua = new LinkedHashMap<>();
         if (sanPhamChinhXac != null) {
-            sanPhamChinhXac.stream().filter(this::coHang).forEach(s -> ketQua.putIfAbsent(s.maSanPham(), s));
+            sanPhamChinhXac.stream()
+                    .filter(this::coHang)
+                    .filter(s -> brand == null || (s.tenThuongHieu() != null && s.tenThuongHieu().equalsIgnoreCase(brand)))
+                    .filter(s -> !dieuKienGia.active() || dieuKienGia.hopLe(s.giaBan()))
+                    .forEach(s -> ketQua.putIfAbsent(s.maSanPham(), s));
         }
-        if (!ketQua.isEmpty()) return ketQua.values().stream().limit(8).toList();
 
         try {
             List<SemanticSearchResultDto> semanticResults = semanticSearchService.search(cauHoi, 8);
             if (semanticResults != null) {
                 for (SemanticSearchResultDto result : semanticResults) {
                     if (result != null && result.sanPham() != null && coHang(result.sanPham())) {
-                        ketQua.putIfAbsent(result.sanPham().maSanPham(), result.sanPham());
+                        if (brand == null || (result.sanPham().tenThuongHieu() != null && result.sanPham().tenThuongHieu().equalsIgnoreCase(brand))) {
+                            if (!dieuKienGia.active() || dieuKienGia.hopLe(result.sanPham().giaBan())) {
+                                ketQua.putIfAbsent(result.sanPham().maSanPham(), result.sanPham());
+                            }
+                        }
                     }
                 }
             }
         } catch (Exception e) {
             log.error("Lỗi Semantic Search khi tìm ứng viên cho chatbot.", e);
         }
+
+        if (ketQua.size() < 3) {
+            List<SanPhamDto> dbCandidates = timSanPhamTheoNhuCau(cauHoi, dieuKienGia, brand);
+            for (SanPhamDto sp : dbCandidates) {
+                if (coHang(sp) && (!dieuKienGia.active() || dieuKienGia.hopLe(sp.giaBan()))) {
+                    ketQua.putIfAbsent(sp.maSanPham(), sp);
+                }
+                if (ketQua.size() >= 8) break;
+            }
+        }
+
         return ketQua.values().stream().limit(8).toList();
+    }
+
+    private boolean laGiaBaoNhieuCungDuoc(String cauHoi) {
+        String k = chuanHoaVanBan(cauHoi);
+        return k.contains("gia bao nhieu cung duoc")
+                || k.contains("bao nhieu tien cung duoc")
+                || k.contains("gia nao cung duoc")
+                || k.contains("khong quan trong gia")
+                || k.contains("khong gioi han gia")
+                || k.contains("thoai mai gia")
+                || k.contains("bat ky gia nao");
+    }
+
+    private List<SanPhamDto> timSanPhamTheoNhuCau(String cauHoi, DieuKienGia dieuKienGia, String brand) {
+        String lower = cauHoi.toLowerCase(Locale.ROOT);
+        boolean laCamera = lower.contains("chụp") || lower.contains("ảnh") || lower.contains("camera") || lower.contains("selfie") || lower.contains("quay video") || lower.contains("quay phim");
+        boolean laGaming = lower.contains("game") || lower.contains("gaming") || lower.contains("cấu hình") || lower.contains("hiệu năng") || lower.contains("chip") || lower.contains("mượt");
+        boolean laPin = lower.contains("pin") || lower.contains("pin trâu") || lower.contains("pin khủng") || lower.contains("pin lâu") || lower.contains("dung lượng pin");
+        boolean laGiaTot = lower.contains("giá tốt") || lower.contains("giá rẻ") || lower.contains("ngon bổ rẻ") || lower.contains("tiết kiệm") || lower.contains("hợp lý");
+
+        if (brand == null) {
+            brand = detectBrand(lower);
+        }
+        final String targetBrand = brand;
+
+        List<SanPhamDto> tatCa = sanPhamService.list(null, null, null, null, "ban_chay", false)
+                .stream()
+                .filter(this::coHang)
+                .filter(s -> targetBrand == null || (s.tenThuongHieu() != null && s.tenThuongHieu().equalsIgnoreCase(targetBrand)))
+                .filter(s -> !dieuKienGia.active() || dieuKienGia.hopLe(s.giaBan()))
+                .toList();
+
+        if (tatCa.isEmpty()) return List.of();
+
+        Comparator<SanPhamDto> comparator;
+        if (laCamera && laGiaTot) {
+            comparator = Comparator.comparingDouble(this::diemCameraGiaTot).reversed()
+                    .thenComparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if (laCamera) {
+            comparator = Comparator.comparingInt(this::diemCamera).reversed()
+                    .thenComparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if (laGaming) {
+            comparator = Comparator.comparingInt(this::diemGaming).reversed()
+                    .thenComparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if (laPin) {
+            comparator = Comparator.comparingInt(this::diemPin).reversed()
+                    .thenComparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if (laGiaTot) {
+            comparator = Comparator.comparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(SanPhamDto::giaBan);
+        } else {
+            comparator = Comparator.comparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(SanPhamDto::soLuongTon, Comparator.reverseOrder());
+        }
+
+        return tatCa.stream().sorted(comparator).limit(8).toList();
+    }
+
+    private double diemCameraGiaTot(SanPhamDto s) {
+        int cam = diemCamera(s);
+        BigDecimal gia = s.giaBan();
+        double valueBonus = 0.0;
+        if (gia != null) {
+            long giaVnd = gia.longValue();
+            if (giaVnd <= 8_000_000L) {
+                valueBonus = 40.0;
+            } else if (giaVnd <= 12_000_000L) {
+                valueBonus = 25.0;
+            } else if (giaVnd <= 18_000_000L) {
+                valueBonus = 10.0;
+            }
+        }
+        double ratingBonus = (s.diemDanhGiaTb() != null && s.diemDanhGiaTb().compareTo(BigDecimal.valueOf(4.0)) >= 0) ? 10.0 : 0.0;
+        return cam + valueBonus + ratingBonus;
+    }
+
+    private boolean laCauHoiPhiShip(String cauHoi) {
+        String k = cauHoi.toLowerCase(Locale.ROOT);
+        return k.contains("ship") || k.contains("giao hang") || k.contains("giao hàng")
+                || k.contains("van chuyen") || k.contains("vận chuyển");
+    }
+
+    private boolean laCauHoiVoucher(String cauHoi) {
+        String k = cauHoi.toLowerCase(Locale.ROOT);
+        return k.contains("khuyen mai") || k.contains("khuyến mãi") || k.contains("voucher")
+                || k.contains("giam gia") || k.contains("giảm giá") || k.contains("ma giam") || k.contains("mã giảm");
+    }
+
+    private int diemCamera(SanPhamDto s) {
+        if (s.thongSo() == null) return 0;
+        int score = 0;
+        String camSau = s.thongSo().cameraSau();
+        if (camSau != null) {
+            Matcher m = Pattern.compile("(\\d+)\\s*mp", Pattern.CASE_INSENSITIVE).matcher(camSau);
+            if (m.find()) {
+                score += Integer.parseInt(m.group(1));
+            }
+            if (camSau.contains("+")) {
+                score += 20;
+            }
+        }
+        if (s.thongSo().cameraTruoc() != null) {
+            score += s.thongSo().cameraTruoc();
+        }
+        return score;
+    }
+
+    private int diemGaming(SanPhamDto s) {
+        if (s.thongSo() == null) return 0;
+        int score = 0;
+        String chip = s.thongSo().chip() != null ? s.thongSo().chip().toLowerCase(Locale.ROOT) : "";
+        if (chip.contains("snapdragon 8") || chip.contains("a17") || chip.contains("a18") || chip.contains("dimensity 9") || chip.contains("dimensity 8300")) {
+            score += 100;
+        } else if (chip.contains("snapdragon") || chip.contains("dimensity") || chip.contains("apple")) {
+            score += 50;
+        }
+        if (s.thongSo().ram() != null) {
+            score += s.thongSo().ram() * 5;
+        }
+        if (s.thongSo().tanSoQuet() != null && s.thongSo().tanSoQuet() >= 120) {
+            score += 30;
+        }
+        return score;
+    }
+
+    private int diemPin(SanPhamDto s) {
+        if (s.thongSo() == null) return 0;
+        int pin = s.thongSo().pin() != null ? s.thongSo().pin() : 0;
+        int sac = s.thongSo().congSuatSac() != null ? s.thongSo().congSuatSac() : 0;
+        return pin + (sac * 10);
+    }
+
+    private String detectBrand(String lower) {
+        if (lower.contains("iphone") || lower.contains("apple")) return "Apple";
+        if (lower.contains("samsung") || lower.contains("galaxy")) return "Samsung";
+        if (lower.contains("xiaomi") || lower.contains("redmi") || lower.contains("poco")) return "Xiaomi";
+        if (lower.contains("oppo")) return "OPPO";
+        if (lower.contains("vivo")) return "Vivo";
+        return null;
     }
 
     private String chuanHoaVanBan(String value) {
@@ -251,6 +470,21 @@ public class ChatService {
         return k.contains("gia") || k.contains("ram") || k.contains("bo nho") || k.contains("camera") || k.contains("pin") || k.contains("mau sac") || k.contains("phien ban") || k.contains("so sanh") || k.contains("tu van");
     }
 
+    private boolean laCauHoiChaoHoi(String cauHoi) {
+        String k = chuanHoaVanBan(cauHoi);
+
+        return k.matches(
+                "^(xin chao|chao|hello|hi|hey)( ban)?$"
+        )
+                || k.matches(
+                "^(xin chao|chao|hello|hi|hey).*" +
+                        "(ban la ai|ban lam gi|gioi thieu).*"
+        )
+                || k.matches(
+                "^(ban la ai|ban lam gi|gioi thieu ve ban).*"
+        );
+    }
+
     private boolean coKhoaAi() {
         return apiKey != null && !apiKey.isBlank() && !apiKey.equals("chua-cau-hinh");
     }
@@ -262,13 +496,21 @@ public class ChatService {
     }
 
     private DieuKienGia phanTichDieuKienGia(String cauHoi) {
+        if (laGiaBaoNhieuCungDuoc(cauHoi)) {
+            return new DieuKienGia(null, false, null, false, false);
+        }
+
         String k = cauHoi.toLowerCase(Locale.ROOT).replace(",", ".");
         Matcher rangeMatcher = RANGE.matcher(k);
 
         if (rangeMatcher.find()) {
             BigDecimal min = doiSangTien(rangeMatcher.group(1));
             BigDecimal max = doiSangTien(rangeMatcher.group(2));
-            if (min.compareTo(max) > 0) { BigDecimal temp = min; min = max; max = temp; }
+            if (min.compareTo(max) > 0) {
+                BigDecimal temp = min;
+                min = max;
+                max = temp;
+            }
             return new DieuKienGia(min, true, max, true, true);
         }
 
@@ -276,10 +518,14 @@ public class ChatService {
         if (!matcher.find()) return new DieuKienGia(null, false, null, false, false);
 
         BigDecimal gia = doiSangTien(matcher.group(1));
-        if (k.contains("trên") || k.contains("hơn") || k.contains("lớn hơn") || k.contains("cao hơn")) return new DieuKienGia(gia, false, null, false, true);
-        if (k.contains("từ") || k.contains("ít nhất") || k.contains("tối thiểu") || k.contains("trở lên")) return new DieuKienGia(gia, true, null, false, true);
-        if (k.contains("dưới") || k.contains("thấp hơn") || k.contains("nhỏ hơn") || k.contains("ít hơn")) return new DieuKienGia(null, false, gia, false, true);
-        if (k.contains("không quá") || k.contains("tối đa") || k.contains("không vượt quá")) return new DieuKienGia(null, false, gia, true, true);
+        if (k.contains("trên") || k.contains("hơn") || k.contains("lớn hơn") || k.contains("cao hơn"))
+            return new DieuKienGia(gia, false, null, false, true);
+        if (k.contains("từ") || k.contains("ít nhất") || k.contains("tối thiểu") || k.contains("trở lên"))
+            return new DieuKienGia(gia, true, null, false, true);
+        if (k.contains("dưới") || k.contains("thấp hơn") || k.contains("nhỏ hơn") || k.contains("ít hơn"))
+            return new DieuKienGia(null, false, gia, false, true);
+        if (k.contains("không quá") || k.contains("tối đa") || k.contains("không vượt quá"))
+            return new DieuKienGia(null, false, gia, true, true);
         if (k.contains("khoảng") || k.contains("tầm") || k.contains("quanh")) {
             BigDecimal saiSo = gia.multiply(new BigDecimal("0.1"));
             return new DieuKienGia(gia.subtract(saiSo), true, gia.add(saiSo), true, true);
@@ -291,16 +537,7 @@ public class ChatService {
         return new BigDecimal(gia).multiply(BigDecimal.valueOf(1_000_000));
     }
 
-    private ChatDto.Response traLoiTheoGia(DieuKienGia dieuKienGia) {
-        List<SanPhamDto> danhSach = sanPhamService.list(null, null, null, null, null, false).stream()
-                .filter(this::coHang).filter(s -> dieuKienGia.hopLe(s.giaBan())).sorted(Comparator.comparing(SanPhamDto::giaBan)).limit(3).toList();
 
-        if (danhSach.isEmpty()) {
-            return new ChatDto.Response("PhoneNest hiện chưa tìm thấy điện thoại đang kinh doanh và còn hàng phù hợp với mức giá bạn yêu cầu. Bạn có thể thử một mức giá khác nhé!", List.of(), "PRICE_FILTER");
-        }
-        String reply = "Các điện thoại phù hợp với mức giá bạn yêu cầu:\n" + danhSach.stream().map(s -> "• " + s.tenMay() + " - " + tien(s.giaBan())).collect(Collectors.joining("\n"));
-        return new ChatDto.Response(reply, danhSach, "PRICE_FILTER");
-    }
 
     private List<Message> lichSu(List<ChatDto.Turn> history) {
         if (history == null || history.isEmpty()) return List.of();
@@ -316,9 +553,15 @@ public class ChatService {
         return s.length() > 500 ? s.substring(0, 500) : s;
     }
 
-    private ChatDto.Response traLoiTheoTuKhoa(String cauHoi, TrackingService.Preferences preferences, List<SanPhamDto> sanPhamQuanTam) {
+    private ChatDto.Response traLoiTuDongTheoNhuCau(
+            String cauHoi,
+            List<SanPhamDto> ungVien,
+            DieuKienGia dieuKienGia,
+            TrackingService.Preferences preferences,
+            List<SanPhamDto> sanPhamQuanTam,
+            String brand
+    ) {
         String k = cauHoi.toLowerCase(Locale.ROOT);
-
         if (k.contains("ship") || k.contains("giao hàng") || k.contains("vận chuyển")) {
             return new ChatDto.Response("Phí vận chuyển của PhoneNest:\n" + phiShipText() + "\nPhí được tính theo tỉnh/thành của địa chỉ nhận hàng và hiển thị rõ ở bước thanh toán.", List.of(), "KEYWORD_FALLBACK");
         }
@@ -326,67 +569,166 @@ public class ChatService {
             return new ChatDto.Response("Hiện cửa hàng có các voucher:\n" + voucherText() + "\nVoucher tốt nhất sẽ được chọn sẵn ở bước thanh toán.", List.of(), "KEYWORD_FALLBACK");
         }
 
-        List<SemanticSearchResultDto> semanticResults = List.of();
-        try {
-            semanticResults = semanticSearchService.search(cauHoi, 3);
-        } catch (Exception e) {
-            log.error("Lỗi khi tìm kiếm Vector Database: {}", e.getMessage(), e);
+        Map<String, SanPhamDto> candidates = new LinkedHashMap<>();
+        if (ungVien != null) {
+            ungVien.stream().filter(this::coHang).forEach(s -> candidates.put(s.maSanPham(), s));
         }
 
-        List<SemanticSearchResultDto> ketQuaSemantic = semanticResults == null ? List.of() : semanticResults.stream().filter(Objects::nonNull).filter(r -> r.sanPham() != null && coHang(r.sanPham())).toList();
-
-        if (!ketQuaSemantic.isEmpty()) {
-            StringBuilder reply = new StringBuilder();
-            BigDecimal toiDa = nganSach(k);
-            if (toiDa != null) reply.append("Với ngân sách khoảng ").append(tien(toiDa)).append(", PhoneNest gợi ý cho bạn:\n");
-            else reply.append("Dựa trên nhu cầu của bạn, PhoneNest gợi ý các mẫu máy phù hợp:\n");
-
-            for (SemanticSearchResultDto r : ketQuaSemantic) {
-                reply.append("• ").append(r.sanPham().tenMay()).append(" (").append(tien(r.sanPham().giaBan())).append("): ").append(r.lyDoPhuHop()).append("\n");
+        if (candidates.size() < 3) {
+            List<SanPhamDto> dbList = timSanPhamTheoNhuCau(cauHoi, dieuKienGia, brand);
+            for (SanPhamDto s : dbList) {
+                if (coHang(s)) {
+                    candidates.putIfAbsent(s.maSanPham(), s);
+                }
             }
-            String mode = ketQuaSemantic.get(0).retrievalMode() != null ? ketQuaSemantic.get(0).retrievalMode() : "VECTOR_SEMANTIC";
-            return new ChatDto.Response(reply.toString().trim(), ketQuaSemantic.stream().map(SemanticSearchResultDto::sanPham).toList(), mode);
         }
 
-        if (chuaKhoaModel(cauHoi)) {
-            return new ChatDto.Response("PhoneNest chưa tìm thấy mẫu điện thoại đúng với tên hoặc mã sản phẩm bạn vừa hỏi. Bạn kiểm tra lại tên model giúp mình nhé!", List.of(), "KEYWORD_FALLBACK");
+        if (sanPhamQuanTam != null) {
+            sanPhamQuanTam.stream().filter(this::coHang)
+                    .filter(s -> brand == null || (s.tenThuongHieu() != null && s.tenThuongHieu().equalsIgnoreCase(brand)))
+                    .filter(s -> !dieuKienGia.active() || dieuKienGia.hopLe(s.giaBan()))
+                    .forEach(s -> candidates.putIfAbsent(s.maSanPham(), s));
         }
 
-        BigDecimal toiDa = nganSach(k);
-        List<SanPhamDto> dsSanPham = sanPhamService.list(null, null, null, toiDa, "ban_chay", false);
-        List<SanPhamDto> kq = dsSanPham.stream().filter(this::coHang).filter(s -> khop(s, k) || matchesNhuCau(s, k)).limit(3).toList();
-
-        if (kq.isEmpty()) {
-            Map<String, SanPhamDto> candidates = new LinkedHashMap<>();
-            dsSanPham.stream().filter(this::coHang).forEach(s -> candidates.put(s.maSanPham(), s));
-            sanPhamQuanTam.stream().filter(this::coHang).filter(s -> toiDa == null || (s.giaBan() != null && s.giaBan().compareTo(toiDa) <= 0)).forEach(s -> candidates.putIfAbsent(s.maSanPham(), s));
-
-            kq = candidates.values().stream()
+        List<SanPhamDto> danhSach;
+        if (preferences != null && (!preferences.productIds().isEmpty() || !preferences.searchTerms().isEmpty())) {
+            danhSach = candidates.values().stream()
                     .sorted(Comparator.comparingInt((SanPhamDto s) -> diemQuanTam(s, preferences)).reversed()
                             .thenComparing(SanPhamDto::diemDanhGiaTb, Comparator.nullsLast(Comparator.reverseOrder())))
                     .limit(3).toList();
+        } else {
+            danhSach = candidates.values().stream().limit(3).toList();
         }
 
-        if (!kq.isEmpty()) {
-            String mo = toiDa == null ? "Dưới đây là một số mẫu điện thoại phù hợp với yêu cầu của bạn:" : "Với ngân sách dưới " + tien(toiDa) + ", PhoneNest gợi ý bạn các mẫu máy sau:";
-            return new ChatDto.Response(mo, kq, "KEYWORD_FALLBACK");
+        if (danhSach.isEmpty()) {
+            if (dieuKienGia.active()) {
+                return new ChatDto.Response(
+                        "PhoneNest chưa tìm thấy điện thoại còn hàng phù hợp với khoảng giá bạn yêu cầu.",
+                        List.of(),
+                        "PRICE_FILTER"
+                );
+            }
+            if (!coSanPhamKhaDung()) {
+                return new ChatDto.Response(
+                        "Hiện tại cửa hàng PhoneNest đang tạm hết hàng các dòng điện thoại. Bạn vui lòng quay lại sau nhé!",
+                        List.of(),
+                        "OUT_OF_STOCK"
+                );
+            }
+            return new ChatDto.Response(
+                    "PhoneNest chưa tìm thấy sản phẩm phù hợp hoàn toàn với yêu cầu của bạn. Bạn vui lòng thử tìm theo thương hiệu hoặc khoảng giá khác nhé!",
+                    List.of(),
+                    "KEYWORD_FALLBACK"
+            );
         }
 
-        return new ChatDto.Response("PhoneNest chưa tìm thấy sản phẩm phù hợp hoàn toàn với yêu cầu của bạn. Bạn vui lòng thử tìm theo thương hiệu hoặc ngân sách chi tiết hơn nhé!", List.of(), "KEYWORD_FALLBACK");
+        boolean laCamera = k.contains("chụp") || k.contains("ảnh") || k.contains("camera") || k.contains("selfie");
+        boolean laGaming = k.contains("game") || k.contains("gaming") || k.contains("cấu hình") || k.contains("hiệu năng") || k.contains("chip");
+        boolean laPin = k.contains("pin");
+        boolean laGiaBaoNhieu = laGiaBaoNhieuCungDuoc(cauHoi);
+
+        StringBuilder reply = new StringBuilder();
+        if (dieuKienGia.active()) {
+            if (dieuKienGia.min() != null && dieuKienGia.max() != null) {
+                reply.append("Với ngân sách từ ").append(tien(dieuKienGia.min()))
+                        .append(" đến ").append(tien(dieuKienGia.max()))
+                        .append(", PhoneNest gợi ý cho bạn các mẫu máy sau:\n");
+            } else if (dieuKienGia.max() != null) {
+                reply.append("Với ngân sách dưới ").append(tien(dieuKienGia.max()))
+                        .append(", PhoneNest gợi ý cho bạn các mẫu máy sau:\n");
+            } else {
+                reply.append("Với ngân sách từ ").append(tien(dieuKienGia.min()))
+                        .append(", PhoneNest gợi ý cho bạn các mẫu máy sau:\n");
+            }
+        } else if (laGiaBaoNhieu) {
+            reply.append("Không giới hạn mức giá, PhoneNest gợi ý cho bạn các mẫu điện thoại nổi bật nhất theo nhu cầu:\n");
+        } else if (laCamera) {
+            reply.append("Dựa trên nhu cầu chụp ảnh đẹp, PhoneNest gợi ý cho bạn các mẫu điện thoại có hệ thống camera ấn tượng:\n");
+        } else if (laGaming) {
+            reply.append("Dựa trên nhu cầu chơi game và hiệu năng cao, PhoneNest gợi ý cho bạn các mẫu điện thoại mạnh mẽ:\n");
+        } else if (laPin) {
+            reply.append("Dựa trên nhu cầu pin trâu, PhoneNest gợi ý cho bạn các mẫu điện thoại có thời lượng pin ấn tượng:\n");
+        } else {
+            reply.append("Dựa trên nhu cầu của bạn, PhoneNest gợi ý các mẫu máy phù hợp đang có sẵn tại cửa hàng:\n");
+        }
+
+        for (SanPhamDto s : danhSach) {
+            reply.append("• ").append(s.tenMay())
+                    .append(" (").append(tien(s.giaBan())).append("): ")
+                    .append(trichXuatDiemNoiBat(s, laCamera, laGaming, laPin))
+                    .append("\n");
+        }
+        reply.append("\nBạn có thể bấm vào sản phẩm bên dưới để xem chi tiết hoặc hỏi thêm mình nhé!");
+
+        return new ChatDto.Response(reply.toString().trim(), danhSach, "KEYWORD_FALLBACK");
     }
 
-    private boolean chuaKhoaModel(String cauHoi) {
-        String k = chuanHoaVanBan(cauHoi);
-        return k.matches(".*\\b[a-z]+\\s*\\d+[a-z0-9 ]*.*");
+    private String trichXuatDiemNoiBat(SanPhamDto s, boolean laCamera, boolean laGaming, boolean laPin) {
+        if (s == null || s.thongSo() == null) {
+            return s != null && s.moTa() != null && !s.moTa().isBlank() ? s.moTa() : "Sản phẩm chính hãng với hiệu năng ổn định.";
+        }
+        var ts = s.thongSo();
+        List<String> highlights = new ArrayList<>();
+
+        if (laCamera) {
+            if (ts.cameraSau() != null && !ts.cameraSau().isBlank()) {
+                highlights.add("Camera sau " + ts.cameraSau());
+            }
+            if (ts.cameraTruoc() != null) {
+                highlights.add("Camera selfie " + ts.cameraTruoc() + "MP");
+            }
+        }
+
+        if (laGaming) {
+            if (ts.chip() != null && !ts.chip().isBlank()) {
+                highlights.add("Chip " + ts.chip());
+            }
+            if (ts.ram() != null) {
+                highlights.add("RAM " + ts.ram() + "GB");
+            }
+            if (ts.tanSoQuet() != null && ts.tanSoQuet() >= 90) {
+                highlights.add("Màn hình mượt " + ts.tanSoQuet() + "Hz");
+            }
+        }
+
+        if (laPin) {
+            if (ts.pin() != null) {
+                highlights.add("Pin khủng " + ts.pin() + " mAh");
+            }
+            if (ts.congSuatSac() != null && ts.congSuatSac() >= 30) {
+                highlights.add("Sạc nhanh " + ts.congSuatSac() + "W");
+            }
+        }
+
+        if (highlights.isEmpty()) {
+            if (ts.chip() != null && !ts.chip().isBlank()) {
+                highlights.add("Chip " + ts.chip());
+            }
+            if (ts.cameraSau() != null && !ts.cameraSau().isBlank()) {
+                highlights.add("Camera " + ts.cameraSau());
+            }
+            if (ts.pin() != null) {
+                highlights.add("Pin " + ts.pin() + " mAh");
+            }
+            if (ts.ram() != null) {
+                highlights.add(ts.ram() + "GB RAM");
+            }
+        }
+
+        if (highlights.isEmpty()) {
+            return ts.tomTat() != null && !ts.tomTat().isBlank() ? ts.tomTat() : "Sản phẩm chính hãng nổi bật.";
+        }
+
+        return String.join(", ", highlights) + ".";
     }
 
-    private boolean matchesNhuCau(SanPhamDto s, String k) {
-        if (s.thongSo() == null || s.thongSo().tomTat() == null) return false;
-        String tomTat = s.thongSo().tomTat().toLowerCase(Locale.ROOT);
-        if (k.contains("pin") || k.contains("pin trâu")) return tomTat.contains("mah") || tomTat.contains("pin");
-        if (k.contains("game") || k.contains("cấu hình")) return tomTat.contains("snapdragon") || tomTat.contains("dimensity") || tomTat.contains("ram");
-        if (k.contains("chụp") || k.contains("ảnh") || k.contains("camera")) return tomTat.contains("mp") || tomTat.contains("camera");
-        return false;
+    private boolean coSanPhamKhaDung() {
+        try {
+            List<SanPhamDto> ds = sanPhamService.list(null, null, null, null, null, false);
+            return ds != null && ds.stream().anyMatch(this::coHang);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private List<SanPhamDto> sanPhamQuanTam(TrackingService.Preferences preferences) {
@@ -407,7 +749,8 @@ public class ChatService {
     private int diemQuanTam(SanPhamDto sanPham, TrackingService.Preferences preferences) {
         int idScore = preferences.productIds().indexOf(sanPham.maSanPham());
         int score = idScore < 0 ? 0 : preferences.productIds().size() - idScore;
-        if (preferences.searchTerms().stream().anyMatch(term -> khop(sanPham, term.toLowerCase(Locale.ROOT)))) score += 5;
+        if (preferences.searchTerms().stream().anyMatch(term -> khop(sanPham, term.toLowerCase(Locale.ROOT))))
+            score += 5;
         return score;
     }
 
