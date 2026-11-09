@@ -17,13 +17,13 @@ const getVisitorId = () => {
 };
 
 export const chatService = {
-  send: (message, history = [], visitorId) => {
+  send: (message, history = [], visitorId, config = {}) => {
     const id = getVisitorId();
 
     return api.post('/chat', {
       message,
       history,
       visitorId: id
-    });
+    }, config);
   }
 };
