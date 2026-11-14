@@ -11,13 +11,16 @@ export default function InvoicePage() {
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
 
+  const completed = o.trangThai === 'DA_GIAO';
+
   return (
     <div className="invoice">
       <div className="row between no-print">
-        <h2>Hóa đơn</h2>
+        <h2>{completed ? 'Hóa đơn' : 'Thông tin đơn hàng'}</h2>
         <button className="btn btn-primary" onClick={() => window.print()}>In / Lưu PDF</button>
       </div>
-      <h1>PhoneNest - HÓA ĐƠN BÁN HÀNG</h1>
+      <h1>PhoneNest - {completed ? 'HÓA ĐƠN BÁN HÀNG' : 'PHIẾU THÔNG TIN ĐƠN HÀNG'}</h1>
+      {!completed && <p>Đơn hàng chưa hoàn thành. Tài liệu này chỉ để đối chiếu thông tin, không phải xác nhận đã thanh toán.</p>}
       <p>Mã đơn: <b>{o.maDonHang}</b> · Ngày: {formatDate(o.ngayMua)}</p>
       <p>Giao đến: {o.diaChiGiaoHang}</p>
       <p>Thanh toán: {PAYMENT_METHODS.find((m) => m.value === o.phuongThucTt)?.label}</p>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import ReviewForm from '../components/ReviewForm';
 import OrderSteps from '../components/OrderSteps';
@@ -13,6 +12,7 @@ import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatPrice } from '../utils/format';
+import { getOrderActions } from '../utils/orderActions';
 
 export default function OrderDetailPage() {
   const { ma } = useParams();
@@ -22,15 +22,24 @@ export default function OrderDetailPage() {
     () => (o?.phuongThucTt === 'VI_DIEN_TU' ? orderService.paymentStatus(ma) : Promise.resolve(null)),
     [ma, o?.phuongThucTt]
   );
-  const [returnForm, setReturnForm] = useState(null);
   const [cancelForm, setCancelForm] = useState(null);
   const [reviewing, setReviewing] = useState(null);
   const [confirmReceive, setConfirmReceive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [reorderPicker, setReorderPicker] = useState(false);
   const { data: reviewStates, loading: reviewsLoading, error: reviewsError, reload: reloadReviews } = useFetch(
     () => (o?.trangThai === 'DA_GIAO' ? customerService.orderReviews(ma) : Promise.resolve([])),
     [ma, o?.trangThai]
+  );
+  // Yêu cầu hậu mãi có thể là đổi trả, bảo hành hoặc khiếu nại.
+  // Chỉ hiện nút theo dõi trên đơn này khi thực sự đã có yêu cầu.
+  const { data: existingRequests } = useFetch(
+    () => (o?.maDonHang
+      ? Promise.all([customerService.returns(), customerService.afterSales()])
+          .then(([returns, afterSales]) => [...(returns || []), ...(afterSales || [])])
+      : Promise.resolve([])),
+    [ma, o?.maDonHang]
   );
   const { replace } = useCart();
   const toast = useToast();
@@ -92,7 +101,18 @@ export default function OrderDetailPage() {
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
 
+  const actions = getOrderActions(o.trangThai);
+  const hasAfterSalesRequest = Boolean(o.trangThaiDoiTra) ||
+    (existingRequests || []).some((req) => req.maDonHang === o.maDonHang);
   const huy = o.trangThai === 'DA_HUY';
+  const muaLaiMotSanPham = (dong) => {
+    if (!dong?.maPhienBan) {
+      toast('Không xác định được phiên bản sản phẩm để mua lại.', 'error');
+      return;
+    }
+    setReorderPicker(false);
+    navigate(`/checkout?mua=${encodeURIComponent(dong.maPhienBan)}&sl=1`);
+  };
 
   return (
     <>
@@ -200,30 +220,7 @@ export default function OrderDetailPage() {
             </section>
           )}
 
-          {returnForm && (
-            <form
-              className="form section"
-              onSubmit={(e) => {
-                e.preventDefault();
-                run(async () => {
-                  await customerService.requestReturn({ maDonHang: o.maDonHang, ...returnForm });
-                  setReturnForm(null);
-                  reloadReviews();
-                }, 'Đã gửi yêu cầu đổi trả');
-              }}
-            >
-              <h3>Yêu cầu đổi trả / hoàn tiền</h3>
-              <label className="field">
-                <span>Lý do đổi trả</span>
-                <textarea rows="3" required value={returnForm.lyDo} onChange={(e) => setReturnForm({ ...returnForm, lyDo: e.target.value })} />
-              </label>
-              <FormField label="Link ảnh minh chứng" value={returnForm.hinhAnhMinhChung} onChange={(e) => setReturnForm({ ...returnForm, hinhAnhMinhChung: e.target.value })} />
-              <div className="row end">
-                <button type="button" className="btn" onClick={() => setReturnForm(null)}>Hủy</button>
-                <button className="btn btn-primary">Gửi yêu cầu</button>
-              </div>
-            </form>
-          )}
+
         </div>
 
         <aside className="side">
@@ -242,20 +239,65 @@ export default function OrderDetailPage() {
           {o.trangThai === 'CHO_KHACH_XAC_NHAN' && (
               <button className="btn btn-primary" onClick={() => setConfirmReceive(true)}>Đã nhận được hàng</button>
           )}
-          <button
-            className="btn"
-            onClick={() => run(async () => { replace(await orderService.reorder(o.maDonHang)); navigate('/cart'); }, 'Đã thêm các sản phẩm vào giỏ hàng')}
-          >
-            Mua lại
-          </button>
-          <Link className="btn" to={`/orders/${o.maDonHang}/invoice`}>Xuất hóa đơn (PDF)</Link>
-          {o.trangThai === 'DA_GIAO' && !o.trangThaiDoiTra && (
-            <button className="btn" onClick={() => setReturnForm({ lyDo: '', hinhAnhMinhChung: '' })}>Yêu cầu đổi trả / hoàn tiền</button>
+          {actions.reorder && (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => o.chiTiet.length === 1
+                  ? muaLaiMotSanPham(o.chiTiet[0])
+                  : setReorderPicker(true)}
+              >
+                Mua lại sản phẩm
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  if (!window.confirm('Thêm tất cả sản phẩm của đơn cũ vào giỏ hiện tại? Các sản phẩm đang có trong giỏ vẫn được giữ lại.')) return;
+                  run(async () => { replace(await orderService.reorder(o.maDonHang)); navigate('/cart'); }, 'Đã thêm sản phẩm của đơn cũ vào giỏ');
+                }}
+              >
+                Thêm cả đơn vào giỏ
+              </button>
+            </>
           )}
-          {['CHO_XAC_NHAN', 'DANG_XU_LY'].includes(o.trangThai) && (
+          <Link className="btn" to={`/orders/${o.maDonHang}/invoice`}>
+            {actions.afterDelivery ? 'Xuất hóa đơn (PDF)' : 'Tải thông tin đơn hàng (PDF)'}
+          </Link>
+          {actions.afterDelivery && (
+            <>
+              <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=TRA_HANG_HOAN_TIEN`}>Đổi / trả hàng</Link>
+              <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=BAO_HANH`}>Yêu cầu bảo hành</Link>
+            </>
+          )}
+          {actions.complain && (
+            <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=KHIEU_NAI`}>Gửi khiếu nại</Link>
+          )}
+          {hasAfterSalesRequest && (
+            <Link className="btn" to="/returns">Theo dõi yêu cầu hậu mãi</Link>
+          )}
+          {actions.cancel && (
             <button className="btn btn-danger" onClick={() => setCancelForm({ lyDo: CANCEL_REASONS[0], khac: '' })}>Hủy đơn hàng</button>
           )}
         </aside>
+        {actions.reorder && reorderPicker && (
+          <Modal title="Chọn sản phẩm muốn mua lại" onClose={() => setReorderPicker(false)}>
+            <p className="muted">Mỗi lần chỉ mua một sản phẩm, số lượng mặc định là 1. Giỏ hàng hiện tại không bị thay đổi.</p>
+            {o.chiTiet.map((dong) => (
+              <div key={dong.maPhienBan} className="line-item">
+                <ProductImage className="thumb" src={dong.anhChinh} alt="" />
+                <div className="grow">
+                  <b>{dong.tenMay}</b>
+                  <p className="muted">Giá mua cũ: {formatPrice(dong.donGia)}</p>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={() => muaLaiMotSanPham(dong)}>
+                  Mua 1 sản phẩm
+                </button>
+              </div>
+            ))}
+          </Modal>
+        )}
         {reviewing && (
           <Modal title="Đánh giá sản phẩm" onClose={() => setReviewing(null)}>
             <ReviewForm maDonHang={o.maDonHang} sanPham={reviewing} onCancel={() => setReviewing(null)}

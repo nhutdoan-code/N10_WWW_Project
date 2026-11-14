@@ -21,6 +21,13 @@ export const customerService = {
 
   returns: () => api.get('/customer/returns'),
   requestReturn: (data) => api.post('/customer/returns', data),
+  afterSales: () => api.get('/customer/after-sales'),
+  createAfterSale: (data) => api.post('/customer/after-sales', data),
+  uploadAfterSaleImage: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/customer/after-sales/images', form);
+  },
 
   notifications: () => api.get('/notifications'),
   markRead: (ma) => api.put(`/notifications/${ma}/read`),

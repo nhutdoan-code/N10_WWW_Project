@@ -206,7 +206,7 @@ export default function MainLayout() {
           <div>
             <h4>Tài khoản</h4>
             <Link to="/orders">Đơn hàng của tôi</Link>
-            <Link to="/returns">Đổi trả / hoàn tiền</Link>
+            <Link to="/returns">Hậu mãi / bảo hành</Link>
             <Link to="/account/addresses">Địa chỉ giao hàng</Link>
           </div>
           <div>

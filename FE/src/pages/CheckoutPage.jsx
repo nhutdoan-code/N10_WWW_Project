@@ -170,7 +170,19 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (dangTinh || !pv) return;
+    if (dangTinh || !pv) {
+      toast('Chưa tải được thông tin đơn hàng. Vui lòng kiểm tra giỏ hàng và thử lại.', 'error');
+      return;
+    }
+    if (!PAYMENT_METHODS.some((method) => method.value === payment)) {
+      toast('Vui lòng chọn phương thức thanh toán hợp lệ.', 'error');
+      return;
+    }
+    const selectedAddress = (addresses || []).find((address) => address.maDiaChi === maDiaChi);
+    if (!selectedAddress?.diaChiNhanHang || !selectedAddress.maTinh || !selectedAddress.maPhuong) {
+      toast('Địa chỉ giao hàng chưa đầy đủ. Vui lòng bấm Sửa để cập nhật.', 'error');
+      return;
+    }
 
     dangDatRef.current = true;
     setDangDat(true);
@@ -256,7 +268,7 @@ export default function CheckoutPage() {
               <div>
                 <b>{a.tenNguoiNhan}</b> · {a.soDienThoaiNhan}
                 {a.macDinh && <span className="tag">Mặc định</span>}
-                <div className="muted">{a.diaChiChiTiet}, {a.tenPhuongXa}, {a.tenTinhThanh}</div>
+                <div className="muted">{[a.diaChiNhanHang, a.tenPhuong, a.tenTinh].filter(Boolean).join(', ') || 'Chưa có địa chỉ chi tiết - vui lòng sửa'}</div>
               </div>
               <button
                 type="button"
@@ -274,20 +286,24 @@ export default function CheckoutPage() {
 
           <h3>Phương thức thanh toán</h3>
           {PAYMENT_METHODS.map((m) => (
-            <label key={m.id} className="option">
+            <label key={m.value} className="option">
               <input
                 type="radio"
                 name="pm"
-                checked={payment === m.id}
-                onChange={() => setPayment(m.id)}
+                value={m.value}
+                checked={payment === m.value}
+                onChange={() => setPayment(m.value)}
               />
               <div>
-                <b>{m.name}</b>
-                <div className="muted">{m.desc}</div>
+                <b>{m.label}</b>
+                {m.value === 'COD' && <div className="muted">Thanh toán khi nhận được hàng</div>}
+                {m.value === 'CHUYEN_KHOAN' && <div className="muted">Chuyển khoản theo hướng dẫn của cửa hàng</div>}
+                {m.value === 'VI_DIEN_TU' && <div className="muted">Chuyển sang cổng MoMo sau khi tạo đơn</div>}
               </div>
             </label>
           ))}
 
+          {loiPv && <p className="error" role="alert">Không thể tính đơn hàng: {loiPv}</p>}
           <h3>Voucher giảm giá</h3>
           <div className="voucher-group">
             <div className="title">Voucher đơn hàng</div>
