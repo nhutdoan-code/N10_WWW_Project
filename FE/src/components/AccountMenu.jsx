@@ -30,7 +30,7 @@ export default function AccountMenu({ user, onLogout }) {
           <Link to="/account">Thông tin tài khoản</Link>
           <Link to="/account/addresses">Địa chỉ giao hàng</Link>
           <Link to="/orders">Đơn hàng của tôi</Link>
-          <Link to="/returns">Đổi trả / hoàn tiền</Link>
+          <Link to="/returns">Hậu mãi: yêu cầu của tôi</Link>
           <hr />
           <button onClick={onLogout}>Đăng xuất</button>
         </div>
