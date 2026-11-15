@@ -55,8 +55,22 @@ public class AdminTuongTacController {
         return doiTraService.tatCa();
     }
 
+    @GetMapping("/returns/{ma}/internal-note")
+    public java.util.Map<String, String> getInternalReturnNote(@PathVariable String ma) {
+        return java.util.Map.of("ghiChu", java.util.Objects.toString(doiTraService.layGhiChuNoiBo(ma), ""));
+    }
+
+    @PutMapping("/returns/{ma}/internal-note")
+    public java.util.Map<String, String> setInternalReturnNote(@PathVariable String ma,
+            @RequestBody java.util.Map<String, String> request) {
+        doiTraService.luuGhiChuNoiBo(ma, request.get("ghiChu"));
+        return java.util.Map.of("message", "Đã lưu ghi chú nội bộ");
+    }
+
     @PutMapping("/returns/{ma}/status")
-    public DoiTraDto capNhatReturn(@PathVariable String ma, @RequestParam TrangThaiDoiTra trangThai) {
-        return doiTraService.capNhat(ma, trangThai);
+    public DoiTraDto capNhatReturn(@PathVariable String ma,
+                                   @RequestParam TrangThaiDoiTra trangThai,
+                                   @RequestParam(required = false) String ghiChuXuLy) {
+        return doiTraService.capNhat(ma, trangThai, ghiChuXuLy);
     }
 }

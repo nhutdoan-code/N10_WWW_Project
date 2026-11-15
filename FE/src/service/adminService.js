@@ -62,7 +62,12 @@ export const adminService = {
   answer: (ma, noiDung) => api.put(`/admin/questions/${ma}/answer`, { noiDung }),
   deleteQuestion: (ma) => api.delete(`/admin/questions/${ma}`),
   returns: () => api.get('/admin/returns'),
-  updateReturn: (ma, trangThai) => api.put(`/admin/returns/${ma}/status`, null, { params: { trangThai } }),
+  updateReturn: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/returns/${ma}/status`, null, { params: { trangThai, ghiChuXuLy } }),
+  afterSales: () => api.get('/admin/after-sales'),
+  updateAfterSale: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/after-sales/${ma}/status`, { trangThai, ghiChuXuLy }),
+
+  getInternalAfterSalesNote: (source, ma) => api.get(`/admin/${source === 'return' ? 'returns' : 'after-sales'}/${encodeURIComponent(ma)}/internal-note`),
+  saveInternalAfterSalesNote: (source, ma, ghiChu) => api.put(`/admin/${source === 'return' ? 'returns' : 'after-sales'}/${encodeURIComponent(ma)}/internal-note`, { ghiChu }),
 
   stats: (tu, den) => api.get('/admin/stats', { params: { tu: tu || undefined, den: den || undefined } }),
   exportStats: (tu, den) => api.get('/admin/stats/export', { params: { tu: tu || undefined, den: den || undefined }, responseType: 'blob' }),
