@@ -7,6 +7,7 @@ package nhom10.phonenest.enums;
 public enum LoaiDoiTuongAudit {
 
     PRODUCT,
+    VARIANT,
     CATEGORY,
     INVENTORY,
     ORDER,

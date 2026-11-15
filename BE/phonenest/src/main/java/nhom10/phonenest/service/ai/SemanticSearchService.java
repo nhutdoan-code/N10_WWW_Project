@@ -8,6 +8,7 @@ import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.mapper.SanPhamMapper;
+import nhom10.phonenest.service.PheDuyetBanHangPolicy;
 import nhom10.phonenest.repository.SanPhamRepository;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -17,6 +18,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -44,6 +48,20 @@ public class SemanticSearchService {
     private VectorStore vectorStore;
     private boolean initialized = false;
 
+    /**
+     * 2B.7D: reindexAll() duoc goi noi bo (self-invocation) nen @Transactional khong co hieu luc ->
+     * moi san pham loi "failed to lazily initialize ... phienBans" va vector store luon rong.
+     * Dung TransactionTemplate de nap du lieu trong mot giao dich chi doc.
+     */
+    private TransactionTemplate docTx;
+
+    @Autowired(required = false)
+    void setTransactionManager(PlatformTransactionManager tm) {
+        TransactionTemplate t = new TransactionTemplate(tm);
+        t.setReadOnly(true);
+        this.docTx = t;
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public synchronized void onApplicationReady() {
         try {
@@ -69,19 +87,7 @@ public class SemanticSearchService {
         log.info("Bắt đầu tái lập chỉ mục Vector Store cho sản phẩm PhoneNest bằng model {}...", embeddingModel.getModelName());
         VectorStore newStore = new PhoneNestVectorStore(embeddingModel);
 
-        List<SanPham> activeProducts = sanPhamRepository.findAll().stream()
-                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
-                .toList();
-
-        List<Document> docs = new ArrayList<>();
-        for (SanPham sp : activeProducts) {
-            try {
-                Document doc = documentBuilder.build(sp);
-                docs.add(doc);
-            } catch (Exception e) {
-                log.warn("Bỏ qua sản phẩm {} khi lập chỉ mục: {}", sp.getMaSanPham(), e.getMessage());
-            }
-        }
+        List<Document> docs = docTx != null ? docTx.execute(st -> taoTaiLieu()) : taoTaiLieu();
 
         if (!docs.isEmpty()) {
             newStore.add(docs);
@@ -105,6 +111,32 @@ public class SemanticSearchService {
             }
         } catch (Exception e) {
             log.warn("Lỗi khi cập nhật vector store cho sản phẩm {}: {}", sp.getMaSanPham(), e.getMessage());
+        }
+    }
+
+    private List<Document> taoTaiLieu() {
+        List<SanPham> activeProducts = sanPhamRepository.findAll().stream()
+                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
+                .toList();
+        List<Document> docs = new ArrayList<>();
+        for (SanPham sp : activeProducts) {
+            try {
+                docs.add(documentBuilder.build(sp));
+            } catch (Exception e) {
+                log.warn("Bỏ qua sản phẩm {} khi lập chỉ mục: {}", sp.getMaSanPham(), e.getMessage());
+            }
+        }
+        return docs;
+    }
+
+    /** Tai lap tai lieu vector cua mot san pham trong giao dich chi doc rieng (dung sau khi giao dich khac da commit). */
+    public void indexProductById(String maSanPham) {
+        if (maSanPham == null) return;
+        Runnable r = () -> sanPhamRepository.findByIdWithPhienBans(maSanPham).ifPresent(this::indexProduct);
+        if (docTx != null) {
+            docTx.executeWithoutResult(st -> r.run());
+        } else {
+            r.run();
         }
     }
 
@@ -165,6 +197,10 @@ public class SemanticSearchService {
             SanPham sp = opt.get();
             if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH || sp.getSoLuongTon() <= 0) continue;
 
+            // 2B.7D: chi dung gia DUOC CONG BO; san pham chua co gia cong bo khong qua duoc bo loc ngan sach.
+            BigDecimal giaCB = PheDuyetBanHangPolicy.giaCongBo(sp);
+            if ((constraints.maxBudget != null || constraints.minBudget != null) && giaCB == null) continue;
+
             double vectorScore = doc.getScore() != null ? doc.getScore() : 0.5;
             double fitScore = evaluateConstraintFit(sp, constraints);
 
@@ -179,20 +215,20 @@ public class SemanticSearchService {
             // Hard pruning for strict upper bound budget if clearly specified
             if (constraints.maxBudget != null) {
                 if (constraints.strictMax) {
-                    int cmp = sp.getGiaBan().compareTo(constraints.maxBudget);
+                    int cmp = giaCB.compareTo(constraints.maxBudget);
                     if (constraints.maxInclusive ? cmp > 0 : cmp >= 0) {
                         continue; // Exceeds strict budget ceiling
                     }
                 } else {
                     BigDecimal ceiling = constraints.maxBudget.multiply(BigDecimal.valueOf(1.15));
-                    if (sp.getGiaBan().compareTo(ceiling) > 0) {
+                    if (giaCB.compareTo(ceiling) > 0) {
                         continue; // Exceeds fuzzy budget ceiling
                     }
                 }
             }
 
             if (constraints.minBudget != null) {
-                int cmp = sp.getGiaBan().compareTo(constraints.minBudget);
+                int cmp = giaCB.compareTo(constraints.minBudget);
                 if (constraints.minInclusive ? cmp < 0 : cmp <= 0) {
                     continue; // Below budget floor
                 }
@@ -310,7 +346,10 @@ public class SemanticSearchService {
 
     private double evaluateConstraintFit(SanPham sp, StructuredConstraints sc) {
         double score = 1.0;
-        BigDecimal price = sp.getGiaBan();
+        BigDecimal price = PheDuyetBanHangPolicy.giaCongBo(sp);
+        if (price == null) {
+            return score; // khong co gia cong bo: khong cham diem theo ngan sach, khong suy doan gia
+        }
 
         // Budget evaluation
         if (sc.targetBudget != null && sc.targetBudget.compareTo(BigDecimal.ZERO) > 0) {
@@ -431,13 +470,15 @@ public class SemanticSearchService {
                         String brand = s.getThuongHieu() != null ? s.getThuongHieu().getTenThuongHieu().toLowerCase() : "";
                         if (!brand.contains(sc.requiredBrand.toLowerCase())) return false;
                     }
-                    // Check budget constraints
+                    // Check budget constraints (2B.7D: chi gia cong bo)
+                    BigDecimal giaCB = PheDuyetBanHangPolicy.giaCongBo(s);
+                    if ((sc.maxBudget != null || sc.minBudget != null) && giaCB == null) return false;
                     if (sc.maxBudget != null) {
-                        int cmp = s.getGiaBan().compareTo(sc.maxBudget);
+                        int cmp = giaCB.compareTo(sc.maxBudget);
                         if (sc.maxInclusive ? cmp > 0 : cmp >= 0) return false;
                     }
                     if (sc.minBudget != null) {
-                        int cmp = s.getGiaBan().compareTo(sc.minBudget);
+                        int cmp = giaCB.compareTo(sc.minBudget);
                         if (sc.minInclusive ? cmp < 0 : cmp <= 0) return false;
                     }
                     return true;

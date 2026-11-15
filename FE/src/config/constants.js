@@ -55,6 +55,9 @@ export const PRODUCT_STATUS = {
   SAP_HET: 'Sắp hết hàng',
   HET_HANG: 'Hết hàng',
   NGUNG_KINH_DOANH: 'Ngừng kinh doanh',
+  PENDING_REVIEW: 'Tạm ngừng nhận đơn',
+  BLOCKED: 'Bị khóa bán',
+  APPROVED: 'Đang mở bán',
 };
 
 export const RETURN_STATUS = {

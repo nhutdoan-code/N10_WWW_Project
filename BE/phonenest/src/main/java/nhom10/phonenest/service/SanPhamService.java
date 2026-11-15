@@ -1,6 +1,7 @@
 package nhom10.phonenest.service;
 
 import lombok.RequiredArgsConstructor;
+import nhom10.phonenest.enums.LyDoKhoaBan;
 import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.entity.HinhAnhSanPham;
 import nhom10.phonenest.entity.LoaiSanPham;
@@ -8,6 +9,7 @@ import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.HanhDongAudit;
 import nhom10.phonenest.enums.LoaiDoiTuongAudit;
+import nhom10.phonenest.enums.TrangThaiPheDuyet;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
@@ -21,6 +23,7 @@ import nhom10.phonenest.repository.PhienBanSanPhamRepository;
 import nhom10.phonenest.repository.SanPhamRepository;
 import nhom10.phonenest.repository.ThuongHieuRepository;
 import nhom10.phonenest.util.IdGenerator;
+import nhom10.phonenest.util.SecurityUtil;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -52,6 +56,7 @@ public class SanPhamService {
     private final ChiTietDonHangRepository chiTietDonHangRepo;
     private final ChiTietGioHangRepository chiTietGioHangRepo;
     private final BienDongKhoRepository bienDongKhoRepo;
+    private final KhoService khoService;
     private final NhatKyHoatDongService nhatKyHoatDongService;
     private final nhom10.phonenest.service.ai.SemanticSearchService semanticSearchService;
 
@@ -129,7 +134,7 @@ public class SanPhamService {
 
         for (SanPham sanPham : filtered) {
 
-            SanPhamDto dto = SanPhamMapper.toDto(sanPham);
+            SanPhamDto dto = SanPhamMapper.toDto(sanPham, admin);
 
             // Lọc giá thấp nhất
             if (min != null) {
@@ -264,11 +269,11 @@ public class SanPhamService {
             }
 
             if (locBienThe && s.getPhienBans().stream()
-                    .noneMatch(p -> phienBanKhop(p, min, max, ram, boNho, conHang))) {
+                    .noneMatch(p -> phienBanKhop(p, min, max, ram, boNho, conHang, admin))) {
                 continue;
             }
 
-            dtos.add(SanPhamMapper.toDto(s));
+            dtos.add(SanPhamMapper.toDto(s, admin));
         }
 
         // Sort ổn định: xếp "mới nhất" trước, rồi sort theo tiêu chí chọn (tie-break = mới nhất)
@@ -307,9 +312,16 @@ public class SanPhamService {
             BigDecimal max,
             Integer ram,
             Integer boNho,
-            Boolean conHang
+            Boolean conHang,
+            boolean admin
     ) {
         if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+            return false;
+        }
+        // 2B.7D: voi khach hang, loc theo gia/con hang chi xet bien the DUOC PHEP BAN. Neu khong,
+        // tham so min/max se de lo gia seed cua bien the chua duyet (do bang cach thu nhieu khoang gia).
+        if (!admin && (min != null || max != null || Boolean.TRUE.equals(conHang))
+                && !PheDuyetBanHangPolicy.duocPhepBan(p)) {
             return false;
         }
         if (ram != null && p.getRam() != ram.intValue()) {
@@ -339,20 +351,8 @@ public class SanPhamService {
     }
 
     public SanPhamDto get(String ma, boolean admin) {
-
         SanPham s = find(ma);
-
-        if (!admin
-                && s.getTrangThai()
-                == TrangThaiSanPham.NGUNG_KINH_DOANH) {
-
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "Không tìm thấy sản phẩm"
-            );
-        }
-
-        return SanPhamMapper.toDto(s);
+        return SanPhamMapper.toDto(s, admin);
     }
 
     public List<SanPhamDto> lienQuan(String ma) {
@@ -384,7 +384,12 @@ public class SanPhamService {
         SanPham s =
                 taoMoi
                         ? new SanPham()
-                        : find(ma);
+                        : khoaSanPham(ma);
+
+        // 2B.7C: chong ghi de tu form cu (optimistic check sau khi da khoa dong).
+        if (!taoMoi) {
+            kiemTraMaKiemTraSua(s, d);
+        }
 
         Map<String, Object> duLieuTruoc = taoMoi ? null : snapshot(s);
 
@@ -548,6 +553,7 @@ public class SanPhamService {
         for (PhienBanSanPham rm : toRemove) {
             if (daDuocThamChieu(rm.getMaPhienBan())) {
                 rm.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
+                khoaBanDoNgungKinhDoanh(rm);
                 pbRepo.save(rm);
                 comboDaCo.add(comboKey(rm));
             } else {
@@ -559,6 +565,7 @@ public class SanPhamService {
         pbRepo.flush();
 
         List<PhienBanSanPham> toKeep = new ArrayList<>();
+        Map<PhienBanSanPham, Integer> tonBanDau = new LinkedHashMap<>();
         Set<String> seenCombo = new HashSet<>();
         Set<String> seenSku = new HashSet<>();
 
@@ -600,6 +607,7 @@ public class SanPhamService {
                 p = new PhienBanSanPham();
                 p.setMaPhienBan(IdGenerator.next("PB"));
                 p.setSanPham(s);
+                p.setTrangThaiPheDuyet(TrangThaiPheDuyet.PENDING_REVIEW);
                 s.getPhienBans().add(p);
             }
 
@@ -621,16 +629,53 @@ public class SanPhamService {
                 throw new AppException(HttpStatus.BAD_REQUEST, "SKU bị trùng: " + sku);
             }
 
+            // Du lieu ban truoc khi sua (chi co y nghia voi bien the da ton tai)
+            boolean daTonTai = p.getGiaBan() != null;
+            String moTaThayDoi = daTonTai
+                    ? PheDuyetBanHangPolicy.moTaThayDoi(
+                            p.getGiaBan(), p.getGiaNiemYet(), p.getRam(), p.getBoNho(), p.getMauSac(),
+                            pbDto.giaBan(), pbDto.giaNiemYet(), pbDto.ram(), pbDto.boNho(), mauSac)
+                    : null;
+            Map<String, Object> pheDuyetTruoc = daTonTai ? PheDuyetBanHangService.anhChup(p) : null;
+
             p.setSku(sku);
             p.setRam(pbDto.ram());
             p.setBoNho(pbDto.boNho());
             p.setMauSac(mauSac);
             p.setGiaBan(pbDto.giaBan());
             p.setGiaNiemYet(pbDto.giaNiemYet());
-            p.setSoLuongTon(pbDto.soLuongTon());
+            // 2B.7D: ton kho KHONG duoc sua tu form san pham. Bien the da ton tai: bo qua gia tri gui len
+            // (chi doi qua nhap kho / dieu chinh kiem ke co ly do va lich su). Bien the moi: bat dau tu 0,
+            // ton ban dau (neu co) duoc ghi qua KhoService.nhapKho ben duoi -> co BienDongKho.
+            if (!daTonTai) {
+                p.setSoLuongTon(0);
+                if (pbDto.soLuongTon() > 0) {
+                    tonBanDau.put(p, pbDto.soLuongTon());
+                }
+            }
             p.setTrangThai(pbDto.trangThai() == null ? s.getTrangThai() : pbDto.trangThai());
+
+            // Gia ban / gia niem yet / RAM / ROM / mau thay doi -> APPROVED mat hieu luc.
+            // BLOCKED khong bao gio duoc mo khoa o day (chi qua /unblock).
+            boolean biHaCap = moTaThayDoi != null
+                    && PheDuyetBanHangService.huyHieuLucDoThayDoi(p, moTaThayDoi, SecurityUtil.currentUserIdOrNull());
+
             pbRepo.save(p);
             toKeep.add(p);
+
+            if (biHaCap) {
+                nhatKyHoatDongService.ghi(HanhDongAudit.INVALIDATE_VARIANT_APPROVAL, LoaiDoiTuongAudit.VARIANT,
+                        p.getMaPhienBan(), pheDuyetTruoc, PheDuyetBanHangService.anhChupSau(p));
+            }
+        }
+
+        if (!tonBanDau.isEmpty()) {
+            pbRepo.flush();
+            String actor = SecurityUtil.currentUserIdOrNull();
+            for (Map.Entry<PhienBanSanPham, Integer> e : tonBanDau.entrySet()) {
+                khoService.nhapKho(e.getKey().getMaPhienBan(), e.getValue(),
+                        "Tồn kho ban đầu khi tạo phiên bản (form sản phẩm)", actor);
+            }
         }
 
         if (s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH
@@ -664,7 +709,7 @@ public class SanPhamService {
             semanticSearchService.indexProduct(s);
         }
 
-        return SanPhamMapper.toDto(s);
+        return SanPhamMapper.toDto(s, true);
     }
 
     public void delete(String ma) {
@@ -677,7 +722,7 @@ public class SanPhamService {
             );
         }
 
-        SanPham s = find(ma);
+        SanPham s = khoaSanPham(ma);
 
         boolean coThamChieu = s.getPhienBans()
                 .stream()
@@ -732,15 +777,16 @@ public class SanPhamService {
     }
 
     public SanPhamDto archive(String ma) {
-        SanPham s = find(ma);
+        SanPham s = khoaSanPham(ma);
         if (s.getTrangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH) {
-            return SanPhamMapper.toDto(s);
+            return SanPhamMapper.toDto(s, true);
         }
         Map<String, Object> duLieuTruoc = snapshot(s);
         s.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
         if (s.getPhienBans() != null) {
             for (PhienBanSanPham pb : s.getPhienBans()) {
                 pb.setTrangThai(TrangThaiSanPham.NGUNG_KINH_DOANH);
+                khoaBanDoNgungKinhDoanh(pb);
             }
         }
         SanPham saved = spRepo.save(s);
@@ -749,13 +795,13 @@ public class SanPhamService {
         if (semanticSearchService != null) {
             semanticSearchService.removeProduct(ma);
         }
-        return SanPhamMapper.toDto(saved);
+        return SanPhamMapper.toDto(saved, true);
     }
 
     public SanPhamDto restore(String ma) {
-        SanPham s = find(ma);
+        SanPham s = khoaSanPham(ma);
         if (s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH) {
-            return SanPhamMapper.toDto(s);
+            return SanPhamMapper.toDto(s, true);
         }
         Map<String, Object> duLieuTruoc = snapshot(s);
         s.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
@@ -812,6 +858,8 @@ public class SanPhamService {
                 pbMap.put("giaNiemYet", pb.getGiaNiemYet());
                 pbMap.put("soLuongTon", pb.getSoLuongTon());
                 pbMap.put("trangThai", pb.getTrangThai() != null ? pb.getTrangThai().name() : null);
+                pbMap.put("trangThaiPheDuyet", pb.getTrangThaiPheDuyet() != null ? pb.getTrangThaiPheDuyet().name() : null);
+                pbMap.put("lyDoKhoa", pb.getLyDoKhoa() != null ? pb.getLyDoKhoa().name() : null);
                 phienBans.add(pbMap);
             }
         }
@@ -835,6 +883,51 @@ public class SanPhamService {
         duLieu.put("hinhAnhs", hinhAnhs);
 
         return duLieu;
+    }
+
+    /**
+     * Khoa dong san pham va TAT CA bien the cua no (SELECT ... FOR UPDATE, thu tu co dinh:
+     * san pham truoc, bien the theo ma). Phai goi TRUOC khi bat ky truy van nao nap san pham
+     * vao persistence context, de entity mang du lieu moi nhat tai thoi diem khoa.
+     */
+    private SanPham khoaSanPham(String ma) {
+        SanPham s = spRepo.findByIdForUpdate(ma)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm"));
+        pbRepo.findBySanPhamForUpdate(ma);
+        return s;
+    }
+
+    /**
+     * Form sua phai gui lai ma kiem tra nhan duoc khi tai du lieu. Neu san pham (trang thai,
+     * tap bien the) hoac bien the (gia, cau hinh, ton kho, trang thai, phe duyet) da bi thay doi
+     * boi giao dich khac -> 409, khong ghi de.
+     */
+    private static void kiemTraMaKiemTraSua(SanPham s, SanPhamDto d) {
+        String maSp = PheDuyetBanHangPolicy.maKiemTraSanPham(s);
+        if (d.maKiemTraSua() == null || !maSp.equals(d.maKiemTraSua())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Sản phẩm đã được thay đổi bởi thao tác khác (thông tin chung, thông số, hình ảnh, trạng thái hoặc danh sách phiên bản) "
+                            + "hoặc dữ liệu gửi lên thiếu mã kiểm tra. Tải lại dữ liệu mới nhất trước khi lưu.",
+                    "STALE_PRODUCT");
+        }
+        Map<String, PhienBanSanPham> theoMa = new HashMap<>();
+        if (s.getPhienBans() != null) {
+            s.getPhienBans().forEach(p -> theoMa.put(p.getMaPhienBan(), p));
+        }
+        List<String> lech = new ArrayList<>();
+        for (SanPhamDto.PhienBan pb : d.phienBans() == null ? List.<SanPhamDto.PhienBan>of() : d.phienBans()) {
+            PhienBanSanPham p = pb.maPhienBan() == null ? null : theoMa.get(pb.maPhienBan());
+            if (p != null && (pb.maKiemTraSua() == null
+                    || !PheDuyetBanHangPolicy.maKiemTraSua(p).equals(pb.maKiemTraSua()))) {
+                lech.add(p.getMaPhienBan() + " (" + p.getRam() + "/" + p.getBoNho() + "GB " + p.getMauSac() + ")");
+            }
+        }
+        if (!lech.isEmpty()) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Phiên bản đã thay đổi kể từ khi mở form (giá, cấu hình, tồn kho hoặc trạng thái phê duyệt): "
+                            + String.join(", ", lech) + ". Tải lại dữ liệu mới nhất trước khi lưu.",
+                    "STALE_VARIANT");
+        }
     }
 
     private SanPham find(String ma) {
@@ -1124,5 +1217,26 @@ public class SanPhamService {
         return chiTietDonHangRepo.existsByPhienBanMaPhienBan(maPhienBan)
                 || chiTietGioHangRepo.existsByPhienBanMaPhienBan(maPhienBan)
                 || bienDongKhoRepo.existsByPhienBanMaPhienBan(maPhienBan);
+    }
+
+    /**
+     * Khoa ban bien the do ngung kinh doanh. Neu bien the DA bi khoa vi ly do khac
+     * (vd. gia seed) thi giu nguyen ly do do, de viec khoi phuc kinh doanh roi
+     * mo khoa khong vuot qua duoc dieu kien cua ly do goc.
+     */
+    private static void khoaBanDoNgungKinhDoanh(PhienBanSanPham pb) {
+        if (pb.getTrangThaiPheDuyet() == TrangThaiPheDuyet.BLOCKED && pb.getLyDoKhoa() != null) {
+            return;
+        }
+        pb.setTrangThaiPheDuyet(TrangThaiPheDuyet.BLOCKED);
+        pb.setLyDoKhoa(LyDoKhoaBan.NGUNG_KINH_DOANH);
+        pb.setGiaBanKhiKhoa(pb.getGiaBan());
+        pb.setNguoiPheDuyet(SecurityUtil.currentUserIdOrNull());
+        pb.setNgayPheDuyet(LocalDateTime.now());
+        pb.setLyDoPheDuyet("Khóa tự động: sản phẩm/biến thể ngừng kinh doanh");
+        pb.setGiaPheDuyet(null);
+        pb.setGiaNiemYetPheDuyet(null);
+        pb.setNguonXacMinh(null);
+        pb.setDauVanTayPheDuyet(null);
     }
 }

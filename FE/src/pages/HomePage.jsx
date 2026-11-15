@@ -10,7 +10,7 @@ import { PRICE_RANGES, SORT_OPTIONS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
 import { productStatus } from '../utils/stock';
-import { formatPrice } from '../utils/format';
+import { formatGiaCongBo, formatPrice } from '../utils/format';
 
 const SERVICES = [
   { icon: 'shield', title: 'Hàng chính hãng', text: 'Nguyên seal, bảo hành đầy đủ' },
@@ -79,7 +79,8 @@ export default function HomePage() {
   );
   const { data: banChay } = useFetch(() => (macDinh ? productService.list({ sort: 'ban_chay' }) : Promise.resolve(null)), [macDinh]);
 
-  const conHang = (banChay || []).filter((p) => ['CON_HANG', 'SAP_HET'].includes(productStatus(p)));
+  // 2B.7D: chi san pham co gia cong bo (co bien the duoc phep ban) moi duoc dua vao khoi goi y.
+  const conHang = (banChay || []).filter((p) => p.giaBan != null && ['CON_HANG', 'SAP_HET'].includes(productStatus(p)));
   const danhGia = [...conHang].sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const giaTot = [...conHang].filter((p) => p.giaBan < 10000000).sort((a, b) => b.diemDanhGiaTb - a.diemDanhGiaTb);
   const hang = categories?.filter((c) => !c.maLoaiCha) || [];
@@ -122,7 +123,7 @@ export default function HomePage() {
         : [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 
   const slide = (id, tone, tag, title, text, cta, to, p) => ({
-    id, tone, tag, title, text, cta, to, image: p?.anhChinh, price: p && formatPrice(p.giaBan),
+    id, tone, tag, title, text, cta, to, image: p?.anhChinh, price: p && formatGiaCongBo(p.giaBan),
   });
   const slides = [
     slide('flagship', 'blue', 'Flagship nổi bật', danhGia[0]?.tenMay || 'Điện thoại chính hãng', 'Hiệu năng đỉnh cao, camera chuyên nghiệp. Xem chi tiết và so sánh cấu hình ngay.', 'Xem chi tiết', danhGia[0] ? `/products/${danhGia[0].maSanPham}` : '/', danhGia[0]),
@@ -143,7 +144,7 @@ export default function HomePage() {
                 <Link key={p.maSanPham} to={`/products/${p.maSanPham}`} className="rank-item">
                   <b className="rank-no">{i + 1}</b>
                   <ProductImage src={p.anhChinh} alt="" />
-                  <span><em>{p.tenMay}</em><strong>{formatPrice(p.giaBan)}</strong></span>
+                  <span><em>{p.tenMay}</em><strong>{formatGiaCongBo(p.giaBan)}</strong></span>
                 </Link>
               ))}
               <button className="rank-more" onClick={() => document.getElementById('tat-ca')?.scrollIntoView({ behavior: 'smooth' })}>Xem tất cả sản phẩm</button>

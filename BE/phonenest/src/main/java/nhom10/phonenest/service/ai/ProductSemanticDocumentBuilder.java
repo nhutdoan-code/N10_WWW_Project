@@ -24,7 +24,8 @@ public class ProductSemanticDocumentBuilder {
         String tenMay = s.getTenMay();
         String hang = s.getThuongHieu() != null ? s.getThuongHieu().getTenThuongHieu() : "";
         String loai = s.getLoai() != null ? s.getLoai().getTenLoai() : "Điện thoại";
-        BigDecimal giaBan = s.getGiaBan();
+        // 2B.7D: chi dua gia DUOC CONG BO vao vector store / ngu canh chatbot.
+        BigDecimal giaBan = nhom10.phonenest.service.PheDuyetBanHangPolicy.giaCongBo(s);
         int tonKho = s.getSoLuongTon();
 
         // Extract RAM & Storage variations from variants
@@ -43,6 +44,8 @@ public class ProductSemanticDocumentBuilder {
         text.append("Danh mục: ").append(loai).append("\n");
         if (giaBan != null) {
             text.append("Giá bán: ").append(giaBan.toBigInteger()).append(" ₫\n");
+        } else {
+            text.append("Giá bán: đang cập nhật, chưa nhận đặt hàng\n");
         }
         text.append("Trạng thái kinh doanh: ").append(s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH ? "Đang kinh doanh" : "Ngừng kinh doanh").append("\n");
         text.append("Số lượng tồn kho: ").append(tonKho).append(" máy\n");
@@ -101,7 +104,9 @@ public class ProductSemanticDocumentBuilder {
         meta.put("maSanPham", ma);
         meta.put("tenMay", tenMay);
         meta.put("hang", hang);
-        meta.put("giaBan", giaBan != null ? giaBan.doubleValue() : 0.0);
+        if (giaBan != null) {
+            meta.put("giaBan", giaBan.doubleValue());
+        }
         meta.put("tonKho", tonKho);
 
         return new Document(ma, text.toString(), meta);

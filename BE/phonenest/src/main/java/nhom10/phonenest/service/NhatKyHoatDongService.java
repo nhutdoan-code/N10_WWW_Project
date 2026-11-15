@@ -128,6 +128,12 @@ public class NhatKyHoatDongService {
             case UPDATE_PRODUCT -> "Cập nhật sản phẩm";
             case DELETE_PRODUCT -> "Xóa sản phẩm";
 
+            case APPROVE_VARIANT -> "Phê duyệt bán biến thể";
+            case REVOKE_VARIANT_APPROVAL -> "Thu hồi phê duyệt biến thể";
+            case BLOCK_VARIANT -> "Khóa bán biến thể";
+            case UNBLOCK_VARIANT -> "Mở khóa biến thể (chờ duyệt lại)";
+            case INVALIDATE_VARIANT_APPROVAL -> "Hủy hiệu lực phê duyệt do dữ liệu bán thay đổi";
+
             case CREATE_CATEGORY -> "Tạo danh mục";
             case UPDATE_CATEGORY -> "Cập nhật danh mục";
             case DELETE_CATEGORY -> "Xóa danh mục";

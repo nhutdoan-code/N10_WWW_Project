@@ -4,6 +4,7 @@ import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.entity.HinhAnhSanPham;
 import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
+import nhom10.phonenest.service.PheDuyetBanHangPolicy;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 
 import java.math.BigDecimal;
@@ -16,6 +17,11 @@ public final class SanPhamMapper {
     }
 
     public static SanPhamDto toDto(SanPham s) {
+        return toDto(s, false);
+    }
+
+    /** admin=true: kem ma kiem tra sua (chi tra ve qua /api/admin/**). */
+    public static SanPhamDto toDto(SanPham s, boolean admin) {
 
         List<HinhAnhSanPham> anh = s.getHinhAnhs();
         String chinh = anh.stream()
@@ -24,17 +30,22 @@ public final class SanPhamMapper {
                 .findFirst()
                 .orElse(anh.isEmpty() ? null : anh.get(0).getDuongDan());
 
-        // Chỉ variant đang kinh doanh mới được tính vào giá/tồn hiển thị.
+        // Chỉ variant đang kinh doanh mới được tính vào giá/tồn hiển thị; nếu toàn bộ đã ngừng kinh doanh thì lấy phiên bản có giá để hiển thị thông tin tham khảo
         List<PhienBanSanPham> active = s.getPhienBans().stream()
                 .filter(x -> x.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
                 .toList();
 
-        PhienBanSanPham p = active.stream()
+        List<PhienBanSanPham> candidates = active.isEmpty() ? s.getPhienBans() : active;
+        PhienBanSanPham p = candidates.stream()
                 .filter(x -> x.getGiaBan() != null)
                 .min(Comparator.comparing(PhienBanSanPham::getGiaBan))
                 .orElse(null);
 
-        BigDecimal gia = p == null ? BigDecimal.ZERO : p.getGiaBan();
+        // 2B.7D: Admin thay gia noi bo (gia thap nhat cua bien the dang kinh doanh, ke ca chua duyet);
+        // API cong khai CHI thay gia cong bo (bien the duoc phep ban), khong co -> null (khong phai 0).
+        BigDecimal gia = admin
+                ? (p == null ? null : p.getGiaBan())
+                : PheDuyetBanHangPolicy.giaCongBo(s);
         int ton = active.stream().mapToInt(PhienBanSanPham::getSoLuongTon).sum();
 
         SanPhamDto.ThongSo ts = new SanPhamDto.ThongSo(
@@ -46,7 +57,11 @@ public final class SanPhamMapper {
         List<SanPhamDto.PhienBan> pbs = s.getPhienBans().stream()
                 .map(x -> new SanPhamDto.PhienBan(
                         x.getMaPhienBan(), x.getSku(), x.getRam(), x.getBoNho(), x.getMauSac(),
-                        x.getGiaBan(), x.getGiaNiemYet(), x.getSoLuongTon(), x.getTrangThai()))
+                        admin ? x.getGiaBan() : PheDuyetBanHangPolicy.giaCongBo(x),
+                        admin ? x.getGiaNiemYet() : PheDuyetBanHangPolicy.giaNiemYetCongBo(x),
+                        x.getSoLuongTon(), x.getTrangThai(),
+                        x.getTrangThaiPheDuyet(), PheDuyetBanHangPolicy.duocPhepBan(x),
+                        admin ? PheDuyetBanHangPolicy.maKiemTraSua(x) : null))
                 .toList();
 
         List<SanPhamDto.Anh> anhs = anh.stream()
@@ -60,7 +75,7 @@ public final class SanPhamMapper {
                 s.getThuongHieu() == null ? null : s.getThuongHieu().getMaThuongHieu(),
                 s.getThuongHieu() == null ? null : s.getThuongHieu().getTenThuongHieu(),
                 s.getTenMay(), gia, s.getMoTa(), ts, ton, s.getTrangThai(), s.getDiemDanhGiaTb(),
-                chinh, anhs, pbs);
+                chinh, anhs, pbs, admin ? PheDuyetBanHangPolicy.maKiemTraSanPham(s) : null);
     }
     /**
      * Chọn ảnh đại diện theo màu: ưu tiên ảnh gán cho màu đó,

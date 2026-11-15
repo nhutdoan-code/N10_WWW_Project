@@ -1,5 +1,6 @@
 package nhom10.phonenest.service;
 
+import nhom10.phonenest.support.TestVariants;
 import nhom10.phonenest.dto.*;
 import nhom10.phonenest.entity.*;
 import nhom10.phonenest.enums.*;
@@ -157,6 +158,8 @@ public class VoucherConcurrencyAndUsageLimitTest {
         pb1.setSoLuongTon(100);
         pb1.setSanPham(sanPham);
         pb1.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
+        // 2B.7B: bien the moi mac dinh PENDING_REVIEW; fixture can phe duyet hop le (co dau van tay)
+        TestVariants.daDuyet(pb1);
         variantCatalog.put("PB001", pb1);
 
         configureCommonMocks();

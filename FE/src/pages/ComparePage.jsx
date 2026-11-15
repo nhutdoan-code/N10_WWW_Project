@@ -7,7 +7,7 @@ import useCompare from '../hooks/useCompare';
 import useFetch from '../hooks/useFetch';
 import { MAX_COMPARE_PRODUCTS } from '../context/CompareContext';
 import { productService } from '../service/productService';
-import { formatPrice } from '../utils/format';
+import { formatGiaCongBo, formatPrice } from '../utils/format';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
 
 export default function ComparePage() {
@@ -68,7 +68,7 @@ export default function ComparePage() {
               </td>
             )}
           </tr>
-          <tr><th>Giá bán</th>{products.map((p) => <td key={p.maSanPham} className="price">{formatPrice(p.giaBan)}</td>)}{canAdd && <td />}</tr>
+          <tr><th>Giá bán</th>{products.map((p) => <td key={p.maSanPham} className="price">{formatGiaCongBo(p.giaBan)}</td>)}{canAdd && <td />}</tr>
           <tr><th>Hãng</th>{products.map((p) => <td key={p.maSanPham}>{p.tenLoai}</td>)}{canAdd && <td />}</tr>
           <tr><th>Đánh giá</th>{products.map((p) => <td key={p.maSanPham}>★ {p.diemDanhGiaTb}</td>)}{canAdd && <td />}</tr>
           {SPEC_FIELDS.map((f) => (
@@ -102,7 +102,7 @@ export default function ComparePage() {
                   <ProductImage className="thumb" src={p.anhChinh} alt="" />
                   <span className="compare-picker-info">
                     <b>{p.tenMay}</b>
-                    <small className="price">{formatPrice(p.giaBan)}</small>
+                    <small className="price">{formatGiaCongBo(p.giaBan)}</small>
                   </span>
                   <span className="compare-picker-plus" aria-hidden="true">+</span>
                 </button>

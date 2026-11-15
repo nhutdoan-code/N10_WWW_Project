@@ -79,6 +79,10 @@ class PostManualTestSafetyIntegrationTest {
         @Mock
         private TaiKhoanRepository taiKhoanRepository;
 
+        // 2B.7E: huy don kiem tra giao dich da thanh toan de danh dau can hoan tien
+        @Mock
+        private nhom10.phonenest.repository.ThanhToanRepository thanhToanRepository;
+
         @InjectMocks
         private DonHangService donHangService;
 
@@ -442,7 +446,7 @@ class PostManualTestSafetyIntegrationTest {
         @DisplayName("archive() sets NGUNG_KINH_DOANH, writes audit and deletes from vector index")
         void archiveProductTest() {
             SanPham sp = taoSanPhamMau("SP001", TrangThaiSanPham.DANG_KINH_DOANH);
-            when(spRepo.findById("SP001")).thenReturn(Optional.of(sp));
+            when(spRepo.findByIdForUpdate("SP001")).thenReturn(Optional.of(sp));
             when(spRepo.save(any(SanPham.class))).thenAnswer(inv -> inv.getArgument(0));
 
             SanPhamDto dto = sanPhamService.archive("SP001");
@@ -466,7 +470,7 @@ class PostManualTestSafetyIntegrationTest {
         @DisplayName("restore() sets DANG_KINH_DOANH, writes audit and indexes into vector store")
         void restoreProductTest() {
             SanPham sp = taoSanPhamMau("SP001", TrangThaiSanPham.NGUNG_KINH_DOANH);
-            when(spRepo.findById("SP001")).thenReturn(Optional.of(sp));
+            when(spRepo.findByIdForUpdate("SP001")).thenReturn(Optional.of(sp));
             when(spRepo.save(any(SanPham.class))).thenAnswer(inv -> inv.getArgument(0));
 
             SanPhamDto dto = sanPhamService.restore("SP001");

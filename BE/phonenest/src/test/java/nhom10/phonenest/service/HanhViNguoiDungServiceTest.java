@@ -252,6 +252,8 @@ class HanhViNguoiDungServiceTest {
         PhienBanSanPham pb = new PhienBanSanPham();
         pb.setGiaBan(BigDecimal.valueOf(30000000));
         pb.setTrangThai(nhom10.phonenest.enums.TrangThaiSanPham.DANG_KINH_DOANH);
+        pb.setSanPham(sp);
+        nhom10.phonenest.support.TestVariants.daDuyet(pb); // 2B.7D: chi gia cong bo duoc dua vao so thich gia
         sp.getPhienBans().add(pb);
 
         when(sanPhamRepository.findAllById(any())).thenReturn(List.of(sp));

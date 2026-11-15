@@ -287,6 +287,19 @@ public class KhoService {
             int soLuongThucTe,
             String lyDo,
             String actorId) {
+        return dieuChinh(ma, soLuongThucTe, lyDo, null, actorId);
+    }
+
+    /**
+     * Dieu chinh kiem ke (dat ton = so dem thuc te). 2B.7D: neu {@code soLuongDaXem} khac ton hien tai
+     * (sau khi khoa dong) thi tu choi 409 — tranh ghi de mot don hang / lan nhap kho vua xay ra.
+     */
+    public SanPhamDto dieuChinh(
+            String ma,
+            int soLuongThucTe,
+            String lyDo,
+            Integer soLuongDaXem,
+            String actorId) {
 
         if (soLuongThucTe < 0
                 || lyDo == null
@@ -308,6 +321,14 @@ public class KhoService {
         PhienBanSanPham p = lockVariant(ma);
 
         int before = p.getSoLuongTon();
+        if (soLuongDaXem != null && soLuongDaXem != before) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Tồn kho đã thay đổi từ " + soLuongDaXem + " thành " + before
+                            + " (có đơn hàng hoặc thao tác kho khác). Tải lại và kiểm kê lại trước khi điều chỉnh.",
+                    "STALE_STOCK"
+            );
+        }
         int delta = soLuongThucTe - before;
 
         if (delta == 0) {

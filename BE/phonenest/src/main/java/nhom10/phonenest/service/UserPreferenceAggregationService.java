@@ -72,7 +72,7 @@ public class UserPreferenceAggregationService {
                     if (p.getLoai() != null) {
                         categoryScores.merge(p.getLoai().getTenLoai(), weight, Integer::sum);
                     }
-                    BigDecimal price = p.getGiaBan();
+                    BigDecimal price = PheDuyetBanHangPolicy.giaCongBo(p); // 2B.7D: chi gia cong bo
                     if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
                         prices.add(price);
                     }
@@ -95,7 +95,7 @@ public class UserPreferenceAggregationService {
                     if (p.getLoai() != null) {
                         categoryScores.merge(p.getLoai().getTenLoai(), 3, Integer::sum);
                     }
-                    BigDecimal price = item.getPhienBan().getGiaBan();
+                    BigDecimal price = PheDuyetBanHangPolicy.giaCongBo(item.getPhienBan()); // 2B.7D
                     if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
                         prices.add(price);
                     }

@@ -10,12 +10,11 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface ThanhToanRepository extends JpaRepository<ThanhToan, String> {
+public interface ThanhToanRepository extends JpaRepository<ThanhToan, String>, KhoaThanhToanRepository {
     List<ThanhToan> findByDonHangMaDonHangOrderByNgayTaoDesc(String ma);
 
     Optional<ThanhToan> findByMaGiaoDich(String maGiaoDich);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select t from ThanhToan t where t.maGiaoDich = :ma")
-    Optional<ThanhToan> findByMaGiaoDichForUpdate(@Param("ma") String ma);
+    // 2B.7E: findByMaGiaoDichForUpdate nam o KhoaThanhToanRepository (khoa + nap lai). Ban @Lock cu tra ve
+    // ban ghi da nap truoc do (paymentRef) voi trang thai cu -> IPN that bai den sau co the ghi de DA_THANH_TOAN.
 }

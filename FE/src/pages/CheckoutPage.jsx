@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import AddressForm from '../components/AddressForm';
+import Icon from '../components/Icon';
 import Modal from '../components/Modal';
 import { PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
@@ -9,6 +10,11 @@ import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatPrice } from '../utils/format';
+import {
+  hasDiscontinuedItems,
+  hasUnapprovedItems,
+  DISCONTINUED_MESSAGES,
+} from '../utils/discontinuedProductRules';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -56,7 +62,8 @@ export default function CheckoutPage() {
   const maPhienBanMua = location.state?.mua || params.get('mua');
   const slMua = Number(location.state?.sl || params.get('sl')) || 1;
   const muaNgay = Boolean(maPhienBanMua);
-
+  const hasDiscontinued = !muaNgay && hasDiscontinuedItems(items);
+  const hasUnapproved = !muaNgay && hasUnapprovedItems(items);
   const {
     data: pv,
     loading: dangTinh,
@@ -68,6 +75,8 @@ export default function CheckoutPage() {
       : Promise.resolve(null),
     [maDiaChi, maPhienBanMua, slMua]
   );
+  // 2B.7C: phai khai bao SAU useFetch (truoc day dung loiPv truoc khi khai bao -> trang checkout bi crash).
+  const hasBlockedOrder = hasDiscontinued || hasUnapproved || Boolean(loiPv);
 
   useEffect(() => {
     if (!addresses?.length) return;
@@ -165,6 +174,11 @@ export default function CheckoutPage() {
   const placeOrder = async () => {
     if (dangDatRef.current || daDatThanhCongRef.current) return;
 
+    if (hasBlockedOrder) {
+      toast(loiPv || (hasUnapproved ? DISCONTINUED_MESSAGES.APPROVAL_CHECKOUT_BANNER : DISCONTINUED_MESSAGES.CHECKOUT_BANNER), 'error');
+      return;
+    }
+
     if (!maDiaChi) {
       toast('Vui lòng chọn địa chỉ giao hàng.', 'error');
       return;
@@ -242,6 +256,24 @@ export default function CheckoutPage() {
   return (
     <>
       <h2>Thanh toán</h2>
+
+      {hasBlockedOrder && (
+        <div className="alert alert-warning discontinued-checkout-banner" style={{ margin: '0 0 20px 0', padding: '16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <Icon name="alert-triangle" size={24} />
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: '0 0 6px 0', color: '#856404' }}>Không thể hoàn tất thanh toán</h4>
+              <p style={{ margin: '0 0 12px 0' }}>
+                {loiPv || (hasUnapproved ? DISCONTINUED_MESSAGES.APPROVAL_CHECKOUT_BANNER : DISCONTINUED_MESSAGES.CHECKOUT_BANNER)}
+              </p>
+              <Link to="/cart" className="btn btn-warning btn-sm" style={{ fontWeight: 600 }}>
+                Quay lại giỏ hàng để cập nhật
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="cart-layout">
         <div className="section">
           <h3>Địa chỉ nhận hàng</h3>
@@ -256,7 +288,7 @@ export default function CheckoutPage() {
               <div>
                 <b>{a.tenNguoiNhan}</b> · {a.soDienThoaiNhan}
                 {a.macDinh && <span className="tag">Mặc định</span>}
-                <div className="muted">{a.diaChiChiTiet}, {a.tenPhuongXa}, {a.tenTinhThanh}</div>
+                <div className="muted">{[a.diaChiNhanHang, a.tenPhuong, a.tenTinh].filter(Boolean).join(', ')}</div>
               </div>
               <button
                 type="button"
@@ -274,16 +306,16 @@ export default function CheckoutPage() {
 
           <h3>Phương thức thanh toán</h3>
           {PAYMENT_METHODS.map((m) => (
-            <label key={m.id} className="option">
+            <label key={m.value} className="option" data-testid={`pm-${m.value}`}>
               <input
                 type="radio"
                 name="pm"
-                checked={payment === m.id}
-                onChange={() => setPayment(m.id)}
+                checked={payment === m.value}
+                onChange={() => setPayment(m.value)}
               />
               <div>
-                <b>{m.name}</b>
-                <div className="muted">{m.desc}</div>
+                {/* 2B.7D: PAYMENT_METHODS dung {value, label}; truoc day doc m.id/m.name -> nhan rong va chon = undefined */}
+                <b>{m.label}</b>
               </div>
             </label>
           ))}
@@ -424,11 +456,17 @@ export default function CheckoutPage() {
             <button
               type="button"
               className="btn btn-primary btn-lg"
-              disabled={!maDiaChi || dangTinh || !pv || dangDat || daDatThanhCongRef.current}
+              disabled={hasBlockedOrder || !maDiaChi || dangTinh || !pv || dangDat || daDatThanhCongRef.current}
               onClick={placeOrder}
             >
               {dangDat ? 'Đang xử lý đơn hàng...' : (daDatThanhCongRef.current ? 'Đã đặt hàng' : 'Xác nhận đặt hàng')}
             </button>
+
+            {hasBlockedOrder && (
+              <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
+                {DISCONTINUED_MESSAGES.CHECKOUT_ACTION_DISABLED}
+              </small>
+            )}
 
             {!maDiaChi && (
               <p className="muted">Hãy thêm địa chỉ giao hàng để tiếp tục.</p>

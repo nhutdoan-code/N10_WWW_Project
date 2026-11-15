@@ -92,7 +92,7 @@ export default function AdminInventoryPage() {
         await adminService.importStock(selected.variant.maPhienBan, amount, form.note);
         toast('Đã nhập kho');
       } else {
-        await adminService.adjustStock(selected.variant.maPhienBan, amount, form.note);
+        await adminService.adjustStock(selected.variant.maPhienBan, amount, form.note, selected.variant.soLuongTon);
         toast('Đã điều chỉnh tồn kho');
       }
       setSelected(null);

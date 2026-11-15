@@ -56,6 +56,15 @@ export default function AdminProductsPage() {
     }
   };
 
+  // Luon tai du lieu MOI NHAT truoc khi mo form sua (kem ma kiem tra dong thoi).
+  const openEdit = async (product) => {
+    try {
+      setEditing(await adminService.product(product.maSanPham));
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
+
   const openImpact = async (product) => {
     setImpactProduct(product);
     setImpactData(null);
@@ -165,7 +174,7 @@ export default function AdminProductsPage() {
                 <td><StatusBadge status={productStatus(p)} /></td>
                 <td>
                   <div className="row" style={{ gap: '6px' }}>
-                    <button className="btn" onClick={() => setEditing(p)}>Sửa</button>
+                    <button className="btn" onClick={() => openEdit(p)}>Sửa</button>
                     {isArchived ? (
                       <button
                         className="btn btn-primary"

@@ -45,7 +45,7 @@ public class TimKiemService {
         Pageable limit20 = PageRequest.of(0, GIOI_HAN);
 
         var sanPhams = sanPhamRepository.searchAdmin(pattern, limit20).stream()
-                .map(SanPhamMapper::toDto)
+                .map(s -> SanPhamMapper.toDto(s, true)) // tim kiem Admin: xem gia noi bo
                 .toList();
 
         var loais = loaiSanPhamRepository.searchAdmin(pattern, limit20).stream()

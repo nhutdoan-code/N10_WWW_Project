@@ -28,3 +28,24 @@ BE/phonenest/uploads/*
 
 # Backend test build output
 BE/phonenest/target_test-classes/
+
+# ---- 2B.7B: du lieu runtime / tam / bi mat (khong commit) ----
+# Thu muc uploads o goc repo la ban sao runtime (backend phuc vu tu BE/phonenest/uploads)
+/uploads/
+# Script va du lieu tam cua cac phien AI / thu nghiem
+/scratch/
+# Cau hinh cuc bo chua mat khau, secret (mau: application-local.properties.example)
+BE/phonenest/application-local.properties
+application-local.properties
+.env.*
+!.env.example
+# Ban sao luu database
+DB/backups/
+*.dump
+*.sql.gz
+*.bak
+
+# E2E (Playwright) - ket qua chay, khong commit
+/FE/e2e-results/
+/FE/test-results/
+/FE/playwright-report/

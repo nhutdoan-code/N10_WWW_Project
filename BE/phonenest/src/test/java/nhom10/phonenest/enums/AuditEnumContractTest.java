@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditEnumContractTest {
 
     @Test
-    @DisplayName("shouldContainExact24HanhDongAuditEnums")
+    @DisplayName("shouldContainExact29HanhDongAuditEnums")
     void shouldContainExact24HanhDongAuditEnums() {
         Set<String> actualNames = Arrays.stream(HanhDongAudit.values())
                 .map(Enum::name)
@@ -22,6 +22,13 @@ class AuditEnumContractTest {
                 "CREATE_PRODUCT",
                 "UPDATE_PRODUCT",
                 "DELETE_PRODUCT",
+
+                // 2B.7B: phe duyet ban hang bien the
+                "APPROVE_VARIANT",
+                "REVOKE_VARIANT_APPROVAL",
+                "BLOCK_VARIANT",
+                "UNBLOCK_VARIANT",
+                "INVALIDATE_VARIANT_APPROVAL",
 
                 "CREATE_CATEGORY",
                 "UPDATE_CATEGORY",
@@ -55,13 +62,13 @@ class AuditEnumContractTest {
         );
 
         assertThat(actualNames)
-                .as("HanhDongAudit must match exactly the 24 planned actions")
+                .as("HanhDongAudit must match exactly the 29 planned actions")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(HanhDongAudit.values()).hasSize(24);
+        assertThat(HanhDongAudit.values()).hasSize(29);
     }
 
     @Test
-    @DisplayName("shouldContainExact10LoaiDoiTuongAuditEnums")
+    @DisplayName("shouldContainExact11LoaiDoiTuongAuditEnums")
     void shouldContainExact10LoaiDoiTuongAuditEnums() {
         Set<String> actualNames = Arrays.stream(LoaiDoiTuongAudit.values())
                 .map(Enum::name)
@@ -69,6 +76,7 @@ class AuditEnumContractTest {
 
         Set<String> expectedNames = Set.of(
                 "PRODUCT",
+                "VARIANT",
                 "CATEGORY",
                 "INVENTORY",
                 "ORDER",
@@ -81,8 +89,8 @@ class AuditEnumContractTest {
         );
 
         assertThat(actualNames)
-                .as("LoaiDoiTuongAudit must match exactly the 10 planned entity types")
+                .as("LoaiDoiTuongAudit must match exactly the 11 planned entity types")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(LoaiDoiTuongAudit.values()).hasSize(10);
+        assertThat(LoaiDoiTuongAudit.values()).hasSize(11);
     }
 }

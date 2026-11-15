@@ -76,6 +76,8 @@ export function groupVariantsForForm(phienBans = []) {
       mauSac: pb.mauSac || '',
       soLuongTon: pb.soLuongTon ?? 0,
       trangThai: pb.trangThai || 'DANG_KINH_DOANH',
+      // Ma kiem tra dong thoi do server cap (2B.7C): gui lai nguyen ven khi luu.
+      maKiemTraSua: pb.maKiemTraSua || null,
     });
   }
 
@@ -115,8 +117,10 @@ export function flattenConfigurations(configurations = []) {
         mauSac: (color.mauSac || '').trim(),
         giaBan,
         giaNiemYet,
-        soLuongTon: Number(color.soLuongTon || 0),
+        // 2B.7D: chi phien ban MOI gui ton ban dau; phien ban da co khong gui ton kho (backend bo qua).
+        ...(color.maPhienBan ? {} : { soLuongTon: Number(color.soLuongTon || 0) }),
         trangThai: color.trangThai || 'DANG_KINH_DOANH',
+        maKiemTraSua: color.maKiemTraSua || null,
       });
     }
   }

@@ -7,6 +7,7 @@ import nhom10.phonenest.entity.ChiTietGioHang;
 import nhom10.phonenest.entity.GioHang;
 import nhom10.phonenest.entity.KhachHang;
 import nhom10.phonenest.entity.PhienBanSanPham;
+import nhom10.phonenest.enums.TrangThaiPheDuyet;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.SanPhamMapper;
@@ -117,7 +118,12 @@ public class GioHangService {
     }
 
     private void validate(PhienBanSanPham p, int sl) {
-        if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH || sl < 1 || sl > p.getSoLuongTon()) {
+        if (p.getSanPham() == null || p.getSanPham().getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH
+                || p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm hoặc phiên bản đã ngừng kinh doanh");
+        }
+        PheDuyetBanHangPolicy.kiemTraDuocBan(p, null);
+        if (sl < 1 || sl > p.getSoLuongTon()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Số lượng không hợp lệ (còn " + p.getSoLuongTon() + " sản phẩm)");
         }
     }
@@ -154,7 +160,10 @@ public class GioHangService {
     private SanPhamDto.PhienBan toPhienBanDto(PhienBanSanPham p) {
         return new SanPhamDto.PhienBan(
                 p.getMaPhienBan(), p.getSku(), p.getRam(), p.getBoNho(), p.getMauSac(),
-                p.getGiaBan(), p.getGiaNiemYet(), p.getSoLuongTon(), p.getTrangThai()
+                // 2B.7D: dong gio cua bien the khong con duoc phep ban khong hien gia seed
+                PheDuyetBanHangPolicy.giaCongBo(p), PheDuyetBanHangPolicy.giaNiemYetCongBo(p),
+                p.getSoLuongTon(), p.getTrangThai(),
+                p.getTrangThaiPheDuyet(), PheDuyetBanHangPolicy.duocPhepBan(p)
         );
     }
 
@@ -163,6 +172,7 @@ public class GioHangService {
                 .map(c -> new GioHangDto.Item(SanPhamMapper.toDto(c.getPhienBan().getSanPham()), toPhienBanDto(c.getPhienBan()), c.getSoLuong()))
                 .toList();
         BigDecimal tong = g.getChiTiet().stream()
+                .filter(c -> PheDuyetBanHangPolicy.duocPhepBan(c.getPhienBan()))
                 .map(c -> c.getPhienBan().getGiaBan().multiply(BigDecimal.valueOf(c.getSoLuong())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new GioHangDto(items, tong);

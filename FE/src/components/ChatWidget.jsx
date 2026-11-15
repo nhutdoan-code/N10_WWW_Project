@@ -4,7 +4,7 @@ import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { chatService } from '../service/chatService';
 import { trackingService } from '../service/trackingService';
-import { formatPrice } from '../utils/format';
+import { formatGiaCongBo, formatPrice } from '../utils/format';
 import { getVisitorId } from '../utils/activityTracking';
 import useAuth from '../hooks/useAuth';
 import {
@@ -124,7 +124,7 @@ function ChatSession({ sessionKey, open, setOpen }) {
                     }}
                   >
                     <ProductImage src={p.anhChinh} alt="" />
-                    <span>{p.tenMay}<b>{formatPrice(p.giaBan)}</b></span>
+                    <span>{p.tenMay}<b>{formatGiaCongBo(p.giaBan)}</b></span>
                   </Link>
                 ))}
               </div>

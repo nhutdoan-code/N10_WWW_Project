@@ -2,7 +2,10 @@ package nhom10.phonenest.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -101,6 +104,39 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest()
                 .body(Map.of("message", "Tham số không hợp lệ: " + e.getName()));
+    }
+
+    /** JSON sai dinh dang hoac gia tri enum khong hop le -> 400 thay vi 500. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleNotReadable(HttpMessageNotReadableException e) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("message", "Dữ liệu gửi lên không đúng định dạng"));
+    }
+
+    /**
+     * Lop phong ve cuoi: gia tri vuot do dai cot (MariaDB 1406 "Data too long") -> 400.
+     * Dau vao da duoc gioi han bang @Size; handler nay chi bat truong hop sot.
+     */
+    @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
+    public ResponseEntity<Map<String, String>> handleDataAccessUsage(InvalidDataAccessResourceUsageException e) {
+        String msg = e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage();
+        if (msg != null && msg.contains("Data too long")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Dữ liệu vượt quá độ dài cho phép"));
+        }
+        return handleOther(e);
+    }
+
+    /**
+     * Xung dot khoa / snapshot isolation (MariaDB "Record has changed since last read", deadlock,
+     * lock wait timeout): giao dich da rollback, KHONG co du lieu nao bi ghi de -> 409 de client tai lai.
+     */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<Map<String, String>> handleConcurrency(ConcurrencyFailureException e) {
+        log.warn("Concurrent modification rejected: {}", e.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("message", "Dữ liệu vừa được thay đổi bởi một thao tác khác. Vui lòng tải lại và thử lại.",
+                        "code", "CONCURRENT_MODIFICATION"));
     }
 
     @ExceptionHandler(Exception.class)

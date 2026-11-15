@@ -12,5 +12,6 @@ public class SanPham {
  @OneToMany(mappedBy="sanPham") private List<PhienBanSanPham> phienBans = new ArrayList<>();
  @OneToMany(mappedBy="sanPham") private List<HinhAnhSanPham> hinhAnhs = new ArrayList<>();
  @Transient public int getSoLuongTon(){ return phienBans.stream().filter(p -> p.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH).mapToInt(PhienBanSanPham::getSoLuongTon).sum(); }
- @Transient public BigDecimal getGiaBan(){ return phienBans.stream().filter(p -> p.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH).map(PhienBanSanPham::getGiaBan).filter(Objects::nonNull).min(BigDecimal::compareTo).orElse(BigDecimal.ZERO); }
+// 2B.7D: da bo getGiaBan() (lay gia thap nhat cua MOI bien the, ke ca gia seed chua duyet, va tra 0 khi khong co).
+ // Dung PheDuyetBanHangPolicy.giaCongBo(SanPham) cho gia cong khai.
 }

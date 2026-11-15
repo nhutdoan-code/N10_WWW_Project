@@ -1,6 +1,9 @@
 import { createContext, useEffect, useState } from 'react';
 import { STORAGE_KEYS } from '../config/constants';
 import { cartService } from '../service/cartService';
+import { productService } from '../service/productService';
+import { isItemDiscontinued, isItemUnapproved } from '../utils/discontinuedProductRules';
+import { refreshGuestItems } from '../utils/guestCart';
 import { storage } from '../utils/storage';
 import useAuth from '../hooks/useAuth';
 
@@ -15,8 +18,15 @@ export function CartProvider({ children }) {
     const guest = storage.get(KEY) || [];
 
     if (!isCustomer) {
-      setItems(guest);
-      return;
+      // Hiển thị ngay ở chế độ fail-closed, sau đó thay bằng dữ liệu mới từ Backend.
+      setItems(guest.map((i) => ({ ...i, phienBan: { ...i.phienBan, duocPhepBan: false } })));
+      let alive = true;
+      refreshGuestItems(guest, productService.get).then((next) => {
+        if (!alive) return;
+        storage.set(KEY, next);
+        setItems(next);
+      });
+      return () => { alive = false; };
     }
 
     const request = guest.length
@@ -131,7 +141,10 @@ export function CartProvider({ children }) {
 
   const count = items.reduce((sum, i) => sum + i.soLuong, 0);
 
-  const total = items.reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? i.sanPham?.giaBan ?? 0) * i.soLuong, 0);
+  // Chỉ cộng các dòng còn mua được: giá của biến thể chưa duyệt/khóa bán không phải giá bán.
+  const total = items
+    .filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i))
+    .reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? i.sanPham?.giaBan ?? 0) * i.soLuong, 0);
   return (
       <CartContext.Provider value={{ items, count, total, add, setQuantity, remove, clear, replace, reset }}>
         {children}

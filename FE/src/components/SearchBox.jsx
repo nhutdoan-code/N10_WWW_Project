@@ -5,7 +5,7 @@ import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { productService } from '../service/productService';
 import { trackingService } from '../service/trackingService';
-import { formatPrice } from '../utils/format';
+import { formatGiaCongBo, formatPrice } from '../utils/format';
 
 export default function SearchBox() {
   const [text, setText] = useState('');
@@ -77,7 +77,7 @@ export default function SearchBox() {
             >
               <ProductImage src={sp.anhChinh} alt="" />
               <span>{sp.tenMay}</span>
-              <b>{formatPrice(sp.giaBan)}</b>
+              <b>{formatGiaCongBo(sp.giaBan)}</b>
             </Link>
           ))}
         </div>

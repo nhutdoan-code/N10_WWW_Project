@@ -1,5 +1,11 @@
 export const formatPrice = (n) => `${Number(n || 0).toLocaleString('vi-VN')} ₫`;
 
+/**
+ * 2B.7D: gia san pham CONG BO. Backend khong tra truong gia cho bien the chua duoc phep ban
+ * -> hien "Gia dang cap nhat", KHONG bao gio hien "0 ₫".
+ */
+export const formatGiaCongBo = (n) => (n === null || n === undefined || n === '' ? 'Giá đang cập nhật' : formatPrice(n));
+
 export const formatNumber = (n) => Number(n || 0).toLocaleString('vi-VN');
 
 export const formatDate = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '');

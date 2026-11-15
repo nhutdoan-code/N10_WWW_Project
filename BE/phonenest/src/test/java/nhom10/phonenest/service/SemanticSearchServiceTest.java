@@ -120,6 +120,8 @@ class SemanticSearchServiceTest {
         pb.setBoNho(256);
         pb.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
         pb.setSanPham(s);
+        // 2B.7D: chi gia cua bien the duoc phep ban moi duoc dung cho ngan sach / ngu canh AI
+        nhom10.phonenest.support.TestVariants.daDuyet(pb);
 
         s.setPhienBans(List.of(pb));
         return s;

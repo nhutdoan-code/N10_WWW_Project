@@ -54,6 +54,6 @@ public class AdminKhoController {
 
     @PutMapping("/{ma}/adjust")
     public SanPhamDto dieuChinh(@PathVariable String ma, @Valid @RequestBody KhoDieuChinhDto d) {
-        return khoService.dieuChinh(ma, d.soLuongThucTe(), d.lyDo(), SecurityUtil.currentUserId());
+        return khoService.dieuChinh(ma, d.soLuongThucTe(), d.lyDo(), d.soLuongHienTai(), SecurityUtil.currentUserId());
     }
 }

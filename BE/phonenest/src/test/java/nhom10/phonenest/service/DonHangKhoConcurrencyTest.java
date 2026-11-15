@@ -1,5 +1,6 @@
 package nhom10.phonenest.service;
 
+import nhom10.phonenest.support.TestVariants;
 import nhom10.phonenest.dto.*;
 import nhom10.phonenest.entity.*;
 import nhom10.phonenest.enums.*;
@@ -127,6 +128,8 @@ public class DonHangKhoConcurrencyTest {
         pb1.setSoLuongTon(1);
         pb1.setSanPham(sanPham);
         pb1.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
+        // 2B.7B: bien the moi mac dinh PENDING_REVIEW; fixture can phe duyet hop le (co dau van tay)
+        TestVariants.daDuyet(pb1);
 
         pb2 = new PhienBanSanPham();
         pb2.setMaPhienBan("PB002");
@@ -136,6 +139,8 @@ public class DonHangKhoConcurrencyTest {
         pb2.setSoLuongTon(5);
         pb2.setSanPham(sanPham);
         pb2.setTrangThai(TrangThaiSanPham.DANG_KINH_DOANH);
+        // 2B.7B: bien the moi mac dinh PENDING_REVIEW; fixture can phe duyet hop le (co dau van tay)
+        TestVariants.daDuyet(pb2);
 
         when(khachHangRepository.findById("KH001")).thenReturn(Optional.of(khachHang));
         when(diaChiRepository.findById("DC001")).thenReturn(Optional.of(diaChi));

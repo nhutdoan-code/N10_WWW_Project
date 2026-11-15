@@ -104,10 +104,12 @@ public class DonHangService {
         BigDecimal tam = BigDecimal.ZERO;
         for (var e : muc.entrySet()) {
             PhienBanSanPham p = lockedVariants.get(e.getKey());
-            if (p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH
-                    || (p.getSanPham() != null && p.getSanPham().getTrangThai() == TrangThaiSanPham.NGUNG_KINH_DOANH)) {
-                throw new AppException(HttpStatus.BAD_REQUEST, p.getSanPham().getTenMay() + " không còn kinh doanh");
+            if (p.getSanPham() == null || p.getSanPham().getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH
+                    || p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+                String ten = p.getSanPham() != null ? p.getSanPham().getTenMay() : "Sản phẩm";
+                throw new AppException(HttpStatus.BAD_REQUEST, ten + " không còn kinh doanh");
             }
+            PheDuyetBanHangPolicy.kiemTraDuocBan(p, null);
             if (e.getValue() > p.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, p.getSanPham().getTenMay() + " không đủ hàng");
             }
@@ -245,6 +247,22 @@ public class DonHangService {
         return mapper.toDto(tim(ma));
     }
 
+    /**
+     * 2B.7E: don bi huy nhung da co giao dich thanh toan thanh cong (MoMo) -> danh dau CAN_HOAN_TIEN va
+     * bao Admin, khong de sot hoan tien. Chay khi da giu khoa dong DonHang (moi cap nhat thanh toan deu khoa
+     * DonHang truoc) nen khong tranh chap voi IPN.
+     */
+    private void danhDauHoanTienKhiHuy(DonHang d) {
+        for (ThanhToan t : thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(d.getMaDonHang())) {
+            if (t.getTrangThai() == TrangThaiThanhToan.DA_THANH_TOAN) {
+                t.setTrangThai(TrangThaiThanhToan.CAN_HOAN_TIEN);
+                thanhToanRepository.save(t);
+                thongBaoService.guiQuanTri("Đơn hàng " + d.getMaDonHang() + " đã bị hủy sau khi khách thanh toán ("
+                        + t.getSoTien() + " VND, mã GD: " + t.getMaGiaoDich() + "). Cần hoàn tiền cho khách hàng.");
+            }
+        }
+    }
+
     public DonHangDto huy(String maKh, String ma, DonHangDto.HuyRequest req) {
         DonHang d = timKhoa(ma);
         if (!d.getKhachHang().getMaKh().equals(maKh)) {
@@ -272,6 +290,7 @@ public class DonHangService {
         for (KhuyenMai km : vouchersToRefund) {
             khuyenMaiService.hoanLuot(km, d.getMaDonHang());
         }
+        danhDauHoanTienKhiHuy(d);
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
         d.setNgayCapNhat(LocalDateTime.now());
         HuyDonHang h = new HuyDonHang();
@@ -335,6 +354,7 @@ public class DonHangService {
             for (KhuyenMai km : vouchersToRefund) {
                 khuyenMaiService.hoanLuot(km, d.getMaDonHang());
             }
+            danhDauHoanTienKhiHuy(d);
         }
 
         d.setTrangThai(moi);
@@ -518,6 +538,9 @@ public class DonHangService {
         } else {
             PhienBanSanPham pb = phienBanRepository.findByIdForUpdate(c.getPhienBan().getMaPhienBan())
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không tồn tại"));
+            if (delta > 0 && !PheDuyetBanHangPolicy.duocPhepBan(pb)) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Không thể tăng số lượng do phiên bản chưa được phê duyệt bán hàng");
+            }
             if (delta > pb.getSoLuongTon()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Không đủ tồn kho");
             }

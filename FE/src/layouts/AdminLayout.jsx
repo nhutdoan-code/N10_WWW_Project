@@ -5,6 +5,7 @@ import useAuth from '../hooks/useAuth';
 const MENU = [
   { to: 'dashboard', label: 'Thống kê & tìm kiếm' },
   { to: 'products', label: 'Sản phẩm' },
+  { to: 'approvals', label: 'Phê duyệt bán hàng' },
   { to: 'categories', label: 'Loại sản phẩm' },
   { to: 'inventory', label: 'Tồn kho' },
   { to: 'orders', label: 'Đơn hàng' },

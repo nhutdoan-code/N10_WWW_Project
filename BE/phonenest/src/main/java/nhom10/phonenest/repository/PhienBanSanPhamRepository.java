@@ -11,15 +11,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface PhienBanSanPhamRepository extends JpaRepository<PhienBanSanPham, String> {
+public interface PhienBanSanPhamRepository extends JpaRepository<PhienBanSanPham, String>, KhoaPhienBanRepository {
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM PhienBanSanPham p WHERE p.maPhienBan = :id")
-    Optional<PhienBanSanPham> findByIdForUpdate(@Param("id") String id);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM PhienBanSanPham p WHERE p.maPhienBan IN :ids")
-    List<PhienBanSanPham> findAllByIdForUpdate(@Param("ids") Collection<String> ids);
+    // 2B.7D: findByIdForUpdate / findAllByIdForUpdate / findBySanPhamForUpdate nam o KhoaPhienBanRepository
+    // (khoa + nap lai trang thai moi nhat, tranh mat cap nhat ton kho).
 
     List<PhienBanSanPham> findBySanPhamMaSanPham(String maSanPham);
 

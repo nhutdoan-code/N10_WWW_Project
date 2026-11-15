@@ -1,10 +1,12 @@
 package nhom10.phonenest.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import nhom10.phonenest.enums.TrangThaiPheDuyet;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 
 import java.math.BigDecimal;
@@ -20,6 +22,8 @@ public record SanPhamDto(
         @NotBlank(message = "Vui lòng chọn thương hiệu") String maThuongHieu,
         String tenThuongHieu,
         @NotBlank(message = "Vui lòng nhập tên máy") String tenMay,
+        // 2B.7D: API cong khai: null (va khong xuat hien trong JSON) khi khong co bien the duoc phep ban.
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         @NotNull(message = "Vui lòng nhập giá bán") @Min(value = 0, message = "Giá bán không được âm") BigDecimal giaBan,
         String moTa,
         @Valid ThongSo thongSo,
@@ -28,7 +32,18 @@ public record SanPhamDto(
         BigDecimal diemDanhGiaTb,
         String anhChinh,
         List<Anh> hinhAnhs,
-        List<PhienBan> phienBans) {
+        List<PhienBan> phienBans,
+        // Chi co trong phan hoi /api/admin/** (null o API cong khai). Form sua phai gui lai
+        // de phat hien ghi de du lieu cu (2B.7C).
+        @JsonInclude(JsonInclude.Include.NON_NULL) String maKiemTraSua) {
+
+    public SanPhamDto(String maSanPham, String maLoai, String tenLoai, String maThuongHieu, String tenThuongHieu,
+                      String tenMay, BigDecimal giaBan, String moTa, ThongSo thongSo, int soLuongTon,
+                      TrangThaiSanPham trangThai, BigDecimal diemDanhGiaTb, String anhChinh, List<Anh> hinhAnhs,
+                      List<PhienBan> phienBans) {
+        this(maSanPham, maLoai, tenLoai, maThuongHieu, tenThuongHieu, tenMay, giaBan, moTa, thongSo, soLuongTon,
+                trangThai, diemDanhGiaTb, anhChinh, hinhAnhs, phienBans, null);
+    }
 
     /**
      * Ảnh sản phẩm. {@code maHinhAnh} là identity bền vững do DB sinh ra;
@@ -49,10 +64,51 @@ public record SanPhamDto(
             int ram,
             int boNho,
             String mauSac,
-            BigDecimal giaBan,
-            BigDecimal giaNiemYet,
+            // 2B.7D: API cong khai: null + an khoi JSON khi bien the chua duoc phep ban
+            @JsonInclude(JsonInclude.Include.NON_NULL) BigDecimal giaBan,
+            @JsonInclude(JsonInclude.Include.NON_NULL) BigDecimal giaNiemYet,
             int soLuongTon,
-            TrangThaiSanPham trangThai) {
+            TrangThaiSanPham trangThai,
+            TrangThaiPheDuyet trangThaiPheDuyet,
+            // Chi doc (server tinh): true khi bien the dang kinh doanh, APPROVED va
+            // dau van tay phe duyet khop du lieu hien tai. Gia tri gui len bi bo qua.
+            Boolean duocPhepBan,
+            // Ma kiem tra sua (chi Admin). Bat buoc gui lai khi sua bien the da ton tai.
+            @JsonInclude(JsonInclude.Include.NON_NULL) String maKiemTraSua) {
+
+        public PhienBan(String maPhienBan, String sku, int ram, int boNho, String mauSac, BigDecimal giaBan,
+                        BigDecimal giaNiemYet, int soLuongTon, TrangThaiSanPham trangThai,
+                        TrangThaiPheDuyet trangThaiPheDuyet, Boolean duocPhepBan) {
+            this(maPhienBan, sku, ram, boNho, mauSac, giaBan, giaNiemYet, soLuongTon, trangThai, trangThaiPheDuyet,
+                    duocPhepBan, null);
+        }
+
+        public PhienBan(
+                String maPhienBan,
+                String sku,
+                int ram,
+                int boNho,
+                String mauSac,
+                BigDecimal giaBan,
+                BigDecimal giaNiemYet,
+                int soLuongTon,
+                TrangThaiSanPham trangThai,
+                TrangThaiPheDuyet trangThaiPheDuyet) {
+            this(maPhienBan, sku, ram, boNho, mauSac, giaBan, giaNiemYet, soLuongTon, trangThai, trangThaiPheDuyet, Boolean.FALSE, null);
+        }
+
+        public PhienBan(
+                String maPhienBan,
+                String sku,
+                int ram,
+                int boNho,
+                String mauSac,
+                BigDecimal giaBan,
+                BigDecimal giaNiemYet,
+                int soLuongTon,
+                TrangThaiSanPham trangThai) {
+            this(maPhienBan, sku, ram, boNho, mauSac, giaBan, giaNiemYet, soLuongTon, trangThai, TrangThaiPheDuyet.PENDING_REVIEW, Boolean.FALSE, null);
+        }
     }
 
     public record ThongSo(

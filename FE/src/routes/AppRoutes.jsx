@@ -30,6 +30,7 @@ import AdminCategoriesPage from '../pages/admin/AdminCategoriesPage';
 import AdminShippingPage from '../pages/admin/AdminShippingPage';
 import AdminOrdersPage from '../pages/admin/AdminOrdersPage';
 import AdminProductsPage from '../pages/admin/AdminProductsPage';
+import AdminApprovalsPage from '../pages/admin/AdminApprovalsPage';
 import ProtectedRoute from './ProtectedRoute';
 import ActivityTracker from '../components/ActivityTracker';
 
@@ -65,6 +66,7 @@ export default function AppRoutes() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboardPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="approvals" element={<AdminApprovalsPage />} />
             <Route path="inventory" element={<AdminInventoryPage />} />
             <Route path="promotions" element={<AdminPromotionsPage />} />
             <Route path="shipping" element={<AdminShippingPage />} />

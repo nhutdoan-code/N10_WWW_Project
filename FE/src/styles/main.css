@@ -245,6 +245,9 @@ select { padding-right: 28px; cursor: pointer; }
 .badge-HET_HANG, .badge-DA_HUY, .badge-NGUNG_KINH_DOANH, .badge-TU_CHOI { background: #fde7e5; color: #a1241c; }
 .badge-CHO_XAC_NHAN, .badge-DANG_XU_LY, .badge-DANG_GIAO, .badge-CHO_DUYET, .badge-CAN_HOAN_TIEN { background: #fdf0d3; color: #8a5a00; }
 .badge-CHO_KHACH_XAC_NHAN { background: #e1ecff; color: #1e4fd8; }
+.badge-PENDING_REVIEW { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-BLOCKED { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+.badge-APPROVED { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
 
 /* ---- Chi tiết sản phẩm ---- */
 .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; background: #fff; padding: 28px; border-radius: 18px; border: 1px solid var(--line); margin-bottom: 24px; }
@@ -1222,4 +1225,28 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 
 .admin-order-customer-info strong {
   color: #334155;
+}
+
+/* ===== Phe duyet ban hang (2B.7C) ===== */
+.approval-filters { display: grid; grid-template-columns: 2fr repeat(3, minmax(0, 1fr)); gap: 10px; align-items: center; margin: 0 0 14px; }
+.approval-filters .approval-check { grid-column: 1 / -1; }
+.approval-check { display: flex; gap: 8px; align-items: flex-start; font-size: .9rem; font-weight: 500; }
+.approval-check input { margin-top: 3px; }
+.table-scroll { width: 100%; overflow-x: auto; }
+.table-scroll .table { min-width: 860px; }
+.approval-warn { background: #fff7ed; color: #9a3412; border: 1px dashed #f97316; }
+.approval-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.approval-grid div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; }
+.approval-grid span { color: var(--muted); font-size: .8rem; }
+.approval-alert { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+.approval-meta p { margin: 4px 0; }
+.approval-actions { margin: 12px 0; flex-wrap: wrap; }
+.approval-form { display: grid; gap: 12px; margin: 12px 0; }
+.approval-form h3 { margin: 0; }
+.approval-form textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; }
+.approval-history-title { margin-top: 18px; }
+.price-pending { color: #b45309; font-weight: 600; }
+@media (max-width: 760px) {
+  .approval-filters { grid-template-columns: 1fr; }
+  .approval-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

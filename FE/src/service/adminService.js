@@ -4,6 +4,7 @@ const save = (base) => (ma, data) => (ma ? api.put(`${base}/${ma}`, data) : api.
 
 export const adminService = {
   products: (q) => api.get('/admin/products', { params: { q } }),
+  product: (ma) => api.get(`/admin/products/${ma}`),
   uploadImage: (file) => {
     const body = new FormData();
     body.append('file', file);
@@ -43,7 +44,8 @@ export const adminService = {
   inventoryHistory: (ma) => api.get(ma ? `/admin/inventory/${ma}/history` : '/admin/inventory/history'),
   importStock: (ma, soLuong, ghiChu) => api.post(`/admin/inventory/${ma}/import`, { soLuong, ghiChu }),
   importStockBatch: (items, ghiChu) => api.post('/admin/inventory/batch-import', { items, ghiChu }),
-  adjustStock: (ma, soLuongThucTe, lyDo) => api.put(`/admin/inventory/${ma}/adjust`, { soLuongThucTe, lyDo }),
+  // 2B.7D: gui kem so ton dang thay de backend tu choi (409) neu ton da doi trong luc kiem ke
+  adjustStock: (ma, soLuongThucTe, lyDo, soLuongHienTai) => api.put(`/admin/inventory/${ma}/adjust`, { soLuongThucTe, lyDo, soLuongHienTai }),
 
   promotions: () => api.get('/admin/promotions'),
   savePromotion: (ma, data) => (ma ? api.put(`/admin/promotions/${ma}`, data) : api.post('/admin/promotions', data)),
@@ -70,4 +72,11 @@ export const adminService = {
 
   auditLogs: (params) => api.get('/admin/audit-logs', { params }),
   auditLogDetail: (ma) => api.get(`/admin/audit-logs/${ma}`),
+
+  // Phe duyet ban hang bien the (2B.7B/2B.7C) - chi ADMIN
+  variants: (params) => api.get('/admin/variants', { params }),
+  variantApproval: (ma) => api.get(`/admin/variants/${ma}/approval`),
+  variantApprovalHistory: (ma) => api.get(`/admin/variants/${ma}/approval-history`),
+  updateVariantApproval: (ma, body) => api.put(`/admin/variants/${ma}/approval`, body),
+  unblockVariant: (ma, body) => api.put(`/admin/variants/${ma}/unblock`, body),
 };

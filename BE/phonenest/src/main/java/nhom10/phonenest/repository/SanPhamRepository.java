@@ -1,8 +1,10 @@
 package nhom10.phonenest.repository;
 
+import jakarta.persistence.LockModeType;
 import nhom10.phonenest.entity.SanPham;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,6 +12,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SanPhamRepository extends JpaRepository<SanPham, String> {
+
+    /** Khoa dong san pham (SELECT ... FOR UPDATE) truoc khi sua/luu tru/khoi phuc. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM SanPham s WHERE s.maSanPham = :ma")
+    Optional<SanPham> findByIdForUpdate(@Param("ma") String ma);
 
     boolean existsByLoaiMaLoai(String maLoai);
 

@@ -165,6 +165,8 @@ public class MomoPaymentService {
         if (payload == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Payload MoMo không được để trống");
         }
+        // 2B.7E: chua cau hinh MoMo -> 503 ro rang (truoc day: khoa rong lam HMAC nem loi -> 500)
+        requireConfigured();
 
         String orderId = required(payload, "orderId");
         String ipnPartnerCode = required(payload, "partnerCode");
@@ -302,17 +304,14 @@ public class MomoPaymentService {
         });
     }
 
+    /**
+     * 2B.7E: ghi thong bao TRONG cung giao dich xu ly IPN.
+     * Loi da phat hien: truoc day thong bao duoc ghi trong afterCommit(); khi do repository.save() tham gia
+     * giao dich DA KET THUC nen ban ghi KHONG BAO GIO duoc commit -> moi thong bao MoMo (ke ca canh bao
+     * "can hoan tien" gui Admin) bi mat am tham. Ghi trong giao dich: commit/rollback cung trang thai thanh toan.
+     */
     private void executeAfterCommitOrImmediate(Runnable task) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    task.run();
-                }
-            });
-        } else {
-            task.run();
-        }
+        task.run();
     }
 
     private ThanhToan findPayment(String maDonHang) {

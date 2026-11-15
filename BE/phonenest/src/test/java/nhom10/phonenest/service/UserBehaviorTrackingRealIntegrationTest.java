@@ -21,9 +21,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import nhom10.phonenest.support.ItDatabaseGuard;
+import nhom10.phonenest.support.TestVariants;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -34,16 +42,20 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@EnabledIfEnvironmentVariable(named = "PHONENEST_IT_DB_URL", matches = ".+",
+        disabledReason = "Integration test chi chay tren clone dung mot lan (dat PHONENEST_IT_DB_URL)")
 @SpringBootTest
+@ActiveProfiles("test")
+@ContextConfiguration(initializers = ItDatabaseGuard.class)
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:mariadb://127.0.0.1:3307/bandienthoai",
-        "spring.datasource.username=root",
-        "spring.datasource.password=sapassword",
         "phonenest.ai.embedding.provider=ollama",
         "phonenest.ai.embedding.ollama.base-url=http://127.0.0.1:11434"
 })
 class UserBehaviorTrackingRealIntegrationTest {
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private MockMvc mockMvc;
@@ -75,19 +87,48 @@ class UserBehaviorTrackingRealIntegrationTest {
     private String adminToken;
     private String customerToken;
 
+    private void verifyDatabaseSafety() throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            String catalog = conn.getCatalog();
+            String url = conn.getMetaData().getURL();
+
+            // FAIL-FAST GUARD 1: Tuyệt đối không cho phép chạy trên database chính 'bandienthoai'
+            if (catalog != null && "bandienthoai".equalsIgnoreCase(catalog.trim())) {
+                throw new IllegalStateException(
+                        "CRITICAL SAFETY VIOLATION: Integration test attempted to execute against MAIN DATABASE 'bandienthoai'! " +
+                        "All operations blocked immediately to prevent table modification or deletion.");
+            }
+            // Ten database thuc te phai la clone dung mot lan hop le
+            ItDatabaseGuard.kiemTra("jdbc:mariadb://127.0.0.1/" + catalog);
+
+            // FAIL-FAST GUARD 3: Kiểm tra JDBC URL không trỏ về database chính
+            if (url != null && url.matches(".*[/:](bandienthoai)(\\?.*)?$")) {
+                throw new IllegalStateException(
+                        "CRITICAL SAFETY VIOLATION: JDBC URL targets production database 'bandienthoai'! URL: " + url);
+            }
+        }
+    }
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws SQLException {
+        verifyDatabaseSafety();
         adminToken = jwtUtil.generate("TK001", Role.ADMIN);
         customerToken = jwtUtil.generate("TK002", Role.CUSTOMER);
         hanhViRepository.deleteAll();
         phienBanRepository.findById("PB001").ifPresent(pb -> {
             pb.setSoLuongTon(100);
+            // Fixture (chi tren clone dung mot lan): test nay can PB001 mua duoc,
+            // nen dat phe duyet hop le theo quy tac 2B.7B (co dau van tay).
+            if (!PheDuyetBanHangPolicy.duocPhepBan(pb)) {
+                TestVariants.daDuyet(pb);
+            }
             phienBanRepository.save(pb);
         });
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws SQLException {
+        verifyDatabaseSafety();
         hanhViRepository.deleteAll();
     }
 

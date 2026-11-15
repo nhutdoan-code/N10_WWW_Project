@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Icon from '../components/Icon';
+import ProductImage from '../components/ProductImage';
+import StatusBadge from '../components/StatusBadge';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useToast from '../hooks/useToast';
-import ProductImage from '../components/ProductImage';
 import { wishlistService } from '../service/wishlistService';
 import { trackingService } from '../service/trackingService';
 import { errorMessage, formatPrice } from '../utils/format';
 import { anhTheoPhienBan } from '../utils/image';
+import {
+  isItemDiscontinued,
+  isItemPendingReview,
+  isItemBlocked,
+  hasDiscontinuedItems,
+  hasUnapprovedItems,
+  DISCONTINUED_MESSAGES,
+} from '../utils/discontinuedProductRules';
 
-function CartQuantity({ soLuong, max, onChange }) {
+function CartQuantity({ soLuong, max, disabled, onChange }) {
   const [value, setValue] = useState(String(soLuong));
 
   useEffect(() => {
@@ -17,6 +27,7 @@ function CartQuantity({ soLuong, max, onChange }) {
   }, [soLuong]);
 
   const save = () => {
+    if (disabled) return;
     const sl = Number(value);
 
     if (!Number.isInteger(sl) || sl < 1) {
@@ -35,7 +46,7 @@ function CartQuantity({ soLuong, max, onChange }) {
       <button
         type="button"
         aria-label="Giảm"
-        disabled={soLuong <= 1}
+        disabled={disabled || soLuong <= 1}
         onClick={() => onChange(soLuong - 1)}
       >
         −
@@ -46,6 +57,7 @@ function CartQuantity({ soLuong, max, onChange }) {
         min="1"
         max={max}
         value={value}
+        disabled={disabled}
         onChange={(e) => setValue(e.target.value)}
         onBlur={save}
         onKeyDown={(e) => {
@@ -57,7 +69,7 @@ function CartQuantity({ soLuong, max, onChange }) {
       <button
         type="button"
         aria-label="Tăng"
-        disabled={max <= 0 || soLuong >= max}
+        disabled={disabled || max <= 0 || soLuong >= max}
         onClick={() => onChange(soLuong + 1)}
       >
         +
@@ -88,6 +100,10 @@ export default function CartPage() {
     }, 'Đã chuyển sang danh sách yêu thích');
   };
 
+  const hasDiscontinued = hasDiscontinuedItems(items);
+  const hasUnapproved = hasUnapprovedItems(items);
+  const hasBlockedOrDiscontinued = hasDiscontinued || hasUnapproved;
+
   if (items.length === 0) {
     return (
       <p className="muted">
@@ -102,10 +118,28 @@ export default function CartPage() {
         Giỏ hàng <span className="muted">({count} sản phẩm)</span>
       </h2>
 
+      {hasUnapproved && (
+        <div className="alert alert-warning unapproved-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Icon name="alert-triangle" size={20} />
+          <span><strong>{DISCONTINUED_MESSAGES.APPROVAL_CART_BANNER}</strong></span>
+        </div>
+      )}
+
+      {!hasUnapproved && hasDiscontinued && (
+        <div className="alert alert-warning discontinued-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Icon name="alert-triangle" size={20} />
+          <span><strong>{DISCONTINUED_MESSAGES.CART_BANNER}</strong></span>
+        </div>
+      )}
+
       <div className="cart-layout">
         <div className="section">
           {items.map((item) => {
             const { sanPham: sp, phienBan: pb, soLuong } = item;
+            const isDiscontinued = isItemDiscontinued(item);
+            const isPending = isItemPendingReview(item);
+            const isBlocked = isItemBlocked(item);
+            const isLocked = isDiscontinued || isPending || isBlocked;
             const stock = Number(pb?.soLuongTon ?? 0);
             const price = Number(pb?.giaBan ?? 0);
             const subtotal = price * soLuong;
@@ -121,21 +155,61 @@ export default function CartPage() {
                     <Link to={`/products/${sp.maSanPham}`}>
                       {sp.tenMay}
                     </Link>
+                    {isDiscontinued && (
+                      <span style={{ marginLeft: '8px' }}>
+                        <StatusBadge status="NGUNG_KINH_DOANH" />
+                      </span>
+                    )}
+                    {isPending && (
+                      <span style={{ marginLeft: '8px' }}>
+                        <StatusBadge status="PENDING_REVIEW" />
+                      </span>
+                    )}
+                    {isBlocked && (
+                      <span style={{ marginLeft: '8px' }}>
+                        <StatusBadge status="BLOCKED" />
+                      </span>
+                    )}
                   </h4>
 
-                  <span className="price">{formatPrice(price)}</span>
+                  {/* 2B.7C: không hiển thị giá seed của biến thể chưa duyệt như giá bán */}
+                  {isPending ? (
+                    <span className="price price-pending">Giá đang cập nhật</span>
+                  ) : isBlocked ? (
+                    <span className="price price-pending">Không khả dụng</span>
+                  ) : (
+                    <span className="price">{formatPrice(price)}</span>
+                  )}
 
                   <div className="muted variant-line">
                     {pb ? `${pb.ram}GB RAM · ${pb.boNho}GB · ${pb.mauSac || 'Mặc định'}` : 'Bản tiêu chuẩn'}
                   </div>
 
-                  {soLuong > stock && (
+                  {isDiscontinued && (
+                    <small className="error" style={{ display: 'block', marginTop: '4px', fontWeight: 500 }}>
+                      {DISCONTINUED_MESSAGES.CART_ITEM_WARNING}
+                    </small>
+                  )}
+
+                  {isPending && (
+                    <small className="error" style={{ display: 'block', marginTop: '4px', fontWeight: 500, color: '#b45309' }}>
+                      Sản phẩm này đang tạm ngừng nhận đơn và không thể thanh toán. Vui lòng xóa khỏi giỏ hàng.
+                    </small>
+                  )}
+
+                  {isBlocked && (
+                    <small className="error" style={{ display: 'block', marginTop: '4px', fontWeight: 500 }}>
+                      Sản phẩm này đã bị khóa bán và không thể thanh toán. Vui lòng xóa khỏi giỏ hàng.
+                    </small>
+                  )}
+
+                  {!isLocked && soLuong > stock && (
                     <small className="error">
                       Số lượng trong giỏ vượt tồn kho hiện tại ({stock}).
                     </small>
                   )}
 
-                  {soLuong === stock && stock > 0 && (
+                  {!isLocked && soLuong === stock && stock > 0 && (
                     <small className="muted">
                       Đã đạt tối đa tồn kho ({stock}).
                     </small>
@@ -145,10 +219,11 @@ export default function CartPage() {
                     <CartQuantity
                       soLuong={soLuong}
                       max={stock}
+                      disabled={isLocked}
                       onChange={(next) => run(() => setQuantity(item, next))}
                     />
 
-                    {isCustomer && (
+                    {isCustomer && !isLocked && (
                       <button
                         type="button"
                         className="link-btn"
@@ -171,7 +246,7 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <b>{formatPrice(subtotal)}</b>
+                <b>{isPending || isBlocked ? '—' : formatPrice(subtotal)}</b>
               </div>
             );
           })}
@@ -193,9 +268,26 @@ export default function CartPage() {
               Nhập mã khuyến mãi và chọn địa chỉ ở bước thanh toán.
             </p>
 
-            <Link to="/checkout" className="btn btn-primary btn-lg">
-              {isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}
-            </Link>
+            {hasBlockedOrDiscontinued ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg"
+                  disabled
+                  title={hasUnapproved ? DISCONTINUED_MESSAGES.APPROVAL_CART_BANNER : DISCONTINUED_MESSAGES.CART_BANNER}
+                  style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                >
+                  Thanh toán
+                </button>
+                <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
+                  {DISCONTINUED_MESSAGES.CHECKOUT_ACTION_DISABLED}
+                </small>
+              </>
+            ) : (
+              <Link to="/checkout" className="btn btn-primary btn-lg">
+                {isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}
+              </Link>
+            )}
           </div>
 
           {!isCustomer && (

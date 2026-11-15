@@ -19,6 +19,14 @@ import { errorMessage, formatPrice } from '../utils/format';
 import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
 import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
+import {
+  isProductDiscontinued,
+  isVariantDiscontinued,
+  isPurchasable,
+  getDefaultSelectedVariant,
+  DISCONTINUED_MESSAGES,
+  isVariantPendingReview,
+} from '../utils/discontinuedProductRules';
 
 const COMMITS = [
   { icon: 'shield', title: 'Hàng chính hãng', text: 'Nguyên seal, bảo hành theo chính sách của hãng.' },
@@ -53,10 +61,8 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (sp?.phienBans?.length) {
-      // Chỉ chọn trong các variant còn kinh doanh; không fallback sang NGUNG_KINH_DOANH.
-      const active = sp.phienBans.filter((p) => p.trangThai === 'DANG_KINH_DOANH');
-      const first = active.find((p) => p.soLuongTon > 0) || active[0];
-      setMaPhienBan(first?.maPhienBan || '');
+      const initial = getDefaultSelectedVariant(sp);
+      setMaPhienBan(initial?.maPhienBan || '');
       setSoLuong(1);
     }
     if (sp?.maSanPham && lastTrackedProductRef.current !== sp.maSanPham) {
@@ -82,30 +88,39 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Chỉ hiển thị tổ hợp thực sự tồn tại trong DB và còn kinh doanh, không tạo combination giả
-  const pbs = (sp.phienBans || []).filter((p) => p.trangThai === 'DANG_KINH_DOANH');
+  const isNgungKD = isProductDiscontinued(sp);
+  const pbs = sp.phienBans || [];
+  const phienBan = pbs.find((p) => p.maPhienBan === maPhienBan) || getDefaultSelectedVariant(sp) || pbs[0] || null;
+  const isVarNgungKD = isVariantDiscontinued(phienBan);
+  const isPending = isVariantPendingReview(phienBan);
+  const isBlocked = phienBan?.trangThaiPheDuyet === 'BLOCKED';
+  const conHang = isPurchasable(sp, phienBan);
+  const canBuy = conHang && !isNgungKD && !isVarNgungKD && !isPending && !isBlocked && phienBan;
+  // 2B.7D: backend chi tra gia cong bo; khong co -> null (khong bao gio dung 0 lam gia).
+  const giaCongBo = phienBan ? (phienBan.giaBan ?? null) : (sp.giaBan ?? null);
+  const giaBan = Number(giaCongBo ?? 0);
 
-  const phienBan = pbs.find((p) => p.maPhienBan === maPhienBan) || pbs[0] || null;
-  const conHang = phienBan?.trangThai === 'DANG_KINH_DOANH' && phienBan.soLuongTon > 0;
-  const giaBan = Number(phienBan?.giaBan ?? sp.giaBan);
   const themVaoGio = () => {
-    if (!phienBan || !conHang) return;
+    if (!canBuy) return;
     return run(async () => {
       await add(sp, phienBan, soLuong);
       trackingService.trackAddToCart(sp.maSanPham, phienBan.maPhienBan);
     }, 'Đã thêm vào giỏ hàng');
   };
-  // Buy Now: truyền variant qua React Router state (không lộ ID trên URL).
-  // state nằm trong history nên vẫn còn khi refresh; query vẫn được CheckoutPage
-  // chấp nhận để tương thích link cũ.
-  const muaNgay = () => { if(!phienBan || !conHang) return; navigate('/checkout', { state: { mua: phienBan.maPhienBan, sl: soLuong } }); };
-  const conTheBan = (pv) => pv && pv.trangThai === 'DANG_KINH_DOANH' && Number(pv.soLuongTon) > 0;
+
+  const muaNgay = () => {
+    if (!canBuy) return;
+    navigate('/checkout', { state: { mua: phienBan.maPhienBan, sl: soLuong } });
+  };
+
+  const conTheBan = (pv) => isPurchasable(sp, pv);
   const keyDungLuong = (pv) => `${pv.ram}-${pv.boNho}`;
   const curKey = phienBan ? keyDungLuong(phienBan) : null;
   const dungLuongs = [...new Map(pbs.map((pv) => [keyDungLuong(pv), { ram: pv.ram, boNho: pv.boNho }])).values()];
   const mauSacs = curKey
     ? [...new Set(pbs.filter((pv) => keyDungLuong(pv) === curKey).map((pv) => pv.mauSac).filter(Boolean))]
     : [];
+
   const chonDungLuong = (dl) => {
     const list = pbs.filter((pv) => pv.ram === dl.ram && pv.boNho === dl.boNho);
     const sel = list.find((pv) => conTheBan(pv) && pv.mauSac === phienBan?.mauSac) || list.find(conTheBan) || list[0];
@@ -113,12 +128,38 @@ export default function ProductDetailPage() {
     setMaPhienBan(sel.maPhienBan);
     setSoLuong(1);
   };
+
   const chonMauSac = (mau) => {
     const sel = pbs.find((pv) => pv.ram === phienBan?.ram && pv.boNho === phienBan?.boNho && pv.mauSac === mau);
     if (!sel) return;
     setMaPhienBan(sel.maPhienBan);
     setSoLuong(1);
   };
+
+  const buttonTooltip = isNgungKD
+    ? 'Sản phẩm đã ngừng kinh doanh'
+    : isVarNgungKD
+    ? 'Phiên bản đã ngừng kinh doanh'
+    : isBlocked
+    ? 'Phiên bản bị khóa bán'
+    : isPending
+    ? 'Sản phẩm đang chờ duyệt, tạm ngừng nhận đơn'
+    : !conHang
+    ? 'Sản phẩm tạm hết hàng'
+    : 'Thêm vào giỏ';
+
+  const buyNowTooltip = isNgungKD
+    ? 'Sản phẩm đã ngừng kinh doanh'
+    : isVarNgungKD
+    ? 'Phiên bản đã ngừng kinh doanh'
+    : isBlocked
+    ? 'Phiên bản bị khóa bán'
+    : isPending
+    ? 'Sản phẩm đang chờ duyệt, tạm ngừng nhận đơn'
+    : !conHang
+    ? 'Sản phẩm tạm hết hàng'
+    : 'Mua ngay';
+
   const dsAnh = danhSachAnhTheoPhienBan(sp, phienBan);
   const anhHienThi = image && dsAnh.some((a) => a.duongDan === image)
       ? image
@@ -130,6 +171,15 @@ export default function ProductDetailPage() {
       <Link to={`/?loai=${sp.maLoai}`}>{sp.tenLoai}</Link><span>›</span>
       <b>{sp.tenMay}</b>
     </nav>
+    {isNgungKD && (
+      <div className="alert alert-warning discontinued-product-banner" style={{ margin: '16px 0', padding: '14px 18px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Icon name="alert-triangle" size={22} />
+          <span><strong>{DISCONTINUED_MESSAGES.DETAIL_BANNER}</strong></span>
+        </div>
+        <Link to="/" className="btn btn-warning btn-sm" style={{ fontWeight: 600 }}>Xem danh mục đang bán</Link>
+      </div>
+    )}
     <div className="detail">
       <div>
         <ProductImage className="detail-img" src={anhHienThi} alt={sp.tenMay} />
@@ -158,7 +208,44 @@ export default function ProductDetailPage() {
       <div>
         <h1>{sp.tenMay}</h1>
         <p className="muted">Hãng: {sp.tenThuongHieu || sp.tenLoai}</p>
-        <div className="price big">{formatPrice(giaBan)}{phienBan?.giaNiemYet && Number(phienBan.giaNiemYet) > giaBan ? <span style={{marginLeft:"12px",textDecoration:"line-through",color:"#666"}}>{formatPrice(phienBan.giaNiemYet)}</span> : null}</div>
+        <div className="price big">
+          {isPending ? (
+            <div>
+              <span style={{ color: '#b45309', fontWeight: 700, fontSize: '1.5rem' }}>Giá đang cập nhật</span>
+              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: '#8a5a00', fontWeight: 600 }}>
+                (Tạm ngừng nhận đơn)
+              </span>
+            </div>
+          ) : isBlocked ? (
+            <div>
+              <span style={{ color: '#b91c1c', fontWeight: 700, fontSize: '1.5rem' }}>Không khả dụng</span>
+              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: '#a1241c', fontWeight: 600 }}>
+                (Bị khóa bán)
+              </span>
+            </div>
+          ) : giaCongBo == null ? (
+            <div>
+              <span style={{ color: '#b45309', fontWeight: 700, fontSize: '1.5rem' }}>
+                {isNgungKD || isVarNgungKD ? 'Ngừng kinh doanh' : 'Giá đang cập nhật'}
+              </span>
+            </div>
+          ) : (
+            <>
+              {formatPrice(giaBan)}
+              {isNgungKD ? (
+                <span style={{ marginLeft: "12px", fontSize: "0.9rem", color: "#a1241c", fontWeight: 600 }}>
+                  {DISCONTINUED_MESSAGES.PRICE_NOTE}
+                </span>
+              ) : (
+                phienBan?.giaNiemYet && Number(phienBan.giaNiemYet) > giaBan ? (
+                  <span style={{ marginLeft: "12px", textDecoration: "line-through", color: "#666" }}>
+                    {formatPrice(phienBan.giaNiemYet)}
+                  </span>
+                ) : null
+              )}
+            </>
+          )}
+        </div>
         {pbs.length > 0 && (
           <>
             {dungLuongs.length > 0 && (
@@ -167,16 +254,26 @@ export default function ProductDetailPage() {
                 <div className="variant-options">
                   {dungLuongs.map((dl) => {
                     const active = phienBan?.ram === dl.ram && phienBan?.boNho === dl.boNho;
-                    const conHangDl = pbs.some((pv) => pv.ram === dl.ram && pv.boNho === dl.boNho && conTheBan(pv));
+                    const listDl = pbs.filter((pv) => pv.ram === dl.ram && pv.boNho === dl.boNho);
+                    const conHangDl = listDl.some(conTheBan);
+                    const allNgungKD = listDl.every(isVariantDiscontinued);
+                    const allPendingDl = listDl.every((pv) => isVariantPendingReview(pv));
+                    const allBlockedDl = listDl.every((pv) => pv.trangThaiPheDuyet === 'BLOCKED');
+                    const clickable = conHangDl || isNgungKD || allPendingDl || allBlockedDl;
+
                     return (
                       <button
                         key={`${dl.ram}-${dl.boNho}`}
                         type="button"
-                        className={`variant-option ${active ? 'active' : ''} ${conHangDl ? '' : 'disabled'}`}
+                        className={`variant-option ${active ? 'active' : ''} ${clickable ? '' : 'disabled'}`}
                         onClick={() => chonDungLuong(dl)}
-                        disabled={!conHangDl}
+                        disabled={!clickable}
                       >
                         <b>{dl.ram}GB / {dl.boNho}GB</b>
+                        {!isNgungKD && allNgungKD && <small className="muted"> (Ngừng KD)</small>}
+                        {!isNgungKD && !allNgungKD && allBlockedDl && <small className="muted"> (Khóa bán)</small>}
+                        {!isNgungKD && !allNgungKD && !allBlockedDl && allPendingDl && <small className="muted"> (Chờ duyệt)</small>}
+                        {!isNgungKD && !allNgungKD && !allBlockedDl && !allPendingDl && !conHangDl && <small className="muted"> (Hết hàng)</small>}
                       </button>
                     );
                   })}
@@ -190,18 +287,32 @@ export default function ProductDetailPage() {
                   {mauSacs.map((mau) => {
                     const pv = pbs.find((x) => x.ram === phienBan?.ram && x.boNho === phienBan?.boNho && x.mauSac === mau);
                     const active = pv?.maPhienBan === phienBan?.maPhienBan;
-                    const hetHangMau = !conTheBan(pv);
+                    const varNgungKD = isVariantDiscontinued(pv);
+                    const varPending = isVariantPendingReview(pv);
+                    const varBlocked = pv?.trangThaiPheDuyet === 'BLOCKED';
+                    const hetHangMau = !isNgungKD && !conTheBan(pv) && !varPending && !varBlocked;
+
+                    let titleText = mau;
+                    if (isNgungKD) titleText = 'Sản phẩm ngừng kinh doanh';
+                    else if (varNgungKD) titleText = 'Phiên bản ngừng kinh doanh';
+                    else if (varBlocked) titleText = 'Phiên bản bị khóa bán';
+                    else if (varPending) titleText = 'Phiên bản đang chờ duyệt';
+                    else if (hetHangMau) titleText = 'Hết hàng';
+
                     return (
                       <button
                         key={mau}
                         type="button"
                         className={`variant-option ${active ? 'active' : ''} ${hetHangMau ? 'disabled' : ''}`}
                         onClick={() => chonMauSac(mau)}
-                        title={hetHangMau ? 'Hết hàng' : mau}
-                        disabled={hetHangMau}
+                        title={titleText}
+                        disabled={!isNgungKD && varNgungKD}
                       >
                         <span>{mau}</span>
-                        {hetHangMau && <small className="muted"> (Hết hàng)</small>}
+                        {!isNgungKD && varNgungKD && <small className="muted"> (Ngừng KD)</small>}
+                        {!isNgungKD && !varNgungKD && varBlocked && <small className="muted"> (Khóa)</small>}
+                        {!isNgungKD && !varNgungKD && !varBlocked && varPending && <small className="muted"> (Chờ duyệt)</small>}
+                        {!isNgungKD && !varNgungKD && !varBlocked && !varPending && hetHangMau && <small className="muted"> (Hết hàng)</small>}
                       </button>
                     );
                   })}
@@ -210,15 +321,58 @@ export default function ProductDetailPage() {
             )}
           </>
         )}
-        <p><StatusBadge status={conHang ? "CON_HANG" : "HET_HANG"} /> {!conHang && <span className="muted">Hết hàng</span>}</p>
+        <p>
+          {isNgungKD ? (
+            <StatusBadge status="NGUNG_KINH_DOANH" />
+          ) : isVarNgungKD ? (
+            <>
+              <StatusBadge status="NGUNG_KINH_DOANH" />
+              <span className="muted" style={{ marginLeft: '8px' }}>Phiên bản ngừng kinh doanh</span>
+            </>
+          ) : isPending ? (
+            <>
+              <StatusBadge status="PENDING_REVIEW" />
+              <span className="muted" style={{ marginLeft: '8px', color: '#8a5a00' }}>Tạm ngừng nhận đơn</span>
+            </>
+          ) : isBlocked ? (
+            <>
+              <StatusBadge status="BLOCKED" />
+              <span className="muted" style={{ marginLeft: '8px', color: '#a1241c' }}>Không khả dụng</span>
+            </>
+          ) : (
+            <>
+              <StatusBadge status={conHang ? "CON_HANG" : "HET_HANG"} />
+              {!conHang && <span className="muted" style={{ marginLeft: '8px' }}>Hết hàng</span>}
+            </>
+          )}
+        </p>
         <div className="buy-box" ref={boxRef}>
           <div className="buy-main">
-            <input type="number" min="1" max={phienBan?.soLuongTon || 1} value={soLuong} onChange={(e) => setSoLuong(Number(e.target.value))} className="qty" aria-label="Số lượng" />
-            <button className="btn btn-primary btn-lg" disabled={!conHang || !phienBan} onClick={themVaoGio}>
+            <input
+              type="number"
+              min="1"
+              max={phienBan?.soLuongTon || 1}
+              value={soLuong}
+              onChange={(e) => setSoLuong(Number(e.target.value))}
+              className="qty"
+              aria-label="Số lượng"
+              disabled={!canBuy}
+            />
+            <button
+              className="btn btn-primary btn-lg"
+              disabled={!canBuy}
+              onClick={themVaoGio}
+              title={buttonTooltip}
+            >
               Thêm vào giỏ
             </button>
             {isCustomer && (
-              <button className="btn btn-buy btn-lg" disabled={!conHang || !phienBan} onClick={muaNgay}>
+              <button
+                className="btn btn-buy btn-lg"
+                disabled={!canBuy}
+                onClick={muaNgay}
+                title={buyNowTooltip}
+              >
                 Mua ngay
               </button>
             )}
@@ -254,14 +408,37 @@ export default function ProductDetailPage() {
     <div className={showBar ? 'sticky-bar on no-print' : 'sticky-bar no-print'} aria-hidden={!showBar}>
       <div className="container sticky-inner">
         <ProductImage src={anhHienThi} alt="" />
-        <div className="sticky-name"><b>{sp.tenMay}</b><span className="muted">Đơn giá {formatPrice(giaBan)}</span></div>
+        <div className="sticky-name">
+          <b>{sp.tenMay}</b>
+          <span className="muted">
+            {isPending || giaCongBo == null ? 'Giá đang cập nhật' : isBlocked ? 'Không khả dụng' : `Đơn giá ${formatPrice(giaBan)}`}
+          </span>
+        </div>
         <div className="sticky-total">
           <span className="muted">Tạm tính</span>
-          <b>{formatPrice(giaBan * (soLuong || 1))}</b>
+          <b>{isPending || giaCongBo == null ? 'Đang cập nhật' : isBlocked ? 'Không khả dụng' : formatPrice(giaBan * (soLuong || 1))}</b>
         </div>
         <div className="sticky-actions">
-          <button className="btn" disabled={!conHang || !phienBan} tabIndex={showBar ? 0 : -1} onClick={themVaoGio}><Icon name="cart" size={18} /> Thêm vào giỏ</button>
-          {isCustomer && <button className="btn btn-primary" disabled={!conHang || !phienBan} tabIndex={showBar ? 0 : -1} onClick={muaNgay}>Mua ngay</button>}
+          <button
+            className="btn"
+            disabled={!canBuy}
+            tabIndex={showBar ? 0 : -1}
+            onClick={themVaoGio}
+            title={buttonTooltip}
+          >
+            <Icon name="cart" size={18} /> Thêm vào giỏ
+          </button>
+          {isCustomer && (
+            <button
+              className="btn btn-primary"
+              disabled={!canBuy}
+              tabIndex={showBar ? 0 : -1}
+              onClick={muaNgay}
+              title={buyNowTooltip}
+            >
+              Mua ngay
+            </button>
+          )}
         </div>
       </div>
     </div>

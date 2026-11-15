@@ -9,13 +9,16 @@ export default function VariantColorRow({ color, onChange, onRemove, canRemove }
           placeholder="Ví dụ: Đen Marble"
         />
       </label>
+      {/* 2B.7D: ton kho cua phien ban da co chi doi qua man hinh Ton kho (nhap kho / kiem ke co ly do). */}
       <label className="field">
-        <span>Tồn kho</span>
+        <span>{color.maPhienBan ? 'Tồn kho (đổi tại mục Tồn kho)' : 'Tồn ban đầu (ghi nhập kho)'}</span>
         <input
           type="number"
           min="0"
           step="1"
           value={color.soLuongTon}
+          readOnly={Boolean(color.maPhienBan)}
+          disabled={Boolean(color.maPhienBan)}
           onChange={(e) => onChange('soLuongTon', e.target.value)}
         />
       </label>

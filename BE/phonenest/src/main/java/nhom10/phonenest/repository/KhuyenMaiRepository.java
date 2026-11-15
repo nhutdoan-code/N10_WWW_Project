@@ -9,10 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface KhuyenMaiRepository extends JpaRepository<KhuyenMai, String> {
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select k from KhuyenMai k where k.maKm = :ma")
-    Optional<KhuyenMai> findByIdForUpdate(@Param("ma") String ma);
+public interface KhuyenMaiRepository extends JpaRepository<KhuyenMai, String>, KhoaKhuyenMaiRepository {
+    // 2B.7D: findByIdForUpdate nam o KhoaKhuyenMaiRepository (khoa + nap lai trang thai moi nhat).
 
     @Modifying
     @Query("update KhuyenMai k set k.daDung = k.daDung + 1 " +

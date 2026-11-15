@@ -1,0 +1,20 @@
+# ==============================================================================
+# Mau cau hinh cuc bo cho PhoneNest backend.
+# Sao chep thanh BE/phonenest/application-local.properties (file nay da duoc
+# .gitignore) roi dien gia tri that. KHONG commit file application-local.properties.
+# Duoc nap boi: spring.config.import=optional:file:./application-local.properties
+# (chay ung dung voi thu muc lam viec la BE/phonenest).
+# ==============================================================================
+
+# MariaDB dev (may hien tai: MariaDB 12.3 o cong 3307; MySQL 8.0 o cong 3306)
+# LUU Y: ma nguon tu Giai doan 2B.7B can cot cua Migration 15 + 16. Database chinh
+# bandienthoai chua co cac cot nay -> chi tro vao database da ap dung migration.
+DB_URL=jdbc:mariadb://127.0.0.1:3307/<ten_database>
+DB_USERNAME=<tai_khoan>
+DB_PASSWORD=<mat_khau>
+
+# Toi thieu 32 ky tu ngau nhien. Moi may/moi moi truong mot gia tri rieng.
+JWT_SECRET=<chuoi_ngau_nhien_toi_thieu_32_ky_tu>
+
+# Gemini (chat). Bat buoc co gia tri de ung dung khoi dong.
+GEMINI_API_KEY=<api_key>
