@@ -14,6 +14,9 @@ public enum HanhDongAudit {
     UPDATE_CATEGORY,
     DELETE_CATEGORY,
 
+    CREATE_BRAND,
+    UPDATE_BRAND,
+
     STOCK_IMPORT,
     STOCK_ADJUSTMENT,
 
@@ -22,6 +25,7 @@ public enum HanhDongAudit {
 
     LOCK_ACCOUNT,
     UNLOCK_ACCOUNT,
+    CREATE_ACCOUNT,
     UPDATE_ACCOUNT,
     DELETE_ACCOUNT,
 

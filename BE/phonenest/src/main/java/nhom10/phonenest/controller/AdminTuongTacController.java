@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -28,6 +30,15 @@ public class AdminTuongTacController {
         return danhGiaService.tatCa();
     }
 
+    @GetMapping("/reviews/page")
+    public Page<DanhGiaDto> reviewsPage(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return danhGiaService.adminPage(q,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
+    }
+
     @DeleteMapping("/reviews/{ma}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void xoaReview(@PathVariable String ma) {
@@ -37,6 +48,15 @@ public class AdminTuongTacController {
     @GetMapping("/questions")
     public List<HoiDapDto> questions() {
         return hoiDapService.tatCa();
+    }
+
+    @GetMapping("/questions/page")
+    public Page<HoiDapDto> questionsPage(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return hoiDapService.adminPage(q,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
     }
 
     @PutMapping("/questions/{ma}/answer")

@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.service.KhuyenMaiService;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +22,15 @@ public class AdminKhuyenMaiController {
     @GetMapping
     public List<KhuyenMaiDto> list() {
         return khuyenMaiService.list();
+    }
+
+    @GetMapping("/page")
+    public Page<KhuyenMaiDto> page(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return khuyenMaiService.listAdminPage(q,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
     }
 
     @GetMapping("/{ma}/impact")

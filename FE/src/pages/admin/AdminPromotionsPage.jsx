@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AdminPagination from '../../components/AdminPagination';
 import FormField from '../../components/FormField';
 import Modal from '../../components/Modal';
+import useDebounce from '../../hooks/useDebounce';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
@@ -9,10 +11,24 @@ import { errorMessage, formatPrice } from '../../utils/format';
 const EMPTY = { maKm: '', tenKm: '', loai: 'DON_HANG', phanTramGiam: '', soTienGiamToiDa: '', donToiThieu: 0, soLuong: '', daDung: 0, chiKhachMoi: false, gioiHanMoiKhach: 1, ngayBatDau: '', ngayKetThuc: '', dieuKienApDung: '' };
 
 export default function AdminPromotionsPage() {
-  const { data: list, reload } = useFetch(adminService.promotions);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(20);
+  const debounced = useDebounce(q);
+  const { data: result, loading, reload } = useFetch(
+    () => adminService.promotionsPage({ q: debounced || undefined, page, size }),
+    [debounced, page, size]
+  );
+  const list = result?.content || [];
   const [editing, setEditing] = useState(null);
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (result && page > 0 && (result.totalElements === 0 || page >= result.totalPages)) {
+      setPage(Math.max(0, result.totalPages - 1));
+    }
+  }, [result, page]);
 
   const run = async (action, message) => {
     try {
@@ -47,6 +63,15 @@ export default function AdminPromotionsPage() {
         <h2>Quản lý khuyến mãi</h2>
         <button className="btn btn-primary" onClick={() => setEditing({ ...EMPTY, isNew: true })}>+ Tạo mã</button>
       </div>
+      <div className="row" style={{ gap: '12px', margin: '16px 0' }}>
+        <input
+          type="search"
+          style={{ flex: 1 }}
+          placeholder="Tìm theo mã hoặc tên chương trình..."
+          value={q}
+          onChange={(event) => { setQ(event.target.value); setPage(0); }}
+        />
+      </div>
       <table className="table">
         <thead>
           <tr><th>Mã</th><th>Tên chương trình</th><th>Loại</th><th>Giảm</th><th>Tối đa</th><th>Đơn tối thiểu</th><th>Đã dùng</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr>
@@ -72,8 +97,20 @@ export default function AdminPromotionsPage() {
               </tr>
             );
           })}
+          {!loading && list.length === 0 && (
+            <tr><td colSpan={10} style={{ textAlign: 'center', padding: '24px' }}>Không tìm thấy khuyến mãi phù hợp.</td></tr>
+          )}
         </tbody>
       </table>
+      <AdminPagination
+        page={page}
+        totalPages={result?.totalPages}
+        totalElements={result?.totalElements}
+        size={size}
+        loading={loading}
+        onPageChange={setPage}
+        onSizeChange={(nextSize) => { setSize(nextSize); setPage(0); }}
+      />
       {editing && (
         <Modal title={editing.isNew ? 'Tạo khuyến mãi' : 'Sửa khuyến mãi'} onClose={() => setEditing(null)}>
           <form className="form" onSubmit={submit}>

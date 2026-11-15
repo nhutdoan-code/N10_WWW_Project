@@ -37,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -54,6 +56,12 @@ public class SanPhamService {
     private final BienDongKhoRepository bienDongKhoRepo;
     private final NhatKyHoatDongService nhatKyHoatDongService;
     private final nhom10.phonenest.service.ai.SemanticSearchService semanticSearchService;
+
+    @Transactional(readOnly = true)
+    public Page<SanPhamDto> adminPage(String q, TrangThaiSanPham status, Pageable pageable) {
+        String pattern = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(java.util.Locale.ROOT) + "%";
+        return spRepo.searchAdminPage(pattern, status, pageable).map(SanPhamMapper::toDto);
+    }
 
     public List<SanPhamDto> list(
             String q,

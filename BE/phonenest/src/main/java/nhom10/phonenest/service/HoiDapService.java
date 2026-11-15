@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +60,12 @@ public class HoiDapService {
     @Transactional(readOnly = true)
     public List<HoiDapDto> tatCa() {
         return hoiDapRepository.findAllByOrderByNgayHoiDesc().stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<HoiDapDto> adminPage(String q, Pageable pageable) {
+        String pattern = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(java.util.Locale.ROOT) + "%";
+        return hoiDapRepository.searchAdminPage(pattern, pageable).map(this::toDto);
     }
 
     public HoiDapDto traLoi(String ma, String noiDung) {

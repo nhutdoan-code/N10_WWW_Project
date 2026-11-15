@@ -258,12 +258,31 @@ public class DonHangService {
                 && d.getTrangThai() != TrangThaiDonHang.DANG_CHUAN_BI) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã bàn giao vận chuyển, không thể hủy");
         }
+        kiemTraLyDoHuy(req);
+        return hoanTatHuy(d, req, maKh, false);
+    }
+
+    public DonHangDto huyQuanTri(String ma, DonHangDto.HuyRequest req) {
+        kiemTraLyDoHuy(req);
+        DonHang d = timKhoa(ma);
+        if (!d.getTrangThai().coTheChuyenSang(TrangThaiDonHang.DA_HUY)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Không thể hủy đơn ở trạng thái " + d.getTrangThai());
+        }
+        return hoanTatHuy(d, req, SecurityUtil.currentUserId(), true);
+    }
+
+    private void kiemTraLyDoHuy(DonHangDto.HuyRequest req) {
         if (!LY_DO_HUY.contains(req.lyDo())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Lý do hủy đơn không hợp lệ");
         }
         if (LY_DO_KHAC.equals(req.lyDo()) && (req.ghiChu() == null || req.ghiChu().isBlank())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy khác");
         }
+    }
+
+    private DonHangDto hoanTatHuy(DonHang d, DonHangDto.HuyRequest req, String nguoiHuy, boolean quanTri) {
+        TrangThaiDonHang truoc = d.getTrangThai();
         doiTon(d, 1, LoaiBienDongKho.HOAN_HUY_DON);
         List<KhuyenMai> vouchersToRefund = Stream.of(d.getKhuyenMai(), d.getKhuyenMaiVanChuyen())
                 .filter(Objects::nonNull)
@@ -272,15 +291,29 @@ public class DonHangService {
         for (KhuyenMai km : vouchersToRefund) {
             khuyenMaiService.hoanLuot(km, d.getMaDonHang());
         }
+
+        LocalDateTime now = LocalDateTime.now();
         d.setTrangThai(TrangThaiDonHang.DA_HUY);
-        d.setNgayCapNhat(LocalDateTime.now());
+        d.setNgayCapNhat(now);
         HuyDonHang h = new HuyDonHang();
-        h.setMaDonHang(ma);
+        h.setMaDonHang(d.getMaDonHang());
         h.setLyDo(req.lyDo());
         h.setGhiChu(req.ghiChu());
-        h.setNgayHuy(LocalDateTime.now());
+        h.setNgayHuy(now);
+        h.setNguoiHuy(nguoiHuy);
         huyRepository.save(h);
-        ghiTrangThai(d, TrangThaiDonHang.DA_HUY, req.lyDo());
+
+        String ghiChuTrangThai = quanTri ? "Quản trị hủy đơn: " + req.lyDo() : req.lyDo();
+        if (nguoiHuy == null) {
+            ghiTrangThai(d, TrangThaiDonHang.DA_HUY, ghiChuTrangThai);
+        } else {
+            ghiTrangThai(d, TrangThaiDonHang.DA_HUY, ghiChuTrangThai, nguoiHuy);
+        }
+        if (quanTri) {
+            auditTrangThai(d.getMaDonHang(), truoc, TrangThaiDonHang.DA_HUY);
+            thongBaoService.gui(d.getKhachHang().getMaKh(),
+                    "Đơn hàng " + d.getMaDonHang() + " đã bị hủy. Lý do: " + req.lyDo());
+        }
         return mapper.toDto(d);
     }
 
@@ -335,6 +368,13 @@ public class DonHangService {
             for (KhuyenMai km : vouchersToRefund) {
                 khuyenMaiService.hoanLuot(km, d.getMaDonHang());
             }
+            HuyDonHang huy = new HuyDonHang();
+            huy.setMaDonHang(ma);
+            huy.setLyDo("Quản trị hủy đơn");
+            huy.setGhiChu("Hủy qua thao tác cập nhật trạng thái");
+            huy.setNgayHuy(LocalDateTime.now());
+            huy.setNguoiHuy(SecurityUtil.currentUserIdOrNull());
+            huyRepository.save(huy);
         }
 
         d.setTrangThai(moi);

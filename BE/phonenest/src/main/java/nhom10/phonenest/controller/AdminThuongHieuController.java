@@ -1,8 +1,10 @@
 package nhom10.phonenest.controller;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import nhom10.phonenest.dto.ThuongHieuDto;
 import nhom10.phonenest.service.ThuongHieuService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +20,17 @@ public class AdminThuongHieuController {
     @GetMapping
     public List<ThuongHieuDto> list() {
         return thuongHieuService.listAll();
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ThuongHieuDto create(@Valid @RequestBody ThuongHieuDto.Request request) {
+        return thuongHieuService.save(null, request);
+    }
+
+    @PutMapping("/{ma}")
+    public ThuongHieuDto update(@PathVariable String ma, @Valid @RequestBody ThuongHieuDto.Request request) {
+        return thuongHieuService.save(ma, request);
     }
 
     @GetMapping("/{ma}/impact")

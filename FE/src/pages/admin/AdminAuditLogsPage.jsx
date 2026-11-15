@@ -13,6 +13,9 @@ export const ACTION_LABELS = {
   UPDATE_CATEGORY: 'Cập nhật danh mục',
   DELETE_CATEGORY: 'Xóa danh mục',
 
+  CREATE_BRAND: 'Tạo thương hiệu',
+  UPDATE_BRAND: 'Cập nhật thương hiệu',
+
   STOCK_IMPORT: 'Nhập kho',
   STOCK_ADJUSTMENT: 'Điều chỉnh tồn kho',
 
@@ -21,6 +24,7 @@ export const ACTION_LABELS = {
 
   LOCK_ACCOUNT: 'Khóa tài khoản',
   UNLOCK_ACCOUNT: 'Mở khóa tài khoản',
+  CREATE_ACCOUNT: 'Tạo tài khoản',
   UPDATE_ACCOUNT: 'Cập nhật tài khoản',
   DELETE_ACCOUNT: 'Xóa tài khoản',
 
@@ -43,6 +47,7 @@ export const ACTION_LABELS = {
 export const ENTITY_LABELS = {
   PRODUCT: 'Sản phẩm',
   CATEGORY: 'Danh mục',
+  BRAND: 'Thương hiệu',
   INVENTORY: 'Kho hàng',
   ORDER: 'Đơn hàng',
   ACCOUNT: 'Tài khoản',

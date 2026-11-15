@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AdminPagination from '../../components/AdminPagination';
 import Modal from '../../components/Modal';
 import ProductForm from '../../components/ProductForm';
 import ProductImage from '../../components/ProductImage';
@@ -14,6 +15,8 @@ import { productStatus } from '../../utils/stock';
 export default function AdminProductsPage() {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(20);
   const [editing, setEditing] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -25,7 +28,14 @@ export default function AdminProductsPage() {
 
   const debounced = useDebounce(q);
   const toast = useToast();
-  const { data: products, reload } = useFetch(() => adminService.products(debounced), [debounced]);
+  const status = statusFilter === 'ACTIVE'
+    ? 'DANG_KINH_DOANH'
+    : statusFilter === 'INACTIVE' ? 'NGUNG_KINH_DOANH' : undefined;
+  const { data: result, loading, reload } = useFetch(
+    () => adminService.productsPage({ q: debounced || undefined, status, page, size }),
+    [debounced, status, page, size]
+  );
+  const products = result?.content || [];
   const { data: categories } = useFetch(productService.categories);
   const { data: brands } = useFetch(productService.brands);
 
@@ -71,15 +81,11 @@ export default function AdminProductsPage() {
     }
   };
 
-  const filteredProducts = (products || []).filter((p) => {
-    if (statusFilter === 'ACTIVE') {
-      return p.trangThai !== 'NGUNG_KINH_DOANH';
+  useEffect(() => {
+    if (result && page > 0 && (result.totalElements === 0 || page >= result.totalPages)) {
+      setPage(Math.max(0, result.totalPages - 1));
     }
-    if (statusFilter === 'INACTIVE') {
-      return p.trangThai === 'NGUNG_KINH_DOANH';
-    }
-    return true;
-  });
+  }, [result, page]);
 
   return (
     <>
@@ -125,11 +131,11 @@ export default function AdminProductsPage() {
           style={{ flex: 1 }}
           placeholder="Tìm theo tên máy, mã sản phẩm, hãng..."
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => { setQ(e.target.value); setPage(0); }}
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
           style={{ minWidth: '180px' }}
         >
           <option value="ALL">Tất cả trạng thái</option>
@@ -152,7 +158,7 @@ export default function AdminProductsPage() {
           </tr>
         </thead>
         <tbody>
-          {filteredProducts.map((p) => {
+          {products.map((p) => {
             const isArchived = p.trangThai === 'NGUNG_KINH_DOANH';
             return (
               <tr key={p.maSanPham}>
@@ -186,7 +192,7 @@ export default function AdminProductsPage() {
               </tr>
             );
           })}
-          {filteredProducts.length === 0 && (
+          {!loading && products.length === 0 && (
             <tr>
               <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
                 Không tìm thấy sản phẩm nào phù hợp.
@@ -195,6 +201,15 @@ export default function AdminProductsPage() {
           )}
         </tbody>
       </table>
+      <AdminPagination
+        page={page}
+        totalPages={result?.totalPages}
+        totalElements={result?.totalElements}
+        size={size}
+        loading={loading}
+        onPageChange={setPage}
+        onSizeChange={(nextSize) => { setSize(nextSize); setPage(0); }}
+      />
 
       {/* Product Edit / Create Modal */}
       {editing && categories && (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
-import { ORDER_STATUS } from '../../config/constants';
+import { CANCEL_REASONS, ORDER_STATUS } from '../../config/constants';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
@@ -17,7 +17,7 @@ const NEXT = {
   CHO_XAC_NHAN: ['DA_XAC_NHAN', 'DA_HUY'],
   DA_XAC_NHAN: ['DANG_CHUAN_BI', 'DA_HUY'],
   DANG_CHUAN_BI: ['DANG_GIAO', 'DA_HUY'],
-  DANG_GIAO: [],
+  DANG_GIAO: ['DA_HUY'],
   CHO_KHACH_XAC_NHAN: [],
   DA_GIAO: [],
   DA_HUY: [],
@@ -42,6 +42,10 @@ export default function AdminOrdersPage() {
   const [selected, setSelected] = useState(null);
   const [xacNhanGiao, setXacNhanGiao] = useState(null);
   const [dangGui, setDangGui] = useState(false);
+  const [cancelOrder, setCancelOrder] = useState(null);
+  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+  const [cancelNote, setCancelNote] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   const toast = useToast();
 
@@ -166,6 +170,27 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const huyDonQuanTri = async () => {
+    if (!cancelOrder || cancelSubmitting) return;
+    setCancelSubmitting(true);
+    try {
+      const updated = await adminService.cancelOrder(cancelOrder.maDonHang, {
+        lyDo: cancelReason,
+        ghiChu: cancelReason === 'Lý do khác' ? cancelNote.trim() : cancelNote.trim() || null,
+      });
+      toast('Đã hủy đơn và lưu lý do hủy');
+      if (selected?.maDonHang === updated.maDonHang) setSelected(updated);
+      setCancelOrder(null);
+      setCancelReason(CANCEL_REASONS[0]);
+      setCancelNote('');
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setCancelSubmitting(false);
+      reload();
+    }
+  };
+
   // Hiển thị thông tin thời gian giao/xác nhận.
   const thoiGian = (o) => {
     if (o.trangThai === 'CHO_KHACH_XAC_NHAN') {
@@ -216,16 +241,16 @@ export default function AdminOrdersPage() {
           <select
             className="admin-order-status-select"
             value={o.trangThai}
-            onChange={(e) =>
-              run(
-                () =>
-                  adminService.updateOrderStatus(
-                    o.maDonHang,
-                    e.target.value
-                  ),
-                'Đã cập nhật trạng thái'
-              )
-            }
+            onChange={(e) => {
+              if (e.target.value === 'DA_HUY') {
+                setCancelOrder(o);
+              } else {
+                run(
+                  () => adminService.updateOrderStatus(o.maDonHang, e.target.value),
+                  'Đã cập nhật trạng thái'
+                );
+              }
+            }}
           >
             <option value={o.trangThai}>
               {ORDER_STATUS[o.trangThai] ||
@@ -581,11 +606,13 @@ export default function AdminOrdersPage() {
                 selected.maKh}
             </p>
 
+            {selected.tenNguoiNhan && <p><strong>Người nhận:</strong> {selected.tenNguoiNhan}</p>}
+
             <p>
               <strong>
                 Số điện thoại:
               </strong>{' '}
-              {laySoDienThoai(selected) ||
+              {selected.soDienThoaiNhan || laySoDienThoai(selected) ||
                 'Chưa có thông tin'}
             </p>
 
@@ -612,6 +639,10 @@ export default function AdminOrdersPage() {
             {selected.diaChiGiaoHang ||
               '—'}
           </p>
+
+          {selected.trangThai === 'DA_HUY' && selected.lyDoHuy && (
+            <p><strong>Lý do hủy:</strong> {selected.lyDoHuy}</p>
+          )}
 
           {selected.ngayGiao && (
             <p>
@@ -763,6 +794,31 @@ export default function AdminOrdersPage() {
               {dangGui
                 ? 'Đang xử lý...'
                 : 'Xác nhận đã giao'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {cancelOrder && (
+        <Modal
+          title="Xác nhận hủy đơn hàng"
+          onClose={() => !cancelSubmitting && setCancelOrder(null)}
+        >
+          <p>Hủy đơn <b>{cancelOrder.maDonHang}</b>? Tồn kho và lượt khuyến mãi sẽ được hoàn theo nghiệp vụ hủy đơn.</p>
+          <label className="field">
+            <span>Lý do hủy</span>
+            <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
+              {CANCEL_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>{cancelReason === 'Lý do khác' ? 'Ghi chú (bắt buộc)' : 'Ghi chú (không bắt buộc)'}</span>
+            <textarea rows="3" maxLength={500} value={cancelNote} onChange={(e) => setCancelNote(e.target.value)} />
+          </label>
+          <div className="row end">
+            <button className="btn" disabled={cancelSubmitting} onClick={() => setCancelOrder(null)}>Quay lại</button>
+            <button className="btn btn-danger" disabled={cancelSubmitting || (cancelReason === 'Lý do khác' && !cancelNote.trim())} onClick={huyDonQuanTri}>
+              {cancelSubmitting ? 'Đang hủy...' : 'Xác nhận hủy đơn'}
             </button>
           </div>
         </Modal>

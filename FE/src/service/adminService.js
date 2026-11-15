@@ -4,6 +4,7 @@ const save = (base) => (ma, data) => (ma ? api.put(`${base}/${ma}`, data) : api.
 
 export const adminService = {
   products: (q) => api.get('/admin/products', { params: { q } }),
+  productsPage: (params) => api.get('/admin/products/page', { params }),
   uploadImage: (file) => {
     const body = new FormData();
     body.append('file', file);
@@ -20,6 +21,7 @@ export const adminService = {
   deleteCategory: (ma) => api.delete(`/admin/categories/${ma}`),
 
   brands: () => api.get('/admin/brands'),
+  saveBrand: (ma, data) => (ma ? api.put(`/admin/brands/${ma}`, data) : api.post('/admin/brands', data)),
   brandImpact: (ma) => api.get(`/admin/brands/${ma}/impact`),
   archiveBrand: (ma) => api.put(`/admin/brands/${ma}/archive`),
   restoreBrand: (ma) => api.put(`/admin/brands/${ma}/restore`),
@@ -30,10 +32,13 @@ export const adminService = {
       api.get('/admin/orders/filter', { params }),
 
   updateOrderStatus: (ma, trangThai) => api.put(`/admin/orders/${ma}/status`, null, { params: { trangThai } }),
+  cancelOrder: (ma, data) => api.put(`/admin/orders/${ma}/cancel`, data),
   markDelivered: (ma) => api.put(`/admin/orders/${ma}/mark-delivered`),
   updateOrderLine: (ma, maSanPham, soLuong) => api.put(`/admin/orders/${ma}/items/${maSanPham}`, { soLuong }),
 
   accounts: () => api.get('/admin/accounts'),
+  accountsPage: (params) => api.get('/admin/accounts/page', { params }),
+  createAccount: (data) => api.post('/admin/accounts', data),
   updateAccount: (ma, data) => api.put(`/admin/accounts/${ma}`, data),
   deleteAccount: (ma) => api.delete(`/admin/accounts/${ma}`),
   toggleLock: (ma) => api.put(`/admin/accounts/${ma}/toggle-lock`),
@@ -46,6 +51,7 @@ export const adminService = {
   adjustStock: (ma, soLuongThucTe, lyDo) => api.put(`/admin/inventory/${ma}/adjust`, { soLuongThucTe, lyDo }),
 
   promotions: () => api.get('/admin/promotions'),
+  promotionsPage: (params) => api.get('/admin/promotions/page', { params }),
   savePromotion: (ma, data) => (ma ? api.put(`/admin/promotions/${ma}`, data) : api.post('/admin/promotions', data)),
   deletePromotion: (ma) => api.delete(`/admin/promotions/${ma}`),
   promotionImpact: (ma) => api.get(`/admin/promotions/${ma}/impact`),
@@ -57,8 +63,10 @@ export const adminService = {
   deleteShippingFee: (ma) => api.delete(`/admin/shipping-fees/${ma}`),
 
   reviews: () => api.get('/admin/reviews'),
+  reviewsPage: (params) => api.get('/admin/reviews/page', { params }),
   deleteReview: (ma) => api.delete(`/admin/reviews/${ma}`),
   questions: () => api.get('/admin/questions'),
+  questionsPage: (params) => api.get('/admin/questions/page', { params }),
   answer: (ma, noiDung) => api.put(`/admin/questions/${ma}/answer`, { noiDung }),
   deleteQuestion: (ma) => api.delete(`/admin/questions/${ma}`),
   returns: () => api.get('/admin/returns'),

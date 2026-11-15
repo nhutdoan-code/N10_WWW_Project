@@ -11,6 +11,7 @@ import { categoryLabel, flattenTree } from '../../utils/tree';
 export default function AdminCategoriesPage() {
   const [tab, setTab] = useState('categories'); // 'categories' | 'brands'
   const [editingCategory, setEditingCategory] = useState(null);
+  const [editingBrand, setEditingBrand] = useState(null);
 
   // Brand impact modal state
   const [impactBrand, setImpactBrand] = useState(null);
@@ -50,16 +51,36 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const saveBrand = async (event) => {
+    event.preventDefault();
+    try {
+      await adminService.saveBrand(editingBrand.maThuongHieu, {
+        tenThuongHieu: editingBrand.tenThuongHieu,
+        logo: editingBrand.logo,
+        moTa: editingBrand.moTa,
+      });
+      toast('Đã lưu thương hiệu');
+      setEditingBrand(null);
+      reloadBrands();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
+
   return (
     <>
       <div className="row between" style={{ alignItems: 'center', marginBottom: '16px' }}>
         <h2>Quản lý phân loại & thương hiệu</h2>
-        {tab === 'categories' && (
+        {tab === 'categories' ? (
           <button
             className="btn btn-primary"
             onClick={() => setEditingCategory({ tenLoai: '', moTa: '', maLoaiCha: '' })}
           >
             + Thêm loại danh mục
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => setEditingBrand({ tenThuongHieu: '', logo: '', moTa: '' })}>
+            + Thêm thương hiệu
           </button>
         )}
       </div>
@@ -124,6 +145,7 @@ export default function AdminCategoriesPage() {
             <tr>
               <th>Mã</th>
               <th>Tên thương hiệu</th>
+              <th>Mô tả</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -135,6 +157,7 @@ export default function AdminCategoriesPage() {
                 <tr key={b.maThuongHieu} style={{ opacity: isActive ? 1 : 0.65 }}>
                   <td><code>{b.maThuongHieu}</code></td>
                   <td><b>{b.tenThuongHieu}</b></td>
+                  <td>{b.moTa || '—'}</td>
                   <td>
                     <span className={`badge ${isActive ? 'badge-audit-create' : 'badge-audit-delete'}`}>
                       {isActive ? 'Đang hoạt động' : 'Đã dừng'}
@@ -142,14 +165,13 @@ export default function AdminCategoriesPage() {
                   </td>
                   <td>
                     <div className="row" style={{ gap: '6px' }}>
+                      <button className="btn" onClick={() => setEditingBrand({ ...b })}>Sửa</button>
                       {isActive ? (
                         <button
                           className="btn btn-danger"
                           onClick={() => openBrandImpact(b)}
                           title="Dừng hoạt động thương hiệu (soft archive, không cascade delete sản phẩm)"
-                        >
-                          Dừng hoạt động
-                        </button>
+                        >Dừng hoạt động</button>
                       ) : (
                         <button
                           className="btn btn-primary"
@@ -170,7 +192,7 @@ export default function AdminCategoriesPage() {
             })}
             {(!brands || brands.length === 0) && (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
                   Không có thương hiệu nào.
                 </td>
               </tr>
@@ -229,6 +251,19 @@ export default function AdminCategoriesPage() {
               }
             />
             <button className="btn btn-primary">Lưu</button>
+          </form>
+        </Modal>
+      )}
+
+      {editingBrand && (
+        <Modal title={editingBrand.maThuongHieu ? 'Sửa thương hiệu' : 'Thêm thương hiệu'} onClose={() => setEditingBrand(null)}>
+          <form className="form" onSubmit={(e) => {
+            saveBrand(e);
+          }}>
+            <FormField label="Tên thương hiệu" value={editingBrand.tenThuongHieu || ''} onChange={(e) => setEditingBrand({ ...editingBrand, tenThuongHieu: e.target.value })} required maxLength={100} />
+            <FormField label="URL logo" value={editingBrand.logo || ''} onChange={(e) => setEditingBrand({ ...editingBrand, logo: e.target.value })} maxLength={500} />
+            <FormField label="Mô tả" value={editingBrand.moTa || ''} onChange={(e) => setEditingBrand({ ...editingBrand, moTa: e.target.value })} />
+            <button className="btn btn-primary">Lưu thương hiệu</button>
           </form>
         </Modal>
       )}

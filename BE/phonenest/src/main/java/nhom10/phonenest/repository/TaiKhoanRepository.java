@@ -1,6 +1,7 @@
 package nhom10.phonenest.repository;
 
 import nhom10.phonenest.entity.TaiKhoan;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -27,4 +28,25 @@ public interface TaiKhoanRepository extends JpaRepository<TaiKhoan, String> {
            "   OR t.maTk IN (SELECT qtv.maQtv FROM QuanTriVien qtv WHERE LOWER(qtv.hoTen) LIKE LOWER(:pattern) ESCAPE '\\') " +
            "ORDER BY t.ngayTao DESC")
     List<TaiKhoan> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
+
+    @Query(value = """
+           SELECT t FROM TaiKhoan t
+           WHERE (:pattern IS NULL
+              OR LOWER(t.email) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR LOWER(t.soDienThoai) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR LOWER(t.maTk) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR t.maTk IN (SELECT kh.maKh FROM KhachHang kh WHERE LOWER(kh.hoTen) LIKE LOWER(:pattern) ESCAPE '\\')
+              OR t.maTk IN (SELECT qtv.maQtv FROM QuanTriVien qtv WHERE LOWER(qtv.hoTen) LIKE LOWER(:pattern) ESCAPE '\\'))
+           ORDER BY t.ngayTao DESC, t.maTk DESC
+           """,
+           countQuery = """
+           SELECT COUNT(t) FROM TaiKhoan t
+           WHERE (:pattern IS NULL
+              OR LOWER(t.email) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR LOWER(t.soDienThoai) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR LOWER(t.maTk) LIKE LOWER(:pattern) ESCAPE '\\'
+              OR t.maTk IN (SELECT kh.maKh FROM KhachHang kh WHERE LOWER(kh.hoTen) LIKE LOWER(:pattern) ESCAPE '\\')
+              OR t.maTk IN (SELECT qtv.maQtv FROM QuanTriVien qtv WHERE LOWER(qtv.hoTen) LIKE LOWER(:pattern) ESCAPE '\\'))
+           """)
+    Page<TaiKhoan> searchAdminPage(@Param("pattern") String pattern, Pageable pageable);
 }

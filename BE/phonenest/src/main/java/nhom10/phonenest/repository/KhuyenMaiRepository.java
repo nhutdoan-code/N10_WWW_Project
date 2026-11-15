@@ -2,6 +2,8 @@ package nhom10.phonenest.repository;
 
 import nhom10.phonenest.entity.KhuyenMai;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -10,6 +12,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface KhuyenMaiRepository extends JpaRepository<KhuyenMai, String> {
+    @Query(value = """
+        SELECT k FROM KhuyenMai k
+        WHERE (:pattern IS NULL OR LOWER(k.maKm) LIKE LOWER(:pattern) OR LOWER(k.tenKm) LIKE LOWER(:pattern))
+        ORDER BY k.ngayBatDau DESC, k.maKm DESC
+        """,
+        countQuery = """
+        SELECT COUNT(k) FROM KhuyenMai k
+        WHERE (:pattern IS NULL OR LOWER(k.maKm) LIKE LOWER(:pattern) OR LOWER(k.tenKm) LIKE LOWER(:pattern))
+        """)
+    Page<KhuyenMai> searchAdminPage(@Param("pattern") String pattern, Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select k from KhuyenMai k where k.maKm = :ma")
     Optional<KhuyenMai> findByIdForUpdate(@Param("ma") String ma);
