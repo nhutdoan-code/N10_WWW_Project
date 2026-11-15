@@ -266,19 +266,16 @@ public class HanhViNguoiDungService {
             }
         }
 
-        // 2. Top viewed products
-        List<HanhViDto.TopProductStats> topView = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_VIEW, start, end, maKh);
+        // 2. Product interaction totals, grouped for every tracked product.
+        List<HanhViDto.TopProductStats> productStats = layThongKeTuongTacSanPham(start, end, maKh);
 
-        // 3. Top clicked products
-        List<HanhViDto.TopProductStats> topClick = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_CLICK, start, end, maKh);
-
-        // 4. Top keywords
+        // 3. Top keywords
         List<Object[]> keywordRows = hanhViRepository.findTopKeywordsFiltered(start, end, maKh, PageRequest.of(0, 10));
         List<HanhViDto.TopKeywordStats> topTuKhoa = keywordRows.stream()
                 .map(r -> new HanhViDto.TopKeywordStats(r[0] != null ? r[0].toString() : "", ((Number) r[1]).longValue()))
                 .toList();
 
-        // 5. Recent events (Batch fetch product names to avoid N+1)
+        // 4. Recent events (Batch fetch product names to avoid N+1)
         List<HanhViNguoiDung> recent = hanhViRepository.findRecentFiltered(start, end, maKh, loai, PageRequest.of(0, 20));
         Set<String> recentProductIds = recent.stream()
                 .map(HanhViNguoiDung::getMaSanPham)
@@ -307,37 +304,52 @@ public class HanhViNguoiDungService {
         return new HanhViDto.BehaviorStatsResponse(
                 tongLuot,
                 theoLoai,
-                topView,
-                topClick,
+                productStats,
                 topTuKhoa,
                 suKienGanDay
         );
     }
 
-    private List<HanhViDto.TopProductStats> layTopSanPhamTheoLoai(LoaiHanhViNguoiDung loai, LocalDateTime start, LocalDateTime end, String maKh) {
-        List<Object[]> rows = hanhViRepository.findTopProductsFiltered(loai, start, end, maKh, PageRequest.of(0, 10));
-        Set<String> pIds = rows.stream()
-                .map(r -> r[0] != null ? r[0].toString() : "")
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toSet());
-        Map<String, String> pNames = sanPhamRepository.findAllById(pIds).stream()
+    private List<HanhViDto.TopProductStats> layThongKeTuongTacSanPham(LocalDateTime start, LocalDateTime end, String maKh) {
+        List<LoaiHanhViNguoiDung> trackedTypes = List.of(
+                LoaiHanhViNguoiDung.PRODUCT_VIEW,
+                LoaiHanhViNguoiDung.PRODUCT_CLICK,
+                LoaiHanhViNguoiDung.ADD_TO_CART
+        );
+        List<Object[]> rows = hanhViRepository.findProductBehaviorStatsFiltered(trackedTypes, start, end, maKh);
+        Map<String, long[]> countsByProduct = new LinkedHashMap<>();
+
+        for (Object[] row : rows) {
+            if (row[0] == null || row[1] == null || row[2] == null) continue;
+            String maSanPham = row[0].toString();
+            LoaiHanhViNguoiDung type = (LoaiHanhViNguoiDung) row[1];
+            int index = switch (type) {
+                case PRODUCT_VIEW -> 0;
+                case PRODUCT_CLICK -> 1;
+                case ADD_TO_CART -> 2;
+                default -> -1;
+            };
+            if (index >= 0) {
+                countsByProduct.computeIfAbsent(maSanPham, ignored -> new long[3])[index] = ((Number) row[2]).longValue();
+            }
+        }
+
+        Set<String> productIds = countsByProduct.keySet();
+        Map<String, String> productNames = sanPhamRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(SanPham::getMaSanPham, SanPham::getTenMay, (a, b) -> a));
 
-        List<HanhViDto.TopProductStats> list = new ArrayList<>();
-        for (Object[] r : rows) {
-            String pId = r[0] != null ? r[0].toString() : "";
-            long count = ((Number) r[1]).longValue();
-            String pName = pNames.getOrDefault(pId, pId);
-            list.add(new HanhViDto.TopProductStats(
-                    pId,
-                    pName,
-                    loai == LoaiHanhViNguoiDung.PRODUCT_VIEW ? count : 0,
-                    loai == LoaiHanhViNguoiDung.PRODUCT_CLICK ? count : 0,
-                    0,
-                    0
-            ));
-        }
-        return list;
+        return countsByProduct.entrySet().stream()
+                .map(entry -> {
+                    long[] counts = entry.getValue();
+                    return new HanhViDto.TopProductStats(
+                            entry.getKey(),
+                            productNames.getOrDefault(entry.getKey(), entry.getKey()),
+                            counts[0],
+                            counts[1],
+                            counts[2]
+                    );
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

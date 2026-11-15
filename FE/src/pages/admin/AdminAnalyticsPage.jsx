@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BarList } from '../../components/Charts';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
@@ -22,6 +22,7 @@ export default function AdminAnalyticsPage() {
   const [lookupCustomerId, setLookupCustomerId] = useState('');
   const [retentionDays, setRetentionDays] = useState(90);
   const [cleanupResult, setCleanupResult] = useState(null);
+  const [productSort, setProductSort] = useState({ key: 'viewCount', direction: 'desc' });
   const toast = useToast();
   const invalidRange = Boolean(range.tuNgay && range.denNgay && range.tuNgay > range.denNgay);
   const params = { tuNgay: range.tuNgay || undefined, denNgay: range.denNgay || undefined,
@@ -47,8 +48,21 @@ export default function AdminAnalyticsPage() {
     } catch (e) { toast(errorMessage(e), 'error'); }
   };
 
+  const sortedProducts = useMemo(() => {
+    const products = [...(data?.sanPhamTuongTac || [])];
+    return products.sort((a, b) => {
+      const comparison = productSort.key === 'tenSanPham'
+        ? String(a.tenSanPham || '').localeCompare(String(b.tenSanPham || ''), 'vi')
+        : Number(a[productSort.key] || 0) - Number(b[productSort.key] || 0);
+      const stableComparison = comparison || String(a.tenSanPham || '').localeCompare(String(b.tenSanPham || ''), 'vi');
+      return productSort.direction === 'asc' ? stableComparison : -stableComparison;
+    });
+  }, [data?.sanPhamTuongTac, productSort]);
+  const toggleProductSort = (key) => setProductSort(current => ({
+    key,
+    direction: current.key === key ? (current.direction === 'desc' ? 'asc' : 'desc') : (key === 'tenSanPham' ? 'asc' : 'desc'),
+  }));
   const eventRows = Object.entries(data?.theoLoai || {}).map(([name, value]) => ({ name: EVENT_LABELS[name] || name, value: Number(value) }));
-  const renderProducts = (items, key) => (items || []).length ? <table className="table"><thead><tr><th>Sản phẩm</th><th>Lượt xem</th><th>Lượt nhấn</th><th>Thêm giỏ</th><th>Mua</th></tr></thead><tbody>{items.map((item) => <tr key={`${key}-${item.maSanPham}`}><td>{item.tenSanPham}<div className="muted">{item.maSanPham}</div></td><td>{formatNumber(item.viewCount)}</td><td>{formatNumber(item.clickCount)}</td><td>{formatNumber(item.addToCartCount)}</td><td>{formatNumber(item.purchaseCount)}</td></tr>)}</tbody></table> : <p className="muted">Chưa có dữ liệu trong khoảng đã chọn.</p>;
 
   return <div className="admin-analytics">
     <h2>Phân tích hành vi khách hàng</h2>
@@ -68,8 +82,30 @@ export default function AdminAnalyticsPage() {
         <section className="card"><h3>Lượt theo loại hành vi</h3><BarList items={eventRows} color="#4775e8" /></section>
         <section className="card"><h3>Từ khóa tìm kiếm phổ biến</h3>{data.topTuKhoa?.length ? <table className="table"><thead><tr><th>Từ khóa</th><th>Lượt tìm</th></tr></thead><tbody>{data.topTuKhoa.map(item => <tr key={item.tuKhoa}><td>{item.tuKhoa}</td><td>{formatNumber(item.count)}</td></tr>)}</tbody></table> : <p className="muted">Chưa có từ khóa tìm kiếm.</p>}</section>
       </div>
-      <section className="card" style={{ marginTop: 18 }}><h3>Sản phẩm được xem nhiều</h3>{renderProducts(data.topSanPhamXem, 'view')}</section>
-      <section className="card" style={{ marginTop: 18 }}><h3>Sản phẩm được nhấn nhiều</h3>{renderProducts(data.topSanPhamClick, 'click')}</section>
+      <section className="card" style={{ marginTop: 18 }}>
+        <h3>Tương tác theo sản phẩm</h3>
+        <p className="muted">Bấm tiêu đề cột để sắp xếp. Bảng hiển thị lượt xem, lượt nhấn và thêm giỏ theo khoảng ngày, khách hàng đã chọn.</p>
+        {sortedProducts.length ? <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead><tr>{[
+              ['tenSanPham', 'Sản phẩm'],
+              ['viewCount', 'Lượt xem'],
+              ['clickCount', 'Lượt nhấn'],
+              ['addToCartCount', 'Thêm giỏ'],
+            ].map(([key, label]) => <th key={key} aria-sort={productSort.key === key ? (productSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+              <button type="button" onClick={() => toggleProductSort(key)} aria-label={`Sắp xếp ${label}`} style={{ padding: 0, border: 0, background: 'transparent', color: 'inherit', font: 'inherit', fontWeight: 'inherit', cursor: 'pointer' }}>
+                {label} <span aria-hidden="true">{productSort.key !== key ? '↕' : productSort.direction === 'asc' ? '↑' : '↓'}</span>
+              </button>
+            </th>)}</tr></thead>
+            <tbody>{sortedProducts.map(item => <tr key={item.maSanPham}>
+              <td>{item.tenSanPham}<div className="muted">{item.maSanPham}</div></td>
+              <td>{formatNumber(item.viewCount)}</td>
+              <td>{formatNumber(item.clickCount)}</td>
+              <td>{formatNumber(item.addToCartCount)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div> : <p className="muted">Chưa có dữ liệu sản phẩm trong khoảng đã chọn.</p>}
+      </section>
       <section className="card" style={{ marginTop: 18 }}><h3>Sự kiện gần đây</h3>{data.suKienGanDay?.length ? <div style={{ overflowX: 'auto' }}><table className="table"><thead><tr><th>Thời gian</th><th>Loại</th><th>Khách / phiên</th><th>Sản phẩm / từ khóa</th><th>Nguồn</th></tr></thead><tbody>{data.suKienGanDay.map(event => <tr key={event.maHanhVi}><td>{event.thoiGian ? new Date(event.thoiGian).toLocaleString('vi-VN') : '—'}</td><td>{EVENT_LABELS[event.loaiHanhVi] || event.loaiHanhVi}</td><td>{event.maKh || `Khách vãng lai · ${(event.sessionId || '').slice(0, 8)}`}</td><td>{event.tenSanPham || event.tuKhoa || event.maSanPham || '—'}</td><td>{event.nguonSuKien || '—'}</td></tr>)}</tbody></table></div> : <p className="muted">Không có sự kiện phù hợp bộ lọc.</p>}</section>
     </>}
     <section className="card" style={{ marginTop: 18 }}><h3>Sở thích của khách hàng</h3><form className="row" onSubmit={e => { e.preventDefault(); setLookupCustomerId(preferenceQuery.trim()); }}><input value={preferenceQuery} onChange={e => setPreferenceQuery(e.target.value)} placeholder="Nhập mã khách hàng" /><button className="btn btn-primary">Xem sở thích</button></form>{preferenceLoading && <p className="muted">Đang tải sở thích...</p>}{preferenceError && <p className="error">{preferenceError} <button className="btn" onClick={reloadPreferences}>Thử lại</button></p>}{preferences && <div className="grid-2" style={{ marginTop: 12 }}><p><b>Tổng tương tác:</b> {formatNumber(preferences.tongLuotTuongTac)}</p><p><b>Khoảng giá:</b> {preferences.giaThapNhat == null ? '—' : `${Number(preferences.giaThapNhat).toLocaleString('vi-VN')} ₫`} – {preferences.giaCaoNhat == null ? '—' : `${Number(preferences.giaCaoNhat).toLocaleString('vi-VN')} ₫`}</p><p><b>Thương hiệu quan tâm:</b> {(preferences.topThuongHieu || []).join(', ') || '—'}</p><p><b>Danh mục quan tâm:</b> {(preferences.topDanhMuc || []).join(', ') || '—'}</p><p><b>Từ khóa gần đây:</b> {(preferences.tuKhoaGanDay || []).join(', ') || '—'}</p><p><b>Sản phẩm quan tâm:</b> {(preferences.sanPhamQuanTam || []).join(', ') || '—'}</p><p style={{ gridColumn: '1 / -1' }}><b>Tóm tắt:</b> {preferences.tomTatAi || '—'}</p></div>}</section>

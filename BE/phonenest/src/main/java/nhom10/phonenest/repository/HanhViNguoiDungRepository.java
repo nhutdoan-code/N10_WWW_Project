@@ -76,12 +76,17 @@ public interface HanhViNguoiDungRepository
     List<Object[]> findTopKeywordsFiltered(@Param("tuNgay") LocalDateTime tuNgay,
             @Param("denNgay") LocalDateTime denNgay, @Param("maKh") String maKh, Pageable pageable);
 
-    @Query("SELECT h.maSanPham, COUNT(h) FROM HanhViNguoiDung h WHERE h.loaiHanhVi = :loai AND h.maSanPham IS NOT NULL " +
-           "AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) " +
-           "AND (:maKh IS NULL OR h.maKh = :maKh) GROUP BY h.maSanPham ORDER BY COUNT(h) DESC")
-    List<Object[]> findTopProductsFiltered(@Param("loai") LoaiHanhViNguoiDung loai,
-            @Param("tuNgay") LocalDateTime tuNgay, @Param("denNgay") LocalDateTime denNgay,
-            @Param("maKh") String maKh, Pageable pageable);
+    @Query("SELECT h.maSanPham, h.loaiHanhVi, COUNT(h) FROM HanhViNguoiDung h " +
+           "WHERE h.maSanPham IS NOT NULL AND h.loaiHanhVi IN :loaiHanhVi " +
+           "AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) " +
+           "AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) " +
+           "AND (:maKh IS NULL OR h.maKh = :maKh) " +
+           "GROUP BY h.maSanPham, h.loaiHanhVi")
+    List<Object[]> findProductBehaviorStatsFiltered(
+            @Param("loaiHanhVi") List<LoaiHanhViNguoiDung> loaiHanhVi,
+            @Param("tuNgay") LocalDateTime tuNgay,
+            @Param("denNgay") LocalDateTime denNgay,
+            @Param("maKh") String maKh);
 
     @Query("SELECT h.maSanPham, COUNT(h) FROM HanhViNguoiDung h WHERE h.loaiHanhVi = :loai AND h.maSanPham IS NOT NULL AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) GROUP BY h.maSanPham ORDER BY COUNT(h) DESC")
     List<Object[]> findTopProductsByLoai(
