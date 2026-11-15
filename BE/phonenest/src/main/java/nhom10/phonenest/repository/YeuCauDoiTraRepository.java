@@ -10,11 +10,9 @@ import java.util.List;
 
 public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, String>, KhoaYeuCauDoiTraRepository {
 
-    /** 2B.7E: so yeu cau doi tra con hieu luc (khong bi tu choi) cua mot don. */
-    @Query("SELECT COUNT(y) FROM YeuCauDoiTra y WHERE y.donHang.maDonHang = :ma AND y.trangThai <> nhom10.phonenest.enums.TrangThaiDoiTra.TU_CHOI")
-    long demConHieuLuc(@Param("ma") String maDonHang);
-
     List<YeuCauDoiTra> findByDonHangMaDonHangOrderByNgayTaoDesc(String maDonHang);
+
+    // 2B.7E: findByIdForUpdate nam o KhoaYeuCauDoiTraRepository (khoa + nap lai trang thai moi nhat).
 
     @Query("SELECT COUNT(y) FROM YeuCauDoiTra y " +
            "WHERE (:start IS NULL OR y.ngayTao >= :start) " +
