@@ -19,8 +19,10 @@ const SERVICES = [
   { icon: 'gift', title: 'Voucher mỗi ngày', text: 'Tự chọn mã tốt nhất khi thanh toán' },
 ];
 
-const POPULAR_BRANDS = ['iPhone', 'Samsung Galaxy', 'Xiaomi / Redmi / POCO', 'OPPO', 'Điện thoại Google', 'Điện thoại vivo'];
-const CATEGORY_TREE_NAMES = ['iPhone', 'Samsung Galaxy', 'Xiaomi / Redmi / POCO', 'OPPO'];
+// Tên danh mục gốc trong DB hiện tại (Apple/Samsung/Xiaomi) và tên cũ (iPhone/Samsung Galaxy/...) đều được nhận.
+const POPULAR_BRANDS = ['Apple', 'iPhone', 'Samsung', 'Samsung Galaxy', 'Xiaomi', 'Xiaomi / Redmi / POCO', 'OPPO',
+  'Điện thoại vivo', 'Điện thoại Realme', 'Điện thoại HONOR', 'Điện thoại TECNO', 'Điện thoại Sony', 'Điện thoại Google'];
+const CATEGORY_TREE_NAMES = ['Apple', 'iPhone', 'Samsung', 'Samsung Galaxy', 'Xiaomi', 'Xiaomi / Redmi / POCO', 'OPPO'];
 const PRODUCTS_PER_PAGE = 12;
 
 const Section = ({ title, to, children }) => (
@@ -93,6 +95,15 @@ export default function HomePage() {
       .filter(Boolean)
   );
   const categoryParentById = new Map((categories || []).map((category) => [category.maLoai, category.maLoaiCha]));
+  // Chỉ hiện nút hãng nổi bật khi hãng đó còn sản phẩm đang bán (banChay = toàn bộ sản phẩm đang bán).
+  const hangCoSanPham = new Set((banChay || []).map((p) => {
+    let ma = p.maLoai;
+    while (categoryParentById.get(ma)) ma = categoryParentById.get(ma);
+    return ma;
+  }));
+  const hangNoiBatHienThi = hangCoSanPham.size
+    ? thuongHieuNoiBat.filter((c) => hangCoSanPham.has(c.maLoai))
+    : thuongHieuNoiBat;
   const filteredCategories = (categories || []).filter((category) => {
     let parentId = category.maLoaiCha;
     while (parentId) {
@@ -161,7 +172,7 @@ export default function HomePage() {
           </section>
 
           <section className="brand-tiles">
-            {thuongHieuNoiBat.map((c) => (
+            {hangNoiBatHienThi.map((c) => (
               <Link key={c.maLoai} to={`/?loai=${c.maLoai}`}>{c.tenLoai.replace(/^Điện thoại\s+/i, '')}</Link>
             ))}
           </section>

@@ -6,12 +6,14 @@ import { isItemDiscontinued, isItemUnapproved } from '../utils/discontinuedProdu
 import { refreshGuestItems } from '../utils/guestCart';
 import { storage } from '../utils/storage';
 import useAuth from '../hooks/useAuth';
+import useToast from '../hooks/useToast';
 
 export const CartContext = createContext(null);
 const KEY = STORAGE_KEYS.guestCart;
 
 export function CartProvider({ children }) {
   const { user, isCustomer } = useAuth();
+  const toast = useToast();
   const [items, setItems] = useState([]);
 
   useEffect(() => {
@@ -29,19 +31,41 @@ export function CartProvider({ children }) {
       return () => { alive = false; };
     }
 
-    const request = guest.length
-        ? cartService.sync(guest.map((i) => ({
-          maPhienBan: i.phienBan.maPhienBan,
-          soLuong: i.soLuong,
-        })))
-        : cartService.get();
+    let alive = true;
+    const loadServerCart = () => cartService.get()
+      .then((cart) => { if (alive) setItems(cart.items || []); })
+      .catch(() => { if (alive) setItems([]); });
 
-    request
-        .then((cart) => {
-          storage.remove(KEY);
-          setItems(cart.items || []);
-        })
-        .catch(() => setItems([]));
+    if (!guest.length) {
+      loadServerCart();
+      return () => { alive = false; };
+    }
+
+    // Bỏ dòng hỏng (thiếu mã / số lượng không hợp lệ): một dòng lỗi sẽ làm Backend từ chối cả request.
+    const dongHopLe = guest
+      .map((i) => ({ maPhienBan: i?.phienBan?.maPhienBan, soLuong: Number(i?.soLuong) }))
+      .filter((i) => i.maPhienBan && Number.isInteger(i.soLuong) && i.soLuong >= 1);
+    if (!dongHopLe.length) {
+      storage.remove(KEY);
+      loadServerCart();
+      return () => { alive = false; };
+    }
+
+    cartService.sync(dongHopLe)
+      .then((cart) => {
+        // Chỉ xóa giỏ khách khi Backend đã nhận đồng bộ; dòng bị giảm/bỏ được báo qua canhBao.
+        storage.remove(KEY);
+        if (!alive) return;
+        setItems(cart.items || []);
+        const canhBao = cart.canhBao || [];
+        if (canhBao.length && toast) {
+          toast(canhBao.length === 1 ? canhBao[0] : `${canhBao[0]} (và ${canhBao.length - 1} thông báo khác về giỏ hàng)`, 'error');
+        }
+      })
+      // Đồng bộ lỗi: giữ giỏ khách trong localStorage để thử lại lần sau, hiển thị giỏ tài khoản.
+      .catch(() => loadServerCart());
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.maTk, isCustomer]);
 
   const saveGuest = (next) => {

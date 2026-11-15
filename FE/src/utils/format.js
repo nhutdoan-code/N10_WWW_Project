@@ -6,6 +6,13 @@ export const formatPrice = (n) => `${Number(n || 0).toLocaleString('vi-VN')} ₫
  */
 export const formatGiaCongBo = (n) => (n === null || n === undefined || n === '' ? 'Giá đang cập nhật' : formatPrice(n));
 
+/** Dung lượng bộ nhớ (GB) dạng gọn: 1024 -> "1TB", 256 -> "256GB". */
+export const formatDungLuong = (gb) => {
+  const n = Number(gb);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return n >= 1024 && n % 1024 === 0 ? `${n / 1024}TB` : `${n}GB`;
+};
+
 export const formatNumber = (n) => Number(n || 0).toLocaleString('vi-VN');
 
 export const formatDate = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '');

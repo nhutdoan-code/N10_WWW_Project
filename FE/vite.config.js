@@ -20,6 +20,13 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
+      },
+
+      // Ảnh gốc catalog (BE/phonenest/src/main/resources/catalog)
+      '/catalog': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
       }
     }
   }

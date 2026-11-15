@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -77,23 +78,54 @@ public class GioHangService {
 
     public GioHangDto sync(String maKh, List<GioHangDto.Request> ds) {
         GioHang g = gioHang(maKh);
+        List<String> canhBao = new ArrayList<>();
         for (var r : ds) {
+            // Phần tử trong List không được @Valid kiểm tra: bỏ qua số lượng không hợp lệ
+            // (âm/0) để đồng bộ giỏ khách không thể làm giảm số lượng đã có.
+            if (r == null || r.soLuong() < 1 || r.maPhienBan() == null || r.maPhienBan().isBlank()) {
+                continue;
+            }
+            PhienBanSanPham p = phienBanRepository.findById(r.maPhienBan()).orElse(null);
+            if (p == null) {
+                canhBao.add("Một sản phẩm trong giỏ không còn tồn tại và đã được bỏ khỏi giỏ hàng");
+                continue;
+            }
+            String ten = tenHienThi(p);
+            ChiTietGioHang c = find(g, p.getMaPhienBan());
+            int hienCo = c == null ? 0 : c.getSoLuong();
             try {
-                String variantId = r.maPhienBan() != null ? r.maPhienBan() : r.maSanPham();
-                PhienBanSanPham p = resolve(variantId);
-                ChiTietGioHang c = find(g, p.getMaPhienBan());
-                int n = (c == null ? 0 : c.getSoLuong()) + r.soLuong();
-                validate(p, n);
-                if (c == null) {
-                    addLine(g, p, n);
-                } else {
-                    c.setSoLuong(n);
-                }
-            } catch (AppException ignored) {
+                kiemTraDuocBan(p);
+            } catch (AppException e) {
+                // Không mua được: không thêm dòng mới, giữ nguyên dòng đã có trong giỏ tài khoản.
+                canhBao.add(ten + ": " + e.getMessage() + " nên không được thêm vào giỏ hàng");
+                continue;
+            }
+            int muonCo = hienCo + r.soLuong();
+            int n = Math.min(muonCo, p.getSoLuongTon());
+            if (n < 1) {
+                canhBao.add(ten + " đã hết hàng nên không được thêm vào giỏ hàng");
+                continue;
+            }
+            if (n < muonCo) {
+                canhBao.add(ten + " chỉ còn " + p.getSoLuongTon() + " sản phẩm, số lượng trong giỏ đã được điều chỉnh");
+            }
+            if (n <= hienCo) {
+                continue;
+            }
+            if (c == null) {
+                addLine(g, p, n);
+            } else {
+                c.setSoLuong(n);
             }
         }
         touch(g);
-        return toDto(g);
+        GioHangDto dto = toDto(g);
+        return new GioHangDto(dto.items(), dto.tongTien(), List.copyOf(canhBao));
+    }
+
+    private String tenHienThi(PhienBanSanPham p) {
+        String ten = p.getSanPham() != null && p.getSanPham().getTenMay() != null ? p.getSanPham().getTenMay() : "Sản phẩm";
+        return ten + (p.getMauSac() != null && !p.getMauSac().isBlank() ? " (" + p.getMauSac() + ")" : "");
     }
 
     private GioHangDto set(GioHang g, PhienBanSanPham p, int sl) {
@@ -117,12 +149,16 @@ public class GioHangService {
         g.getChiTiet().add(c);
     }
 
-    private void validate(PhienBanSanPham p, int sl) {
+    private void kiemTraDuocBan(PhienBanSanPham p) {
         if (p.getSanPham() == null || p.getSanPham().getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH
                 || p.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm hoặc phiên bản đã ngừng kinh doanh");
         }
         PheDuyetBanHangPolicy.kiemTraDuocBan(p, null);
+    }
+
+    private void validate(PhienBanSanPham p, int sl) {
+        kiemTraDuocBan(p);
         if (sl < 1 || sl > p.getSoLuongTon()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Số lượng không hợp lệ (còn " + p.getSoLuongTon() + " sản phẩm)");
         }

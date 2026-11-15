@@ -11,7 +11,9 @@ public final class HoSoDto {
     }
 
     public record Profile(String maKh, String hoTen, String email, String soDienThoai, LocalDate ngaySinh,
-                          String anhDaiDien, int diemTichLuy, String hangThanhVien, String maGioiThieu) {
+                          String anhDaiDien, int diemTichLuy, String hangThanhVien, String maGioiThieu,
+                          // Nhãn "Khách hàng mới": chưa có đơn nào ngoài đơn đã hủy (cùng định nghĩa với voucher chiKhachMoi).
+                          boolean khachHangMoi) {
     }
 
     public record Update(

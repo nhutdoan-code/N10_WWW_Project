@@ -8,12 +8,13 @@ import useCart from '../hooks/useCart';
 import useToast from '../hooks/useToast';
 import { wishlistService } from '../service/wishlistService';
 import { trackingService } from '../service/trackingService';
-import { errorMessage, formatPrice } from '../utils/format';
+import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
 import { anhTheoPhienBan } from '../utils/image';
 import {
   isItemDiscontinued,
   isItemPendingReview,
   isItemBlocked,
+  isItemUnapproved,
   hasDiscontinuedItems,
   hasUnapprovedItems,
   DISCONTINUED_MESSAGES,
@@ -103,6 +104,14 @@ export default function CartPage() {
   const hasDiscontinued = hasDiscontinuedItems(items);
   const hasUnapproved = hasUnapprovedItems(items);
   const hasBlockedOrDiscontinued = hasDiscontinued || hasUnapproved;
+  // Dòng còn mua được nhưng số lượng trong giỏ đã vượt tồn kho hiện tại (tồn giảm sau khi thêm vào giỏ).
+  const overStockItems = items.filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i)
+    && i.soLuong > Number(i.phienBan?.soLuongTon ?? 0));
+  const hasOverStock = overStockItems.length > 0;
+  // "Tạm tính (N sản phẩm)" chỉ đếm các dòng được cộng vào tổng tiền.
+  const payableCount = items
+    .filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i))
+    .reduce((sum, i) => sum + i.soLuong, 0);
 
   if (items.length === 0) {
     return (
@@ -182,7 +191,7 @@ export default function CartPage() {
                   )}
 
                   <div className="muted variant-line">
-                    {pb ? `${pb.ram}GB RAM · ${pb.boNho}GB · ${pb.mauSac || 'Mặc định'}` : 'Bản tiêu chuẩn'}
+                    {pb ? `${pb.ram}GB RAM · ${formatDungLuong(pb.boNho)} · ${pb.mauSac || 'Mặc định'}` : 'Bản tiêu chuẩn'}
                   </div>
 
                   {isDiscontinued && (
@@ -255,7 +264,7 @@ export default function CartPage() {
         <aside className="side">
           <div className="summary">
             <div className="row between">
-              <span>Tạm tính ({count} sản phẩm)</span>
+              <span>Tạm tính ({payableCount} sản phẩm)</span>
               <span>{formatPrice(total)}</span>
             </div>
 
@@ -281,6 +290,15 @@ export default function CartPage() {
                 </button>
                 <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
                   {DISCONTINUED_MESSAGES.CHECKOUT_ACTION_DISABLED}
+                </small>
+              </>
+            ) : hasOverStock ? (
+              <>
+                <button type="button" className="btn btn-primary btn-lg" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
+                  Thanh toán
+                </button>
+                <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
+                  Có {overStockItems.length} sản phẩm vượt số lượng tồn kho. Vui lòng giảm số lượng trước khi thanh toán.
                 </small>
               </>
             ) : (

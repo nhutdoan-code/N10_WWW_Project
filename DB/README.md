@@ -21,7 +21,8 @@ DB/
 │   ├── 08_checkout_idempotency.sql         # Idempotency cho checkout (PNE-004)
 │   ├── 09_voucher_usage_concurrency.sql    # Concurrency và giới hạn lượt voucher (PNE-003)
 │   ├── 10_return_refund_restock.sql        # (Dự kiến từ fix/return-refund-restock - PNE-005)
-│   └── 11_user_behavior_tracking.sql       # User Behavior Tracking phục vụ Spring AI
+│   ├── 11_user_behavior_tracking.sql       # User Behavior Tracking phục vụ Spring AI
+│   └── 19_new_customer_voucher.sql         # Voucher KHACHMOI10: khách mới giảm 10% đơn đầu tiên (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -32,14 +33,26 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` đã tích hợp đầy đủ 100% schema của 33 bảng, toàn bộ ràng buộc khóa chính, khóa ngoại, chỉ mục, check constraint và 1.703 bản ghi seed ban đầu.
+File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
+
+| Dữ liệu | Số lượng |
+|---|---|
+| Sản phẩm đang bán (ảnh theo màu, giá tham khảo có nguồn, đã phê duyệt bán) | 75 sản phẩm / 433 phiên bản / 249 ảnh chụp thật (không ảnh quảng cáo, logo AI) |
+| Sản phẩm ngừng bán (dữ liệu mẫu) | 100 |
+| Tài khoản (`admin@phonenest.vn`, `khach1@`, `khach2@`, tài khoản thành viên + bộ cũ `admin@phonenest.com`, `an@`, `binh@`, `hoang@` — mật khẩu giữ nguyên) + khách hàng + địa chỉ | 8 / 5 / 7 |
+| Tỉnh / phường xã / phí vận chuyển / voucher | 34 / 3.321 / có sẵn / 6 (hiệu lực đến 31/12/2027, `HETHAN20` cố ý hết hạn) |
+| Đơn hàng, giỏ hàng, đánh giá, nhật ký cũ | 0 (dữ liệu thử nghiệm đã dọn) |
+
+- Ảnh gốc catalog nằm trong `BE/phonenest/src/main/resources/catalog` (phục vụ tại `/catalog/...`), **tách riêng** khỏi ảnh Admin tải lên (`uploads/`, `/uploads/...`). Nguồn từng ảnh: `catalog/nguon-anh.csv`.
+- Giá: `PhienBanSanPham.nguonXacMinh` ghi trang nguồn (CellphoneS / Thế Giới Di Động, ngày 15/11/2026); `lyDoPheDuyet` ghi rõ "dữ liệu demo". Admin sửa giá/cấu hình/màu thì biến thể tự về chờ duyệt như quy trình bình thường.
+- Test tích hợp `*IntegrationTest` (khi đặt `PHONENEST_IT_DB_URL`) vẫn dựng clone từ **bản dump database cũ** (`DB/tests/create_it_clone.sh <dump>`), vì chúng dùng mã cố định của dữ liệu cũ (`PB001`, `PB500500`...).
 
 > [!WARNING] **QUY TẮC AN TOÀN KHI IMPORT:**
 > 1. **Khuyến cáo sao lưu**: Luôn sao lưu database hiện có trước khi thực hiện bất kỳ thao tác nạp dữ liệu nào (`mariadb-dump -u root -p --databases BanDienThoai > backup_bandienthoai.sql`).
 > 2. **Chỉ dùng cho database mới/trống**: `phonenest_full.sql` hoàn toàn **KHÔNG** chứa lệnh `DROP DATABASE` hay `CREATE DATABASE`, và **KHÔNG** chỉ định cứng `USE <db>`.
 > 3. **Cơ chế bảo vệ 2 lớp ngăn chặn tác động database không trống:**
 >    - **Lớp 1 (Fail-fast Pre-check):** Ngay đầu file `phonenest_full.sql`, một truy vấn kiểm tra tự động `information_schema.TABLES` sẽ kích hoạt lỗi hủy lệnh ngay lập tức (`ERROR 1103`) nếu database đích đang chứa bất kỳ bảng nào, ngăn chặn triệt để tình trạng ghi đè hoặc tạo bảng chắp vá trên database có sẵn dữ liệu.
->    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 33 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
+>    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 38 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
 > 4. Tuyệt đối không dùng `INSERT IGNORE` hay `REPLACE INTO`.
 
 **Quy trình kiểm tra database đích trống và import an toàn:**
@@ -79,6 +92,7 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 9. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/09_voucher_usage_concurrency.sql`
 10. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/10_return_refund_restock.sql` *(khi merge PNE-005)*
 11. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/11_user_behavior_tracking.sql`
+12. *(sau 12–18)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/19_new_customer_voucher.sql` — chỉ thêm dữ liệu voucher khách hàng mới, không đổi schema.
 
 ---
 
@@ -102,6 +116,8 @@ Migration `11_user_behavior_tracking.sql` bổ sung bảng lưu vết toàn bộ
 ---
 
 ## 4. Kiểm chứng tương đương (Verification)
+
+> Bản `phonenest_full.sql` ngày 15/11/2026 được kiểm chứng: import vào database trống thành công; import lần 2 bị chặn bởi guard; `CHECKSUM TABLE` 38/38 bảng khớp database nguồn; 55/55 khóa ngoại; backend chạy `SCHEMA_CHECK OK`. Phần dưới mô tả lần kiểm chứng của bản cũ (33 bảng).
 
 Cơ chế tạo `phonenest_full.sql` được kiểm chứng bằng script so sánh tự động giữa cơ sở dữ liệu chạy tuần tự (`test_phonenest_source`) và cơ sở dữ liệu import từ `phonenest_full.sql` (`test_phonenest_full`).
 

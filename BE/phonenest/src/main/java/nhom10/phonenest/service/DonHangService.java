@@ -118,7 +118,7 @@ public class DonHangService {
             c.setDonHang(d);
             c.setPhienBan(p);
             c.setTenSanPham(p.getSanPham().getTenMay());
-            c.setTenPhienBan(p.getRam() + "GB/" + p.getBoNho() + "GB/" + p.getMauSac());
+            c.setTenPhienBan(p.getRam() + "GB/" + nhom10.phonenest.util.DungLuongUtil.format(p.getBoNho()) + "/" + p.getMauSac());
             c.setSku(p.getSku());
             c.setHinhAnh(SanPhamMapper.anhTheoMau(p.getSanPham(), p));
             c.setSoLuong(e.getValue());

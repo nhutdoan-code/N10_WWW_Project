@@ -46,6 +46,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("message", message));
     }
 
+    /**
+     * Spring 6.1+: @Valid trên tham số dạng List (vd. /api/customer/cart/sync) ném HandlerMethodValidationException
+     * thay vì MethodArgumentNotValidException. Trả 400 kèm thông điệp đầu tiên, không để rơi xuống 500.
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ResponseEntity<Map<String, String>> handleMethodValidation(
+            org.springframework.web.method.annotation.HandlerMethodValidationException e) {
+        String message = e.getAllErrors().stream()
+                .map(org.springframework.context.MessageSourceResolvable::getDefaultMessage)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse("Dữ liệu không hợp lệ");
+        return ResponseEntity.badRequest().body(Map.of("message", message));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> handleData(DataIntegrityViolationException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

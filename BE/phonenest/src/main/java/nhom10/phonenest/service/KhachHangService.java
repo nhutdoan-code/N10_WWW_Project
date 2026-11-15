@@ -3,6 +3,7 @@ package nhom10.phonenest.service;
 import nhom10.phonenest.dto.HoSoDto;
 import nhom10.phonenest.entity.KhachHang;
 import nhom10.phonenest.entity.TaiKhoan;
+import nhom10.phonenest.enums.TrangThaiDonHang;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.KhachHangRepository;
 import nhom10.phonenest.repository.TaiKhoanRepository;
@@ -19,6 +20,7 @@ public class KhachHangService {
 
     private final TaiKhoanRepository taiKhoanRepository;
     private final KhachHangRepository khachHangRepository;
+    private final nhom10.phonenest.repository.DonHangRepository donHangRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -62,6 +64,7 @@ public class KhachHangService {
 
     private HoSoDto.Profile toDto(TaiKhoan tk, KhachHang kh) {
         return new HoSoDto.Profile(kh.getMaKh(), kh.getHoTen(), tk.getEmail(), tk.getSoDienThoai(), kh.getNgaySinh(),
-                kh.getAnhDaiDien(), kh.getDiemTichLuy(), kh.getHangThanhVien(), kh.getMaGioiThieu());
+                kh.getAnhDaiDien(), kh.getDiemTichLuy(), kh.getHangThanhVien(), kh.getMaGioiThieu(),
+                !donHangRepository.existsByKhachHangMaKhAndTrangThaiNot(kh.getMaKh(), TrangThaiDonHang.DA_HUY));
     }
 }

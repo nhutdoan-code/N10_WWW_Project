@@ -40,7 +40,15 @@ export default function ProfilePage() {
 
   return (
     <div className="checkout">
-      <h2>Tài khoản của tôi</h2>
+      <h2>
+        Tài khoản của tôi
+        {profile.khachHangMoi && <span className="badge badge-KHACH_MOI" style={{ marginLeft: 8, verticalAlign: 'middle' }}>Khách hàng mới</span>}
+      </h2>
+      {profile.khachHangMoi && (
+        <p className="new-customer-note">
+          Ưu đãi chào mừng: giảm <b>10%</b> cho đơn hàng đầu tiên với mã <b>KHACHMOI10</b> (tự áp dụng khi thanh toán).
+        </p>
+      )}
       <p className="muted">
         {profile.email} · Hạng <b>{profile.hangThanhVien}</b> · {profile.diemTichLuy} điểm · Mã giới thiệu: <b>{profile.maGioiThieu}</b>
       </p>

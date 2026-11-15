@@ -578,8 +578,8 @@ public class SanPhamService {
             if (mauSac.isEmpty()) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Màu sắc không được để trống");
             }
-            if (pbDto.giaBan() == null || pbDto.giaBan().compareTo(BigDecimal.ZERO) < 0) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Giá bán không hợp lệ");
+            if (pbDto.giaBan() == null || pbDto.giaBan().signum() <= 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Giá bán phải lớn hơn 0");
             }
             if (pbDto.giaNiemYet() != null && pbDto.giaNiemYet().compareTo(pbDto.giaBan()) < 0) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Giá niêm yết không được nhỏ hơn giá bán");

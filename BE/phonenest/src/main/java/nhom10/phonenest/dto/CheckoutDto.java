@@ -26,6 +26,8 @@ public record CheckoutDto(
             LocalDate ngayBatDau,
             LocalDate ngayKetThuc,
             String dieuKienApDung,
+            // Nhãn "Khách hàng mới": mã chỉ dành cho đơn đầu tiên của tài khoản.
+            boolean chiKhachMoi,
             boolean apDungDuoc,
             String lyDo,
             BigDecimal soTienGiam) {

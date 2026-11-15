@@ -171,8 +171,10 @@ public KhuyenMaiDto restore(String ma) {
         k.setSoLuong(d.soLuong());
         k.setChiKhachMoi(d.chiKhachMoi());
         k.setGioiHanMoiKhach(d.gioiHanMoiKhach());
-        // Trạng thái hiệu lực được xác định từ ngày bắt đầu và ngày kết thúc.
-        k.setTrangThaiHoatDong(true);
+        // Mã mới luôn bật. Sửa thông tin KHÔNG được bật lại mã đã tắt (chỉ bật qua restore()).
+        if (taoMoi) {
+            k.setTrangThaiHoatDong(true);
+        }
         k.setDieuKienApDung(d.dieuKienApDung());
         KhuyenMai daLuu = khuyenMaiRepository.save(k);
         Map<String, Object> duLieuSau = snapshot(daLuu);
@@ -235,6 +237,9 @@ public KhuyenMaiDto restore(String ma) {
     }
 
     public String lyDoKhongDung(KhuyenMai k, BigDecimal tamTinh, boolean khachMoi, String maKh) {
+        if (!k.isTrangThaiHoatDong()) {
+            return "Mã khuyến mãi đã ngừng hoạt động";
+        }
         LocalDate hom = LocalDate.now();
         if (hom.isBefore(k.getNgayBatDau()) || hom.isAfter(k.getNgayKetThuc())) {
             return "Mã khuyến mãi không còn hiệu lực";

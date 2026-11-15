@@ -44,6 +44,7 @@ public class SecurityConfig {
                         // application errors are not masked as 401.
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/catalog/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/tracking/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payment/momo/ipn").permitAll()

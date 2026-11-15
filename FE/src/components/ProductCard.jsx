@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import useCompare from '../hooks/useCompare';
 import useToast from '../hooks/useToast';
-import { errorMessage, formatPrice } from '../utils/format';
+import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
 import { trackingService } from '../service/trackingService';
 import Icon from './Icon';
 import ProductImage from './ProductImage';
@@ -20,7 +20,7 @@ export default function ProductCard({ sp }) {
   const { allPending, allBlocked, hetHang, tonBan, nhieuGia, gia } = cardPricing(sp);
   const giaHienThi = gia ?? sp.giaBan ?? null;
   const t = sp.thongSo || {};
-  const tags = [t.ram && t.boNho && `${t.ram}GB | ${t.boNho}GB`, t.kichThuocManHinh && `${t.kichThuocManHinh}"`, t.ho5G && '5G'].filter(Boolean);
+  const tags = [t.ram && t.boNho && `${t.ram}GB | ${formatDungLuong(t.boNho)}`, t.kichThuocManHinh && `${t.kichThuocManHinh}"`, t.ho5G && '5G'].filter(Boolean);
 
   const run = async (action, message) => {
     try {

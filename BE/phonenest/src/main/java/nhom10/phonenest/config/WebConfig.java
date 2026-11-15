@@ -18,8 +18,15 @@ public class WebConfig implements WebMvcConfigurer {
             location = location + "/";
         }
 
+        // Ảnh Admin tải lên (dữ liệu runtime, không commit): thư mục app.upload-dir.
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(location)
                 .setCachePeriod(3600);
+
+        // Ảnh gốc của catalog (commit trong repo, đóng gói cùng ứng dụng): src/main/resources/catalog.
+        // Tách riêng khỏi /uploads để Admin thêm/xóa ảnh mới không ảnh hưởng dữ liệu gốc.
+        registry.addResourceHandler("/catalog/**")
+                .addResourceLocations("classpath:/catalog/")
+                .setCachePeriod(86400);
     }
 }

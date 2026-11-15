@@ -1,3 +1,4 @@
+import { formatDungLuong } from './format';
 const yn = (v) => (v ? 'Có' : 'Không');
 
 export const SPEC_FIELDS = [
@@ -6,7 +7,7 @@ export const SPEC_FIELDS = [
   { key: 'tanSoQuet', label: 'Tần số quét', show: (t) => t.tanSoQuet && `${t.tanSoQuet} Hz` },
   { key: 'chip', label: 'Chip xử lý', show: (t) => t.chip },
   { key: 'ram', label: 'RAM', show: (t) => t.ram && `${t.ram} GB` },
-  { key: 'boNho', label: 'Bộ nhớ trong', show: (t) => t.boNho && `${t.boNho} GB` },
+  { key: 'boNho', label: 'Bộ nhớ trong', show: (t) => t.boNho && formatDungLuong(t.boNho) },
   { key: 'cameraSau', label: 'Camera sau', show: (t) => t.cameraSau },
   { key: 'cameraTruoc', label: 'Camera trước', show: (t) => t.cameraTruoc && `${t.cameraTruoc} MP` },
   { key: 'pin', label: 'Pin', show: (t) => t.pin && `${t.pin} mAh` },

@@ -14,7 +14,7 @@ import useToast from '../hooks/useToast';
 import { productService } from '../service/productService';
 import { wishlistService } from '../service/wishlistService';
 import { trackingService } from '../service/trackingService';
-import { errorMessage, formatPrice } from '../utils/format';
+import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
 
 import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
 import { productStatus } from '../utils/stock';
@@ -161,6 +161,14 @@ export default function ProductDetailPage() {
     : 'Mua ngay';
 
   const dsAnh = danhSachAnhTheoPhienBan(sp, phienBan);
+  // Ảnh nhỏ trên nút màu: chỉ hiện khi màu đó có ảnh riêng (theo phiên bản hoặc theo màu).
+  const anhMau = (pv) => {
+    if (!pv) return null;
+    const ds = sp.hinhAnhs || [];
+    const rieng = ds.find((a) => a.maPhienBan === pv.maPhienBan)
+      || ds.find((a) => !a.maPhienBan && (a.mauSac || '').trim().toLowerCase() === (pv.mauSac || '').trim().toLowerCase());
+    return rieng?.duongDan || null;
+  };
   const anhHienThi = image && dsAnh.some((a) => a.duongDan === image)
       ? image
       : anhTheoPhienBan(sp, phienBan);
@@ -186,7 +194,15 @@ export default function ProductDetailPage() {
         <div className="thumbs">
           {dsAnh.map((anh) => {
             const url = anh.duongDan;
-            return <ProductImage key={anh.maHinhAnh || url} src={url} alt="" onClick={() => setImage(url)} />;
+            return (
+              <ProductImage
+                key={anh.maHinhAnh || url}
+                src={url}
+                alt={anh.mauSac ? `${sp.tenMay} - ${anh.mauSac}` : ''}
+                className={url === anhHienThi ? 'active' : ''}
+                onClick={() => setImage(url)}
+              />
+            );
           })}
         </div>
         <section className="desc">
@@ -269,7 +285,7 @@ export default function ProductDetailPage() {
                         onClick={() => chonDungLuong(dl)}
                         disabled={!clickable}
                       >
-                        <b>{dl.ram}GB / {dl.boNho}GB</b>
+                        <b>{dl.ram}GB / {formatDungLuong(dl.boNho)}</b>
                         {!isNgungKD && allNgungKD && <small className="muted"> (Ngừng KD)</small>}
                         {!isNgungKD && !allNgungKD && allBlockedDl && <small className="muted"> (Khóa bán)</small>}
                         {!isNgungKD && !allNgungKD && !allBlockedDl && allPendingDl && <small className="muted"> (Chờ duyệt)</small>}
@@ -308,6 +324,7 @@ export default function ProductDetailPage() {
                         title={titleText}
                         disabled={!isNgungKD && varNgungKD}
                       >
+                        {anhMau(pv) && <ProductImage className="variant-swatch" src={anhMau(pv)} alt="" />}
                         <span>{mau}</span>
                         {!isNgungKD && varNgungKD && <small className="muted"> (Ngừng KD)</small>}
                         {!isNgungKD && !varNgungKD && varBlocked && <small className="muted"> (Khóa)</small>}

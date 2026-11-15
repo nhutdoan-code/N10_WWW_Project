@@ -5,8 +5,11 @@ import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage, formatPrice } from '../../utils/format';
+import { trangThaiVoucher } from '../../utils/voucherAdmin';
 
 const EMPTY = { maKm: '', tenKm: '', loai: 'DON_HANG', phanTramGiam: '', soTienGiamToiDa: '', donToiThieu: 0, soLuong: '', daDung: 0, chiKhachMoi: false, gioiHanMoiKhach: 1, ngayBatDau: '', ngayKetThuc: '', dieuKienApDung: '' };
+
+const toNumberOrNull = (v) => (v === '' || v == null ? null : Number(v));
 
 export default function AdminPromotionsPage() {
   const { data: list, reload } = useFetch(adminService.promotions);
@@ -33,13 +36,36 @@ export default function AdminPromotionsPage() {
       () => adminService.savePromotion(isNew ? null : data.maKm, {
         ...data,
         phanTramGiam: Number(data.phanTramGiam),
-        soTienGiamToiDa: data.soTienGiamToiDa === '' || data.soTienGiamToiDa == null ? null : Number(data.soTienGiamToiDa),
+        soTienGiamToiDa: toNumberOrNull(data.soTienGiamToiDa),
         donToiThieu: Number(data.donToiThieu || 0),
-        soLuong: data.soLuong === '' || data.soLuong == null ? null : Number(data.soLuong),
+        soLuong: toNumberOrNull(data.soLuong),
+        gioiHanMoiKhach: Number(data.gioiHanMoiKhach || 1),
       }),
       'Đã lưu khuyến mãi'
     );
   };
+
+  // Xóa chỉ cho mã chưa từng dùng; mã đã dùng thì đề nghị tắt để giữ lịch sử đơn hàng.
+  const xoa = async (k) => {
+    try {
+      const impact = await adminService.promotionImpact(k.maKm);
+      if (impact?.coDonHangLienQuan) {
+        if (k.trangThaiHoatDong !== false
+          && window.confirm(`Mã ${k.maKm} đã được dùng trong ${impact.soDonHangDaDung} đơn hàng nên không thể xóa. Tắt mã này thay vì xóa?`)) {
+          await run(() => adminService.archivePromotion(k.maKm), `Đã tắt mã ${k.maKm}`);
+        }
+        return;
+      }
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+      return;
+    }
+    if (window.confirm(`Xóa vĩnh viễn mã ${k.maKm}?`)) {
+      run(() => adminService.deletePromotion(k.maKm), 'Đã xóa khuyến mãi');
+    }
+  };
+
+  const isNew = Boolean(editing?.isNew);
 
   return (
     <>
@@ -53,46 +79,61 @@ export default function AdminPromotionsPage() {
         </thead>
         <tbody>
           {list?.map((k) => {
-            const hieuLuc = k.ngayBatDau <= today && today <= k.ngayKetThuc;
+            const tt = trangThaiVoucher(k, today);
+            const dangBat = k.trangThaiHoatDong !== false;
             return (
-              <tr key={k.maKm}>
+              <tr key={k.maKm} className={dangBat ? '' : 'row-muted'}>
                 <td><b>{k.maKm}</b></td>
-                <td>{k.tenKm}</td>
+                <td>
+                  {k.tenKm}
+                  {k.chiKhachMoi && <> <span className="badge badge-KHACH_MOI">Khách hàng mới</span></>}
+                </td>
                 <td>{k.loai === 'VAN_CHUYEN' ? 'Vận chuyển' : 'Đơn hàng'}</td>
                 <td>{k.phanTramGiam}%</td>
                 <td>{k.soTienGiamToiDa ? formatPrice(k.soTienGiamToiDa) : '—'}</td>
                 <td>{Number(k.donToiThieu) > 0 ? formatPrice(k.donToiThieu) : '—'}</td>
                 <td>{k.daDung}{k.soLuong != null && ` / ${k.soLuong}`}</td>
                 <td>{k.ngayBatDau} → {k.ngayKetThuc}</td>
-                <td>{hieuLuc ? 'Đang chạy' : today < k.ngayBatDau ? 'Sắp diễn ra' : 'Hết hạn'}</td>
+                <td><span className={`badge ${tt.className}`}>{tt.label}</span></td>
                 <td className="row">
                   <button className="btn" onClick={() => setEditing(k)}>Sửa</button>
-                  <button className="btn btn-danger" onClick={() => window.confirm(`Xóa mã ${k.maKm}?`) && run(() => adminService.deletePromotion(k.maKm), 'Đã xóa khuyến mãi')}>Xóa</button>
+                  {dangBat ? (
+                    <button className="btn" onClick={() => window.confirm(`Tắt mã ${k.maKm}? Khách sẽ không dùng được mã này nữa.`) && run(() => adminService.archivePromotion(k.maKm), `Đã tắt mã ${k.maKm}`)}>Tắt</button>
+                  ) : (
+                    <button className="btn" onClick={() => run(() => adminService.restorePromotion(k.maKm), `Đã bật lại mã ${k.maKm}`)}>Bật</button>
+                  )}
+                  <button className="btn btn-danger" onClick={() => xoa(k)}>Xóa</button>
                 </td>
               </tr>
             );
           })}
+          {list?.length === 0 && (
+            <tr><td colSpan={10} className="muted">Chưa có mã khuyến mãi nào.</td></tr>
+          )}
         </tbody>
       </table>
       {editing && (
-        <Modal title={editing.isNew ? 'Tạo khuyến mãi' : 'Sửa khuyến mãi'} onClose={() => setEditing(null)}>
+        <Modal title={isNew ? 'Tạo khuyến mãi' : 'Sửa khuyến mãi'} onClose={() => setEditing(null)}>
           <form className="form" onSubmit={submit}>
-            <FormField label="Mã khuyến mãi" value={editing.maKm} onChange={(e) => setEditing({ ...editing, maKm: e.target.value.toUpperCase().replace(/\s/g, '') })} disabled={!editing.isNew} required />
+            <FormField label="Mã khuyến mãi" value={editing.maKm} onChange={(e) => setEditing({ ...editing, maKm: e.target.value.toUpperCase().replace(/\s/g, '') })} disabled={!isNew} required />
             <FormField label="Tên chương trình" value={editing.tenKm} onChange={set('tenKm')} required />
             <label className="field">
               <span>Loại voucher</span>
-              <select value={editing.loai || 'DON_HANG'} onChange={set('loai')}>
+              <select value={editing.loai || 'DON_HANG'} onChange={set('loai')} disabled={!isNew}>
                 <option value="DON_HANG">Giảm giá đơn hàng</option>
                 <option value="VAN_CHUYEN">Giảm phí vận chuyển</option>
               </select>
             </label>
             <div className="grid-2">
-              <FormField label="Phần trăm giảm (%)" type="number" min="1" max="100" value={editing.phanTramGiam} onChange={set('phanTramGiam')} required />
+              <FormField label="Phần trăm giảm (%)" type="number" min="0.01" max="100" step="0.01" value={editing.phanTramGiam} onChange={set('phanTramGiam')} disabled={!isNew} required />
               <FormField label={`Giảm tối đa (₫)${editing.loai === 'VAN_CHUYEN' ? ' (bắt buộc)' : ''}`} type="number" min="0" value={editing.soTienGiamToiDa ?? ''} onChange={set('soTienGiamToiDa')} required={editing.loai === 'VAN_CHUYEN'} />
             </div>
+            {!isNew && (
+              <small className="muted">Loại voucher và phần trăm giảm không đổi được sau khi tạo (đảm bảo đúng với các đơn đã dùng). Cần mức giảm khác thì tạo mã mới.</small>
+            )}
             <div className="grid-2">
               <FormField label="Đơn tối thiểu (₫)" type="number" min="0" value={editing.donToiThieu ?? 0} onChange={set('donToiThieu')} />
-              <FormField label="Số lượng mã (để trống = không giới hạn)" type="number" min="1" value={editing.soLuong ?? ''} onChange={set('soLuong')} />
+              <FormField label="Số lượng mã (để trống = không giới hạn)" type="number" min={Math.max(1, Number(editing.daDung) || 0)} value={editing.soLuong ?? ''} onChange={set('soLuong')} />
             </div>
             <FormField label="Giới hạn mỗi khách" type="number" min="1" value={editing.gioiHanMoiKhach ?? 1} onChange={set('gioiHanMoiKhach')} required />
             <label className="option">
@@ -100,9 +141,9 @@ export default function AdminPromotionsPage() {
             </label>
             <div className="grid-2">
               <FormField label="Từ ngày" type="date" value={editing.ngayBatDau} onChange={set('ngayBatDau')} required />
-              <FormField label="Đến ngày" type="date" value={editing.ngayKetThuc} onChange={set('ngayKetThuc')} required />
+              <FormField label="Đến ngày" type="date" min={editing.ngayBatDau || undefined} value={editing.ngayKetThuc} onChange={set('ngayKetThuc')} required />
             </div>
-            <FormField label="Điều kiện áp dụng" value={editing.dieuKienApDung || ''} onChange={set('dieuKienApDung')} />
+            <FormField label="Điều kiện áp dụng (mô tả cho khách)" value={editing.dieuKienApDung || ''} onChange={set('dieuKienApDung')} />
             <button className="btn btn-primary">Lưu</button>
           </form>
         </Modal>

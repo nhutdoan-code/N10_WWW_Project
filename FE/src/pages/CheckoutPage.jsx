@@ -9,7 +9,7 @@ import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
-import { errorMessage, formatPrice } from '../utils/format';
+import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
 import {
   hasDiscontinuedItems,
   hasUnapprovedItems,
@@ -103,7 +103,7 @@ export default function CheckoutPage() {
     : items.map((i) => ({
       maPhienBan: i.phienBan?.maPhienBan,
       tenMay: i.phienBan
-        ? `${i.sanPham.tenMay} - RAM ${i.phienBan.ram}GB / ${i.phienBan.boNho}GB - ${i.phienBan.mauSac}`
+        ? `${i.sanPham.tenMay} - RAM ${i.phienBan.ram}GB / ${formatDungLuong(i.phienBan.boNho)} -${i.phienBan.mauSac}`
         : i.sanPham.tenMay,
       soLuong: i.soLuong,
       donGia: i.phienBan?.giaBan ?? i.sanPham.giaBan,
@@ -359,8 +359,9 @@ export default function CheckoutPage() {
                 />
                 <div>
                   <b>{v.tenKm}</b>
-                  <div className="muted">{v.dieuKien}</div>
-                  {!v.apDungDuoc && <span className="reason">{v.lyDoKhongDung}</span>}
+                  {v.chiKhachMoi && <span className="badge badge-KHACH_MOI">Khách hàng mới</span>}
+                  <div className="muted">{v.dieuKienApDung}</div>
+                  {!v.apDungDuoc && <span className="reason">{v.lyDo}</span>}
                 </div>
                 {v.apDungDuoc && (
                   <span className="discount">-{formatPrice(v.soTienGiam)}</span>
@@ -399,8 +400,9 @@ export default function CheckoutPage() {
                 />
                 <div>
                   <b>{v.tenKm}</b>
-                  <div className="muted">{v.dieuKien}</div>
-                  {!v.apDungDuoc && <span className="reason">{v.lyDoKhongDung}</span>}
+                  {v.chiKhachMoi && <span className="badge badge-KHACH_MOI">Khách hàng mới</span>}
+                  <div className="muted">{v.dieuKienApDung}</div>
+                  {!v.apDungDuoc && <span className="reason">{v.lyDo}</span>}
                 </div>
                 {v.apDungDuoc && (
                   <span className="discount">-{formatPrice(v.soTienGiam)}</span>

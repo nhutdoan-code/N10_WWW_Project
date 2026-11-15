@@ -8,8 +8,14 @@ import java.util.List;
 
 public record GioHangDto(
         List<Item> items,
-        BigDecimal tongTien
+        BigDecimal tongTien,
+        // Cảnh báo khi đồng bộ giỏ khách (dòng bị giảm số lượng / bị bỏ). Rỗng với các thao tác khác.
+        List<String> canhBao
 ) {
+    public GioHangDto(List<Item> items, BigDecimal tongTien) {
+        this(items, tongTien, List.of());
+    }
+
     public record Item(
             SanPhamDto sanPham,
             SanPhamDto.PhienBan phienBan,
