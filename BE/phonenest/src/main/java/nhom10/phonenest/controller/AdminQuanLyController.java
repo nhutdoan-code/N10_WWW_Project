@@ -15,11 +15,14 @@ import nhom10.phonenest.service.TaiKhoanService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -36,7 +39,16 @@ public class AdminQuanLyController {
 
     @PutMapping("/orders/{ma}/status")
     public DonHangDto capNhatTrangThai(@PathVariable String ma, @RequestParam TrangThaiDonHang trangThai) {
+        if (trangThai == TrangThaiDonHang.DA_HUY) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Vui lòng dùng chức năng hủy đơn để ghi nhận lý do");
+        }
         return donHangService.capNhatTrangThai(ma, trangThai);
+    }
+
+    @PutMapping("/orders/{ma}/cancel")
+    public DonHangDto huyDonQuanTri(@PathVariable String ma, @Valid @RequestBody DonHangDto.HuyRequest request) {
+        return donHangService.huyQuanTri(ma, request);
     }
     @PutMapping("/orders/{ma}/mark-delivered")
     public DonHangDto danhDauDaGiao(@PathVariable String ma) {
@@ -72,6 +84,20 @@ public class AdminQuanLyController {
     @GetMapping("/accounts")
     public List<TaiKhoanDto> accounts() {
         return taiKhoanService.list();
+    }
+
+    @GetMapping("/accounts/page")
+    public Page<TaiKhoanDto> accountsPage(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return taiKhoanService.listAdminPage(q, PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
+    }
+
+    @PostMapping("/accounts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TaiKhoanDto taoAccount(@Valid @RequestBody TaiKhoanDto.Create request) {
+        return taiKhoanService.taoKhachHang(request);
     }
 
     @PutMapping("/accounts/{ma}/toggle-lock")

@@ -246,8 +246,8 @@ export default function AdminInventoryPage() {
 
       {historyVariant && (
         <Modal title="Lịch sử biến động kho" wide onClose={() => setHistoryVariant(null)}>
-          <table className="table"><thead><tr><th>Thời gian</th><th>SKU</th><th>Loại</th><th>Số lượng</th><th>Tồn trước</th><th>Tồn sau</th><th>Đơn hàng</th><th>Ghi chú</th></tr></thead>
-            <tbody>{historyRows.map((item) => <tr key={item.maBienDong}><td>{item.thoiGian}</td><td>{item.sku}</td><td>{item.loaiBienDong}</td><td>{['BAN_HANG'].includes(item.loaiBienDong) ? -item.soLuong : `+${item.soLuong}`}</td><td>{item.tonTruoc}</td><td>{item.tonSau}</td><td>{item.maDonHang || '-'}</td><td>{item.ghiChu || '-'}</td></tr>)}</tbody>
+          <table className="table"><thead><tr><th>Thời gian</th><th>SKU</th><th>Loại</th><th>Số lượng</th><th>Tồn trước</th><th>Tồn sau</th><th>Đơn hàng</th><th>Yêu cầu đổi trả</th><th>Ghi chú</th></tr></thead>
+            <tbody>{historyRows.map((item) => <tr key={item.maBienDong}><td>{item.thoiGian}</td><td>{item.sku}</td><td>{item.loaiBienDong}</td><td>{['BAN_HANG'].includes(item.loaiBienDong) ? -item.soLuong : `+${item.soLuong}`}</td><td>{item.tonTruoc}</td><td>{item.tonSau}</td><td>{item.maDonHang || '-'}</td><td>{item.maYeuCau || '-'}</td><td>{item.ghiChu || '-'}</td></tr>)}</tbody>
           </table>
         </Modal>
       )}

@@ -83,6 +83,10 @@ class PostManualTestSafetyIntegrationTest {
         @Mock
         private nhom10.phonenest.repository.ThanhToanRepository thanhToanRepository;
 
+        // PR #24: admin chuyen don sang DA_HUY cung luu ban ghi HuyDonHang
+        @Mock
+        private HuyDonHangRepository huyRepository;
+
         @InjectMocks
         private DonHangService donHangService;
 
@@ -351,12 +355,12 @@ class PostManualTestSafetyIntegrationTest {
         @Test
         @DisplayName("Import quantity <= 0 is rejected (HTTP 400)")
         void importZeroOrNegativeRejected() {
-            assertThatThrownBy(() -> khoService.nhapKho("PB001", 0))
+            assertThatThrownBy(() -> khoService.nhapKho("PB001", 0, "Test nhập kho", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
                     .hasMessageContaining("lớn hơn 0");
 
-            assertThatThrownBy(() -> khoService.nhapKho("PB001", -5))
+            assertThatThrownBy(() -> khoService.nhapKho("PB001", -5, "Test nhập kho", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST);
         }
@@ -364,7 +368,7 @@ class PostManualTestSafetyIntegrationTest {
         @Test
         @DisplayName("Import quantity exceeding MAX_IMPORT_QUANTITY (100,000) is rejected (HTTP 400)")
         void importExceedingMaxPerTransactionRejected() {
-            assertThatThrownBy(() -> khoService.nhapKho("PB001", 100_001))
+            assertThatThrownBy(() -> khoService.nhapKho("PB001", 100_001, "Test nhập kho", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
                     .hasMessageContaining("không vượt quá");
@@ -374,9 +378,9 @@ class PostManualTestSafetyIntegrationTest {
         @DisplayName("Import resulting in total stock exceeding MAX_TOTAL_STOCK (1,000,000) is rejected")
         void importExceedingMaxTotalStockRejected() {
             PhienBanSanPham pb = taoPhienBan("PB001", 950_000);
-            when(pbRepo.findById("PB001")).thenReturn(Optional.of(pb));
+            when(pbRepo.findByIdForUpdate("PB001")).thenReturn(Optional.of(pb));
 
-            assertThatThrownBy(() -> khoService.nhapKho("PB001", 60_000))
+            assertThatThrownBy(() -> khoService.nhapKho("PB001", 60_000, "Test nhập kho", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
                     .hasMessageContaining("không được vượt quá");
@@ -385,7 +389,7 @@ class PostManualTestSafetyIntegrationTest {
         @Test
         @DisplayName("Set stock negative is rejected (HTTP 400)")
         void setStockNegativeRejected() {
-            assertThatThrownBy(() -> khoService.datTon("PB001", -1))
+            assertThatThrownBy(() -> khoService.dieuChinh("PB001", -1, "Kiểm kê", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST);
         }
@@ -393,7 +397,7 @@ class PostManualTestSafetyIntegrationTest {
         @Test
         @DisplayName("Set stock exceeding MAX_TOTAL_STOCK is rejected (HTTP 400)")
         void setStockExceedingMaxRejected() {
-            assertThatThrownBy(() -> khoService.datTon("PB001", 1_000_001))
+            assertThatThrownBy(() -> khoService.dieuChinh("PB001", 1_000_001, "Kiểm kê", null))
                     .isInstanceOf(AppException.class)
                     .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
                     .hasMessageContaining("từ 0 đến");

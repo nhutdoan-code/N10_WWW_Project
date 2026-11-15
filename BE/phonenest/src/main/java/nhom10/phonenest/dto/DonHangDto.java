@@ -26,11 +26,28 @@ public record DonHangDto(
         LocalDateTime ngayCapNhat,
         LocalDateTime ngayGiao,
         String tenKhach,
+        String tenNguoiNhan,
+        String soDienThoaiNhan,
         String trangThaiDoiTra,
         String lyDoHuy,
         LocalDateTime ngayKhachXacNhan,
         String nguoiXacNhan,
         List<Dong> chiTiet ) {
+
+    /** Backward-compatible constructor for service tests and older internal callers. */
+    public DonHangDto(
+            String maDonHang, String maKh, String maKm, String maKmVanChuyen,
+            LocalDateTime ngayMua, PhuongThucTt phuongThucTt, TrangThaiDonHang trangThai,
+            BigDecimal tamTinh, BigDecimal giamGia, BigDecimal phiVanChuyen,
+            BigDecimal giamPhiVanChuyen, BigDecimal tongTien, String diaChiGiaoHang,
+            LocalDateTime ngayCapNhat, LocalDateTime ngayGiao, String tenKhach,
+            String trangThaiDoiTra, String lyDoHuy, LocalDateTime ngayKhachXacNhan,
+            String nguoiXacNhan, List<Dong> chiTiet) {
+        this(maDonHang, maKh, maKm, maKmVanChuyen, ngayMua, phuongThucTt, trangThai,
+                tamTinh, giamGia, phiVanChuyen, giamPhiVanChuyen, tongTien,
+                diaChiGiaoHang, ngayCapNhat, ngayGiao, tenKhach, null, null,
+                trangThaiDoiTra, lyDoHuy, ngayKhachXacNhan, nguoiXacNhan, chiTiet);
+    }
 
     public record Dong(String maSanPham, String maPhienBan, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
     }
@@ -43,7 +60,9 @@ public record DonHangDto(
                            Integer soLuong) {
     }
 
-    public record HuyRequest(@NotBlank(message = "Vui lòng chọn lý do hủy đơn") String lyDo, String ghiChu) {
+    public record HuyRequest(
+            @NotBlank(message = "Vui lòng chọn lý do hủy đơn") @jakarta.validation.constraints.Size(max = 200) String lyDo,
+            @jakarta.validation.constraints.Size(max = 500) String ghiChu) {
     }
 
 }

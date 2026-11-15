@@ -17,6 +17,9 @@ import nhom10.phonenest.service.PheDuyetBanHangService;
 import nhom10.phonenest.service.SanPhamService;
 import nhom10.phonenest.service.UploadOrphanAuditService;
 import nhom10.phonenest.service.ai.SemanticSearchService;
+import nhom10.phonenest.enums.TrangThaiSanPham;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,6 +54,16 @@ public class AdminSanPhamController {
     @GetMapping("/products")
     public List<SanPhamDto> products(@RequestParam(required = false) String q) {
         return sanPhamService.list(q, null, null, null, null, true);
+    }
+
+    @GetMapping("/products/page")
+    public Page<SanPhamDto> productsPage(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) TrangThaiSanPham status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return sanPhamService.adminPage(q, status,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
     }
 
     @GetMapping("/products/{ma}")

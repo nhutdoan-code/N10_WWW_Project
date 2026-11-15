@@ -205,11 +205,11 @@ class HanhViNguoiDungServiceTest {
         List<Object[]> keywordRows = new ArrayList<>();
         keywordRows.add(new Object[]{"iphone", 5L});
 
-        when(hanhViRepository.countGroupedByLoaiHanhVi(any(), any(), any())).thenReturn(grouped);
-        when(hanhViRepository.findTopProductsByLoai(eq(LoaiHanhViNguoiDung.PRODUCT_VIEW), any(), any(), any())).thenReturn(List.of());
-        when(hanhViRepository.findTopProductsByLoai(eq(LoaiHanhViNguoiDung.PRODUCT_CLICK), any(), any(), any())).thenReturn(List.of());
-        when(hanhViRepository.findTopKeywords(any(), any(), any())).thenReturn(keywordRows);
-        when(hanhViRepository.findAllByOrderByThoiGianDesc(any())).thenReturn(List.of());
+        // Service dùng các query có lọc theo khách hàng / loại hành vi (AdminAnalyticsPage).
+        when(hanhViRepository.countGroupedFiltered(any(), any(), any(), any())).thenReturn(grouped);
+        when(hanhViRepository.findProductBehaviorStatsFiltered(any(), any(), any(), any())).thenReturn(List.of());
+        when(hanhViRepository.findTopKeywordsFiltered(any(), any(), any(), any())).thenReturn(keywordRows);
+        when(hanhViRepository.findRecentFiltered(any(), any(), any(), any(), any())).thenReturn(List.of());
 
         HanhViDto.BehaviorStatsResponse stats = hanhViService.layThongKe(LocalDate.now().minusDays(7), LocalDate.now(), null, null);
 

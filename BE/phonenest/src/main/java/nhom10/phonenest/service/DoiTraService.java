@@ -26,6 +26,7 @@ public class DoiTraService {
     private final DonHangRepository donRepo;
     private final ThongBaoService thongBao;
     private final NhatKyHoatDongService nhatKyHoatDongService;
+    private final KhoService khoService;
 
     public DoiTraDto tao(String maKh, DoiTraDto.Request r) {
         // 2B.7E: khoa dong don hang (serialize cac yeu cau dong thoi); kiem tra trung tung san pham
@@ -137,7 +138,18 @@ public class DoiTraService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do từ chối");
         }
         Map<String, Object> truoc = snapshot(yeuCau);
-        if (moi == TrangThaiDoiTra.HOAN_TAT) tinhSoTienHoanDuKien(yeuCau);
+        if (moi == TrangThaiDoiTra.HOAN_TAT) {
+            boolean hasReturn = yeuCau.getChiTiet().stream()
+                    .anyMatch(ct -> ct.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN);
+            if (yeuCau.getChiTiet().stream().anyMatch(ct -> !ct.isDaNhapKho())) {
+                throw new AppException(HttpStatus.CONFLICT,
+                        "Cần xác nhận nhận và nhập kho sản phẩm trước khi hoàn tất yêu cầu");
+            }
+            if (hasReturn && yeuCau.getNgayHoanTien() == null) {
+                throw new AppException(HttpStatus.CONFLICT,
+                        "Cần ghi nhận giao dịch hoàn tiền trước khi hoàn tất yêu cầu");
+            }
+        }
         yeuCau.setTrangThai(moi);
         yeuCau.setNgayCapNhat(java.time.LocalDateTime.now());
         if (ghiChu != null && !ghiChu.isEmpty()) yeuCau.setGhiChuXuLy(ghiChu);
@@ -163,6 +175,59 @@ public class DoiTraService {
         y.setGhiChuNoiBo(ghiChu == null ? "" : ghiChu.trim());
     }
 
+    public DoiTraDto xacNhanNhapKho(String ma, String adminId) {
+        YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
+                new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        if (y.getTrangThai() != TrangThaiDoiTra.DA_DUYET && y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY) {
+            throw new AppException(HttpStatus.CONFLICT, "Chỉ nhập kho cho yêu cầu đã duyệt và đang xử lý");
+        }
+        if (y.getChiTiet().isEmpty() || y.getChiTiet().stream().anyMatch(ChiTietDoiTra::isDaNhapKho)) {
+            throw new AppException(HttpStatus.CONFLICT, "Yêu cầu đã được nhập kho hoặc không có sản phẩm");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (ChiTietDoiTra ct : y.getChiTiet()) {
+            PhienBanSanPham variant = ct.getChiTietDonHang().getPhienBan();
+            khoService.thayDoiTonDoiTra(variant, ct.getSoLuong(), y, adminId,
+                    "Nhận hàng đổi trả " + y.getMaYeuCau());
+            ct.setDaNhapKho(true);
+            ct.setNgayNhapKho(now);
+        }
+        return dto(y);
+    }
+
+    public DoiTraDto ghiNhanHoanTien(String ma, DoiTraDto.XacNhanHoanTienRequest request) {
+        YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
+                new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        if (y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY) {
+            throw new AppException(HttpStatus.CONFLICT, "Chỉ ghi nhận hoàn tiền khi yêu cầu đang xử lý");
+        }
+        if (y.getNgayHoanTien() != null) {
+            throw new AppException(HttpStatus.CONFLICT, "Yêu cầu này đã được ghi nhận hoàn tiền");
+        }
+        if (y.getChiTiet().isEmpty() || y.getChiTiet().stream()
+                .anyMatch(ct -> ct.getLoaiYeuCau() != LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Yêu cầu không phải trả hàng hoàn tiền");
+        }
+        if (y.getChiTiet().stream().anyMatch(ct -> !ct.isDaNhapKho())) {
+            throw new AppException(HttpStatus.CONFLICT, "Xác nhận đã nhận và nhập kho sản phẩm trước khi ghi nhận hoàn tiền");
+        }
+        String method = request.hinhThuc().trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("MOMO", "CHUYEN_KHOAN", "TIEN_MAT", "KHAC").contains(method)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Hình thức hoàn tiền không hợp lệ");
+        }
+        tinhSoTienHoanDuKien(y);
+        if (tongTienHoan(y).signum() <= 0) {
+            throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn dự kiến phải lớn hơn 0");
+        }
+        Map<String, Object> truoc = snapshot(y);
+        y.setHinhThucHoanTien(method);
+        y.setMaGiaoDichHoanTien(request.maGiaoDich().trim());
+        y.setNgayHoanTien(LocalDateTime.now());
+        nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
+                LoaiDoiTuongAudit.RETURN, ma, truoc, snapshot(y));
+        return dto(y);
+    }
+
     // Chỉ tính số tiền dự kiến được hoàn, KHÔNG thực hiện chuyển tiền qua cổng thanh toán.
     private void tinhSoTienHoanDuKien(YeuCauDoiTra y) {
         DonHang don = y.getDonHang();
@@ -178,9 +243,16 @@ public class DoiTraService {
         }
     }
 
+    private BigDecimal tongTienHoan(YeuCauDoiTra y) {
+        return y.getChiTiet().stream().map(ChiTietDoiTra::getSoTienHoan)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     private Map<String, Object> snapshot(YeuCauDoiTra y) {
         Map<String, Object> duLieu = new LinkedHashMap<>();
         duLieu.put("trangThai", y.getTrangThai().name());
+        duLieu.put("hinhThucHoanTien", y.getHinhThucHoanTien());
+        duLieu.put("maGiaoDichHoanTien", y.getMaGiaoDichHoanTien());
         return duLieu;
     }
 
@@ -191,10 +263,31 @@ public class DoiTraService {
         String tenSanPham = ct == null ? null : ct.getChiTietDonHang().getTenSanPham()
                 + " - " + ct.getChiTietDonHang().getTenPhienBan();
         int soLuong = y.getChiTiet().stream().mapToInt(ChiTietDoiTra::getSoLuong).sum();
+        List<DoiTraDto.ChiTietDto> items = y.getChiTiet().stream().map(item ->
+                new DoiTraDto.ChiTietDto(item.getChiTietDonHang().getPhienBan().getMaPhienBan(),
+                        item.getChiTietDonHang().getTenSanPham() + " - " + item.getChiTietDonHang().getTenPhienBan(),
+                        item.getSoLuong(), item.getLoaiYeuCau(), item.isDaNhapKho(), item.getNgayNhapKho(),
+                        item.getSoTienHoan())).toList();
         return new DoiTraDto(y.getMaYeuCau(), y.getDonHang().getMaDonHang(),
                 y.getDonHang().getKhachHang().getHoTen(), y.getDonHang().getSoDienThoaiNhan(), y.getLyDoChung(), img,
                 y.getNgayTao().toLocalDate(), y.getNgayCapNhat(), y.getTrangThai(),
                 ct == null ? null : ct.getLoaiYeuCau(), tenSanPham,
-                soLuong, y.getGhiChuXuLy());
+                soLuong, y.getGhiChuXuLy(), items,
+                y.getChiTiet().stream().anyMatch(item -> item.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN)
+                        ? (tongTienHoan(y).signum() > 0 ? tongTienHoan(y) : tinhTongHoanDuKien(y)) : null,
+                y.getHinhThucHoanTien(), y.getMaGiaoDichHoanTien(), y.getNgayHoanTien(),
+                !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho));
+    }
+
+    private BigDecimal tinhTongHoanDuKien(YeuCauDoiTra y) {
+        DonHang don = y.getDonHang();
+        BigDecimal tam = don.getTamTinh() == null ? BigDecimal.ZERO : don.getTamTinh();
+        BigDecimal giam = don.getGiamGia() == null ? BigDecimal.ZERO : don.getGiamGia();
+        return y.getChiTiet().stream().filter(item -> item.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN)
+                .map(item -> {
+                    BigDecimal giaTri = item.getChiTietDonHang().getDonGia().multiply(BigDecimal.valueOf(item.getSoLuong()));
+                    BigDecimal phanBo = tam.signum() == 0 ? BigDecimal.ZERO : giam.multiply(giaTri).divide(tam, 0, RoundingMode.FLOOR);
+                    return giaTri.subtract(phanBo).max(BigDecimal.ZERO);
+                }).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

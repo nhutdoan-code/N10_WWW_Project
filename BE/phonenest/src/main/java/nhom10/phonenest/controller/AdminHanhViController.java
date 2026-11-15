@@ -33,6 +33,9 @@ public class AdminHanhViController {
             @RequestParam(required = false) LoaiHanhViNguoiDung loaiHanhVi,
             @RequestParam(required = false) String maKh
     ) {
+        if (tuNgay != null && denNgay != null && tuNgay.isAfter(denNgay)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ngày bắt đầu không được sau ngày kết thúc");
+        }
         HanhViDto.BehaviorStatsResponse stats = hanhViNguoiDungService.layThongKe(tuNgay, denNgay, loaiHanhVi, maKh);
         return ResponseEntity.ok(stats);
     }

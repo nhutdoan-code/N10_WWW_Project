@@ -1,8 +1,8 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..19 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..20 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20 (pn_migration_log có M12/M15/M16).
 --   * 38 bảng. Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
@@ -559,6 +559,8 @@ CREATE TABLE `ChiTietDoiTra` (
   `lyDo` text NOT NULL,
   `hinhAnhMinhChung` varchar(500) DEFAULT NULL,
   `soTienHoan` decimal(15,2) DEFAULT NULL,
+  `daNhapKho` tinyint(1) NOT NULL DEFAULT 0,
+  `ngayNhapKho` datetime DEFAULT NULL,
   PRIMARY KEY (`maChiTietDoiTra`),
   UNIQUE KEY `UQ_ChiTietDoiTra` (`maYeuCau`,`maChiTietDonHang`),
   KEY `FK_ChiTietDoiTra_ChiTietDonHang` (`maChiTietDonHang`),
@@ -5822,6 +5824,9 @@ CREATE TABLE `YeuCauDoiTra` (
   `ghiChuXuLy` varchar(500) DEFAULT NULL,
   `ngayCapNhat` datetime DEFAULT NULL,
   `ghiChuNoiBo` varchar(1000) DEFAULT NULL,
+  `hinhThucHoanTien` varchar(60) DEFAULT NULL,
+  `maGiaoDichHoanTien` varchar(150) DEFAULT NULL,
+  `ngayHoanTien` datetime DEFAULT NULL,
   PRIMARY KEY (`maYeuCau`),
   KEY `FK_YeuCauDoiTra_DonHang` (`maDonHang`),
   CONSTRAINT `FK_YeuCauDoiTra_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`) ON UPDATE CASCADE

@@ -105,4 +105,5 @@ export const trackingService = {
   // Admin APIs
   getBehaviorStats: (params) => api.get('/admin/analytics/behavior', { params }),
   getUserPreferences: (maKh) => api.get(`/admin/analytics/preferences/${maKh}`),
+  cleanupBehavior: (days) => api.delete('/admin/analytics/cleanup', { params: { soNgayLuuTru: days } }),
 };

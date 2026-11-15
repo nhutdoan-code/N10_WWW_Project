@@ -55,6 +55,39 @@ public interface HanhViNguoiDungRepository
             @Param("maKh") String maKh
     );
 
+    @Query("SELECT h.loaiHanhVi, COUNT(h) FROM HanhViNguoiDung h " +
+           "WHERE (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) " +
+           "AND (:maKh IS NULL OR h.maKh = :maKh) AND (:loai IS NULL OR h.loaiHanhVi = :loai) GROUP BY h.loaiHanhVi")
+    List<Object[]> countGroupedFiltered(@Param("tuNgay") LocalDateTime tuNgay,
+            @Param("denNgay") LocalDateTime denNgay, @Param("maKh") String maKh,
+            @Param("loai") LoaiHanhViNguoiDung loai);
+
+    @Query("SELECT h FROM HanhViNguoiDung h WHERE (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) " +
+           "AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) AND (:maKh IS NULL OR h.maKh = :maKh) " +
+           "AND (:loai IS NULL OR h.loaiHanhVi = :loai) ORDER BY h.thoiGian DESC")
+    List<HanhViNguoiDung> findRecentFiltered(@Param("tuNgay") LocalDateTime tuNgay,
+            @Param("denNgay") LocalDateTime denNgay, @Param("maKh") String maKh,
+            @Param("loai") LoaiHanhViNguoiDung loai, Pageable pageable);
+
+    @Query("SELECT LOWER(TRIM(h.tuKhoa)), COUNT(h) FROM HanhViNguoiDung h WHERE h.loaiHanhVi = nhom10.phonenest.enums.LoaiHanhViNguoiDung.SEARCH " +
+           "AND h.tuKhoa IS NOT NULL AND TRIM(h.tuKhoa) <> '' AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) " +
+           "AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) AND (:maKh IS NULL OR h.maKh = :maKh) " +
+           "GROUP BY LOWER(TRIM(h.tuKhoa)) ORDER BY COUNT(h) DESC")
+    List<Object[]> findTopKeywordsFiltered(@Param("tuNgay") LocalDateTime tuNgay,
+            @Param("denNgay") LocalDateTime denNgay, @Param("maKh") String maKh, Pageable pageable);
+
+    @Query("SELECT h.maSanPham, h.loaiHanhVi, COUNT(h) FROM HanhViNguoiDung h " +
+           "WHERE h.maSanPham IS NOT NULL AND h.loaiHanhVi IN :loaiHanhVi " +
+           "AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) " +
+           "AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) " +
+           "AND (:maKh IS NULL OR h.maKh = :maKh) " +
+           "GROUP BY h.maSanPham, h.loaiHanhVi")
+    List<Object[]> findProductBehaviorStatsFiltered(
+            @Param("loaiHanhVi") List<LoaiHanhViNguoiDung> loaiHanhVi,
+            @Param("tuNgay") LocalDateTime tuNgay,
+            @Param("denNgay") LocalDateTime denNgay,
+            @Param("maKh") String maKh);
+
     @Query("SELECT h.maSanPham, COUNT(h) FROM HanhViNguoiDung h WHERE h.loaiHanhVi = :loai AND h.maSanPham IS NOT NULL AND (:tuNgay IS NULL OR h.thoiGian >= :tuNgay) AND (:denNgay IS NULL OR h.thoiGian <= :denNgay) GROUP BY h.maSanPham ORDER BY COUNT(h) DESC")
     List<Object[]> findTopProductsByLoai(
             @Param("loai") LoaiHanhViNguoiDung loai,

@@ -6,6 +6,7 @@ import nhom10.phonenest.entity.QuanTriVien;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.entity.TaiKhoan;
 import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiBienDongKho;
 import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.*;
@@ -41,7 +42,7 @@ class RepresentativeBusinessIntegrationTest {
         private PhienBanSanPhamRepository pbRepo;
 
         @Mock
-        private NhatKyHoatDongService nhatKyHoatDongService;
+        private BienDongKhoRepository bienDongRepo;
 
         @InjectMocks
         private KhoService khoService;
@@ -60,18 +61,16 @@ class RepresentativeBusinessIntegrationTest {
             sp.setLoai(loai);
             pb.setSanPham(sp);
 
-            when(pbRepo.findById("PB001")).thenReturn(Optional.of(pb));
+            when(pbRepo.findByIdForUpdate("PB001")).thenReturn(Optional.of(pb));
 
-            khoService.nhapKho("PB001", 5);
+            khoService.nhapKho("PB001", 5, "Test nhập kho", null);
 
             assertThat(pb.getSoLuongTon()).isEqualTo(15);
-            verify(nhatKyHoatDongService, times(1)).ghi(
-                    eq(HanhDongAudit.STOCK_IMPORT),
-                    eq(LoaiDoiTuongAudit.INVENTORY),
-                    eq("PB001"),
-                    argThat(map -> Integer.valueOf(10).equals(map.get("soLuongTon"))),
-                    argThat(map -> Integer.valueOf(15).equals(map.get("soLuongTon")))
-            );
+            verify(bienDongRepo).save(argThat(change ->
+                    change.getLoaiBienDong() == LoaiBienDongKho.NHAP_KHO
+                            && change.getTonTruoc() == 10
+                            && change.getTonSau() == 15
+            ));
         }
 
         @Test
@@ -88,27 +87,25 @@ class RepresentativeBusinessIntegrationTest {
             sp.setLoai(loai);
             pb.setSanPham(sp);
 
-            when(pbRepo.findById("PB001")).thenReturn(Optional.of(pb));
+            when(pbRepo.findByIdForUpdate("PB001")).thenReturn(Optional.of(pb));
 
-            khoService.datTon("PB001", 10);
+            khoService.dieuChinh("PB001", 10, "Kiểm kê", null);
 
             assertThat(pb.getSoLuongTon()).isEqualTo(10);
-            verify(nhatKyHoatDongService, times(1)).ghi(
-                    eq(HanhDongAudit.STOCK_ADJUSTMENT),
-                    eq(LoaiDoiTuongAudit.INVENTORY),
-                    eq("PB001"),
-                    argThat(map -> Integer.valueOf(15).equals(map.get("soLuongTon"))),
-                    argThat(map -> Integer.valueOf(10).equals(map.get("soLuongTon")))
-            );
+            verify(bienDongRepo).save(argThat(change ->
+                    change.getLoaiBienDong() == LoaiBienDongKho.DIEU_CHINH
+                            && change.getTonTruoc() == 15
+                            && change.getTonSau() == 10
+            ));
         }
 
         @Test
         @DisplayName("shouldNotAuditWhenValidationFailsOnNhapKho")
         void shouldNotAuditWhenValidationFailsOnNhapKho() {
-            assertThatThrownBy(() -> khoService.nhapKho("PB001", 0))
+            assertThatThrownBy(() -> khoService.nhapKho("PB001", 0, "Test nhập kho", null))
                     .isInstanceOf(AppException.class);
 
-            verify(nhatKyHoatDongService, never()).ghi(any(), any(), any(), any(), any());
+            verifyNoInteractions(bienDongRepo);
         }
     }
 

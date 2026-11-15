@@ -22,7 +22,10 @@ DB/
 │   ├── 09_voucher_usage_concurrency.sql    # Concurrency và giới hạn lượt voucher (PNE-003)
 │   ├── 10_return_refund_restock.sql        # (Dự kiến từ fix/return-refund-restock - PNE-005)
 │   ├── 11_user_behavior_tracking.sql       # User Behavior Tracking phục vụ Spring AI
-│   └── 19_new_customer_voucher.sql         # Voucher KHACHMOI10: khách mới giảm 10% đơn đầu tiên (+ _rollback)
+│   ├── 17_after_sales.sql                  # Yêu cầu bảo hành/khiếu nại và lịch sử (+ _rollback)
+│   ├── 18_after_sales_update_time.sql      # Thời điểm cập nhật và ghi chú nội bộ hậu mãi (+ _rollback)
+│   ├── 19_new_customer_voucher.sql         # Voucher KHACHMOI10: khách mới giảm 10% đơn đầu tiên (+ _rollback)
+│   └── 20_return_refund_restock_admin.sql  # Đối soát hoàn tiền và nhập lại kho khi đổi trả (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -33,7 +36,7 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
+File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -93,6 +96,7 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 10. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/10_return_refund_restock.sql` *(khi merge PNE-005)*
 11. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/11_user_behavior_tracking.sql`
 12. *(sau 12–18)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/19_new_customer_voucher.sql` — chỉ thêm dữ liệu voucher khách hàng mới, không đổi schema.
+13. *(sau 17–18)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/20_return_refund_restock_admin.sql` — thêm cột đối soát hoàn tiền / nhập lại kho cho đổi trả.
 
 ---
 

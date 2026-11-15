@@ -6,6 +6,7 @@ import nhom10.phonenest.enums.LoaiHanhViNguoiDung;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,8 +61,7 @@ public final class HanhViDto {
             String tenSanPham,
             long viewCount,
             long clickCount,
-            long addToCartCount,
-            long purchaseCount
+            long addToCartCount
     ) {}
 
     public record TopKeywordStats(
@@ -72,11 +72,45 @@ public final class HanhViDto {
     public record BehaviorStatsResponse(
             long tongLuot,
             Map<String, Long> theoLoai,
-            List<TopProductStats> topSanPhamXem,
-            List<TopProductStats> topSanPhamClick,
+            List<TopProductStats> sanPhamTuongTac,
             List<TopKeywordStats> topTuKhoa,
             List<EventDetailDto> suKienGanDay
-    ) {}
+    ) {
+        public BehaviorStatsResponse(
+                long tongLuot,
+                Map<String, Long> theoLoai,
+                List<TopProductStats> topSanPhamXem,
+                List<TopProductStats> topSanPhamClick,
+                List<TopKeywordStats> topTuKhoa,
+                List<EventDetailDto> suKienGanDay
+        ) {
+            this(tongLuot, theoLoai, mergeProductLists(topSanPhamXem, topSanPhamClick), topTuKhoa, suKienGanDay);
+        }
+
+        private static List<TopProductStats> mergeProductLists(
+                List<TopProductStats> viewed,
+                List<TopProductStats> clicked
+        ) {
+            Map<String, TopProductStats> products = new LinkedHashMap<>();
+            mergeProductList(products, viewed);
+            mergeProductList(products, clicked);
+            return List.copyOf(products.values());
+        }
+
+        private static void mergeProductList(Map<String, TopProductStats> products, List<TopProductStats> group) {
+            if (group == null) return;
+            for (TopProductStats product : group) {
+                if (product == null) continue;
+                products.merge(product.maSanPham(), product, (left, right) -> new TopProductStats(
+                        left.maSanPham(),
+                        left.tenSanPham() != null ? left.tenSanPham() : right.tenSanPham(),
+                        left.viewCount() + right.viewCount(),
+                        left.clickCount() + right.clickCount(),
+                        left.addToCartCount() + right.addToCartCount()
+                ));
+            }
+        }
+    }
 
     public record UserPreferenceDto(
             String maKh,

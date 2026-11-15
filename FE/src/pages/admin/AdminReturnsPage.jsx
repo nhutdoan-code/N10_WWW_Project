@@ -25,6 +25,8 @@ export default function AdminReturnsPage() {
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [savingInternal, setSavingInternal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refundMethod, setRefundMethod] = useState('MOMO');
+  const [refundReference, setRefundReference] = useState('');
   const toast = useToast();
   const rows = useMemo(() => normalizeRequests(data), [data]);
   const results = useMemo(() => filterRequests(rows, filters), [rows, filters]);
@@ -36,6 +38,8 @@ export default function AdminReturnsPage() {
   useEffect(() => {
     setNote('');
     setInternalNote('');
+    setRefundMethod('MOMO');
+    setRefundReference('');
     if (!selected) return;
     let alive = true;
     setLoadingInternal(true);
@@ -62,7 +66,7 @@ export default function AdminReturnsPage() {
   const applyAction = async (r, next) => {
     if (busy) return;
     if (next === 'TU_CHOI' && !note.trim()) { toast('Nhập lý do từ chối trước khi xác nhận.', 'error'); return; }
-    if (next === 'HOAN_TAT' && !window.confirm('Xác nhận đã xử lý xong yêu cầu này? Thao tác này không tự hoàn tiền.')) return;
+    if (next === 'HOAN_TAT' && !window.confirm('Xác nhận hoàn tất yêu cầu sau khi đã xử lý đổi/trả thực tế?')) return;
     setBusy(true);
     try {
       if (r.source === 'return') await adminService.updateReturn(r.maYeuCau, next, note.trim());
@@ -71,6 +75,31 @@ export default function AdminReturnsPage() {
       setNote('');
       reload();
       window.dispatchEvent(new Event('phonenest:after-sales-updated'));
+    } catch (e) { toast(errorMessage(e), 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const restock = async () => {
+    if (!detail || busy) return;
+    if (!window.confirm('Xác nhận đã nhận và kiểm tra sản phẩm trả về? Hệ thống sẽ cộng số lượng vào kho và ghi lịch sử biến động.')) return;
+    setBusy(true);
+    try {
+      await adminService.restockReturn(detail.maYeuCau);
+      toast('Đã xác nhận nhận hàng và nhập lại kho');
+      reload();
+    } catch (e) { toast(errorMessage(e), 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const recordRefund = async () => {
+    if (!detail || busy || !refundReference.trim()) return;
+    if (!window.confirm(`Sau khi bạn đã chuyển ${Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN')} ₫ ở ${refundMethod}, xác nhận ghi lại mã đối soát này?`)) return;
+    setBusy(true);
+    try {
+      await adminService.recordReturnRefund(detail.maYeuCau, { hinhThuc: refundMethod, maGiaoDich: refundReference.trim() });
+      toast('Đã ghi nhận thông tin hoàn tiền');
+      setRefundReference('');
+      reload();
     } catch (e) { toast(errorMessage(e), 'error'); }
     finally { setBusy(false); }
   };
@@ -123,6 +152,8 @@ export default function AdminReturnsPage() {
           <div><b>Số điện thoại</b><p>{detail.soDienThoai || 'Chưa có'}</p></div><div><b>Ngày yêu cầu</b><p>{formatAdminDate(detail.ngayTao)}</p></div>
           <div><b>Loại yêu cầu</b><p>{TYPE_LABELS[detail.loai] || detail.loai}</p></div><div><b>Trạng thái</b><p><span className={`as-status as-${detail.trangThai}`}>{STATUS_LABELS[detail.trangThai] || detail.trangThai}</span></p></div></div>
         <p><b>Sản phẩm:</b> {detail.tenSanPham || 'Toàn đơn'} {detail.soLuong ? `· Số lượng ${detail.soLuong}` : ''}</p>
+        {detail.chiTiet?.length > 0 && <div className="as-request-items"><b>Các dòng hàng</b>{detail.chiTiet.map((item) => <p key={item.maPhienBan}>{item.tenSanPham} · SL {item.soLuong} · {item.daNhapKho ? `Đã nhập kho ${formatAdminDate(item.ngayNhapKho)}` : 'Chưa nhập kho'}</p>)}</div>}
+        {detail.soTienHoanDuKien != null && <p><b>Số tiền hoàn dự kiến:</b> {Number(detail.soTienHoanDuKien).toLocaleString('vi-VN')} ₫</p>}
         <p><b>Lý do / mô tả:</b> {detail.lyDo}</p>
         {detail.hinhAnhMinhChung && <div><b>Ảnh minh chứng</b><p><a href={detail.hinhAnhMinhChung} target="_blank" rel="noreferrer"><img className="as-proof" src={detail.hinhAnhMinhChung} alt="Bằng chứng khách gửi" /></a></p></div>}
         <p><b>Phản hồi đã lưu:</b> {detail.ghiChuXuLy || 'Chưa có'}</p>
@@ -130,10 +161,12 @@ export default function AdminReturnsPage() {
           <textarea rows="3" maxLength={1000} placeholder="Thông tin trao đổi nội bộ, không gửi cho khách hàng" value={internalNote} disabled={loadingInternal} onChange={e=>setInternalNote(e.target.value)} />
         </label><button className="btn" disabled={savingInternal || loadingInternal} onClick={saveInternal}>{savingInternal ? 'Đang lưu...' : 'Lưu ghi chú nội bộ'}</button></div>
         {detail.lichSu?.length > 0 && <div><b>Lịch sử xử lý</b><ol className="as-history">{detail.lichSu.map((h,i)=><li key={i}>{formatAdminDate(h.thoiGian)} · {STATUS_LABELS[h.trangThai] || h.trangThai} {h.ghiChu ? `· ${h.ghiChu}` : ''}</li>)}</ol></div>}
+        {detail.source === 'return' && ['DA_DUYET', 'DANG_XU_LY'].includes(detail.trangThai) && !detail.daNhapKho && <div className="as-review"><b>Nhận hàng và nhập kho</b><p className="muted">Chỉ xác nhận sau khi cửa hàng đã nhận và kiểm tra đủ sản phẩm. Số lượng tồn và lịch sử kho được cập nhật cùng giao dịch.</p><button className="btn btn-primary" disabled={busy} onClick={restock}>{busy ? 'Đang lưu...' : 'Xác nhận đã nhận hàng và nhập kho'}</button></div>}
+        {detail.source === 'return' && detail.loai === 'TRA_HANG_HOAN_TIEN' && detail.trangThai === 'DANG_XU_LY' && <div className="as-review"><b>Đối soát hoàn tiền</b>{detail.ngayHoanTien ? <p>Đã ghi nhận {Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN')} ₫ qua {detail.hinhThucHoanTien} · Mã: <code>{detail.maGiaoDichHoanTien}</code> · {formatAdminDate(detail.ngayHoanTien)}</p> : <><p className="muted">Thực hiện chuyển tiền trong MoMo/ngân hàng trước, sau đó nhập mã giao dịch để lưu đối soát. Hệ thống không tự gọi cổng thanh toán.</p><label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo</option><option value="CHUYEN_KHOAN">Chuyển khoản</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label><label>Mã giao dịch / đối soát<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)} placeholder="Mã giao dịch từ MoMo/ngân hàng" /></label><button className="btn btn-primary" disabled={busy || !detail.daNhapKho || !refundReference.trim()} onClick={recordRefund}>{busy ? 'Đang lưu...' : 'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho && <p className="muted">Cần xác nhận nhận hàng và nhập kho trước.</p>}</>}</div>}
         {(ACTIONS[detail.source][detail.trangThai] || []).length > 0 && <div className="as-review">
           <label>Ghi chú xử lý / lý do từ chối (khách hàng có thể nhìn thấy)<textarea rows="3" maxLength={500} placeholder="Nhập ghi chú hoặc lý do từ chối..." value={note} onChange={e=>setNote(e.target.value)}/></label>
           <div className="after-sales-actions">{ACTIONS[detail.source][detail.trangThai].map(([next,label]) =>
-            <button key={next} className="btn" disabled={busy} onClick={()=>applyAction(detail,next)}>{busy ? 'Đang lưu...' : label}</button>)}</div>
+            <button key={next} className="btn" disabled={busy || (next === 'HOAN_TAT' && detail.source === 'return' && (!detail.daNhapKho || (detail.loai === 'TRA_HANG_HOAN_TIEN' && !detail.ngayHoanTien)))} onClick={()=>applyAction(detail,next)}>{busy ? 'Đang lưu...' : label}</button>)}</div>
         </div>}
         <button className="btn" onClick={()=>setSelected(null)}>Đóng</button>
       </section>

@@ -180,6 +180,10 @@ public class LocDonHangAdminController {
                                 pattern, '\\'
                         ),
                         cb.like(
+                                cb.lower(root.get("soDienThoaiNhan")),
+                                pattern, '\\'
+                        ),
+                        cb.like(
                                 cb.lower(root.get("diaChiGiaoHang")),
                                 pattern, '\\'
                         ),

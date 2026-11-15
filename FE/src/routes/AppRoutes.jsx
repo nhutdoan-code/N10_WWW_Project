@@ -13,6 +13,7 @@ import AdminFeedbackPage from '../pages/admin/AdminFeedbackPage';
 import AdminInventoryPage from '../pages/admin/AdminInventoryPage';
 import AdminPromotionsPage from '../pages/admin/AdminPromotionsPage';
 import AdminReturnsPage from '../pages/admin/AdminReturnsPage';
+import AdminAnalyticsPage from '../pages/admin/AdminAnalyticsPage';
 import AdminLayout from '../layouts/AdminLayout';
 import MainLayout from '../layouts/MainLayout';
 import CartPage from '../pages/CartPage';
@@ -76,6 +77,7 @@ export default function AppRoutes() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="accounts" element={<AdminAccountsPage />} />
             <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
         </Route>
       </Routes>

@@ -138,6 +138,9 @@ public class NhatKyHoatDongService {
             case UPDATE_CATEGORY -> "Cập nhật danh mục";
             case DELETE_CATEGORY -> "Xóa danh mục";
 
+            case CREATE_BRAND -> "Tạo thương hiệu";
+            case UPDATE_BRAND -> "Cập nhật thương hiệu";
+
             case STOCK_IMPORT -> "Nhập kho";
             case STOCK_ADJUSTMENT -> "Điều chỉnh tồn kho";
 
@@ -146,6 +149,7 @@ public class NhatKyHoatDongService {
 
             case LOCK_ACCOUNT -> "Khóa tài khoản";
             case UNLOCK_ACCOUNT -> "Mở khóa tài khoản";
+            case CREATE_ACCOUNT -> "Tạo tài khoản";
             case UPDATE_ACCOUNT -> "Cập nhật tài khoản";
             case DELETE_ACCOUNT -> "Xóa tài khoản";
 

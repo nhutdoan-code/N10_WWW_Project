@@ -9,6 +9,7 @@ public enum LoaiDoiTuongAudit {
     PRODUCT,
     VARIANT,
     CATEGORY,
+    BRAND,
     INVENTORY,
     ORDER,
     ACCOUNT,

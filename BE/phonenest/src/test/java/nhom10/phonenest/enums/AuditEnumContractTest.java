@@ -34,6 +34,11 @@ class AuditEnumContractTest {
                 "UPDATE_CATEGORY",
                 "DELETE_CATEGORY",
 
+                // PR #24: quan ly thuong hieu va tao tai khoan quan tri
+                "CREATE_BRAND",
+                "UPDATE_BRAND",
+                "CREATE_ACCOUNT",
+
                 "STOCK_IMPORT",
                 "STOCK_ADJUSTMENT",
 
@@ -62,9 +67,9 @@ class AuditEnumContractTest {
         );
 
         assertThat(actualNames)
-                .as("HanhDongAudit must match exactly the 29 planned actions")
+                .as("HanhDongAudit must match exactly the 32 planned actions")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(HanhDongAudit.values()).hasSize(29);
+        assertThat(HanhDongAudit.values()).hasSize(32);
     }
 
     @Test
@@ -78,6 +83,7 @@ class AuditEnumContractTest {
                 "PRODUCT",
                 "VARIANT",
                 "CATEGORY",
+                "BRAND",
                 "INVENTORY",
                 "ORDER",
                 "ACCOUNT",
@@ -89,8 +95,8 @@ class AuditEnumContractTest {
         );
 
         assertThat(actualNames)
-                .as("LoaiDoiTuongAudit must match exactly the 11 planned entity types")
+                .as("LoaiDoiTuongAudit must match exactly the 12 planned entity types")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(LoaiDoiTuongAudit.values()).hasSize(11);
+        assertThat(LoaiDoiTuongAudit.values()).hasSize(12);
     }
 }

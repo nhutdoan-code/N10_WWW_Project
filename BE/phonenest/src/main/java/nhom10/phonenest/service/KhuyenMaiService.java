@@ -20,6 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,12 @@ public class KhuyenMaiService {
     @Transactional(readOnly = true)
     public List<KhuyenMaiDto> list() {
         return khuyenMaiRepository.findAll().stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<KhuyenMaiDto> listAdminPage(String q, Pageable pageable) {
+        String pattern = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        return khuyenMaiRepository.searchAdminPage(pattern, pageable).map(this::toDto);
     }
 
     public KhuyenMaiDto tao(KhuyenMaiDto d) {
