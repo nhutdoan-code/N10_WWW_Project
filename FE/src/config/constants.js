@@ -61,6 +61,9 @@ export const RETURN_STATUS = {
   CHO_DUYET: 'Chờ duyệt',
   DA_DUYET: 'Đã duyệt',
   TU_CHOI: 'Từ chối',
+  DANG_XU_LY: 'Đang xử lý',
+  HOAN_TAT: 'Hoàn tất',
+  CHO_TIEP_NHAN: 'Chờ tiếp nhận',
   DA_HOAN_TIEN: 'Đã hoàn tiền',
 };
 
