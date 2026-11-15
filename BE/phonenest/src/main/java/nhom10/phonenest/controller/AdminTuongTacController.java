@@ -93,4 +93,15 @@ public class AdminTuongTacController {
                                    @RequestParam(required = false) String ghiChuXuLy) {
         return doiTraService.capNhat(ma, trangThai, ghiChuXuLy);
     }
+
+    @PostMapping("/returns/{ma}/restock")
+    public DoiTraDto xacNhanNhapKho(@PathVariable String ma) {
+        return doiTraService.xacNhanNhapKho(ma, SecurityUtil.currentUserId());
+    }
+
+    @PostMapping("/returns/{ma}/refund")
+    public DoiTraDto ghiNhanHoanTien(@PathVariable String ma,
+                                    @Valid @RequestBody DoiTraDto.XacNhanHoanTienRequest request) {
+        return doiTraService.ghiNhanHoanTien(ma, request);
+    }
 }

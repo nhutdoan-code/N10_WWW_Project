@@ -71,6 +71,8 @@ export const adminService = {
   deleteQuestion: (ma) => api.delete(`/admin/questions/${ma}`),
   returns: () => api.get('/admin/returns'),
   updateReturn: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/returns/${ma}/status`, null, { params: { trangThai, ghiChuXuLy } }),
+  restockReturn: (ma) => api.post(`/admin/returns/${ma}/restock`),
+  recordReturnRefund: (ma, data) => api.post(`/admin/returns/${ma}/refund`, data),
   afterSales: () => api.get('/admin/after-sales'),
   updateAfterSale: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/after-sales/${ma}/status`, { trangThai, ghiChuXuLy }),
 

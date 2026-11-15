@@ -7,11 +7,11 @@
 --   2. NO 'CREATE DATABASE' or 'USE <name>' statement.
 --      Operator specifies the target database directly via CLI:
 --         mariadb -h <host> -P <port> -u <user> -p <target_database> < phonenest_full.sql
---   3. All 33 tables use strict 'CREATE TABLE <name>' (WITHOUT 'IF NOT EXISTS').
+--   3. All 35 tables use strict 'CREATE TABLE <name>' (WITHOUT 'IF NOT EXISTS').
 --      If the target database already contains tables, MariaDB safely halts
 --      immediately with ERROR 1050 without modifying existing data.
 --   4. Standard 'INSERT INTO' only (NO 'INSERT IGNORE' or 'REPLACE INTO').
---   5. Includes all migrations (03, 05, 06, 07, 08, 09, 11) and full seed data.
+--   5. Includes migrations (03, 05, 06, 07, 08, 09, 11, 12, 13, 14) and full seed data.
 --
 -- HOW TO IMPORT INTO A NEW DATABASE:
 --   Step 1: Create an empty database:
@@ -337,8 +337,13 @@ CREATE TABLE YeuCauDoiTra (
     maDonHang VARCHAR(50) NOT NULL,
     lyDoChung TEXT,
     ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NULL,
     trangThai ENUM('CHO_DUYET','DA_DUYET','TU_CHOI','DANG_XU_LY','HOAN_TAT') NOT NULL DEFAULT 'CHO_DUYET',
     ghiChuXuLy VARCHAR(500),
+    ghiChuNoiBo VARCHAR(1000),
+    hinhThucHoanTien VARCHAR(60),
+    maGiaoDichHoanTien VARCHAR(150),
+    ngayHoanTien DATETIME,
     CONSTRAINT FK_YeuCauDoiTra_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
@@ -351,9 +356,40 @@ CREATE TABLE ChiTietDoiTra (
     lyDo TEXT NOT NULL,
     hinhAnhMinhChung VARCHAR(500),
     soTienHoan DECIMAL(15,2),
+    daNhapKho BOOLEAN NOT NULL DEFAULT FALSE,
+    ngayNhapKho DATETIME,
     CONSTRAINT FK_ChiTietDoiTra_YeuCau FOREIGN KEY (maYeuCau) REFERENCES YeuCauDoiTra(maYeuCau) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT FK_ChiTietDoiTra_ChiTietDonHang FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT UQ_ChiTietDoiTra UNIQUE (maYeuCau, maChiTietDonHang)
+);
+
+-- Migration 12/13: Hậu mãi bảo hành, khiếu nại và lịch sử xử lý.
+CREATE TABLE YeuCauHauMai (
+    maYeuCau VARCHAR(50) PRIMARY KEY,
+    maDonHang VARCHAR(50) NOT NULL,
+    maChiTietDonHang VARCHAR(50) NULL,
+    loai ENUM('BAO_HANH','KHIEU_NAI') NOT NULL,
+    trangThai ENUM('CHO_TIEP_NHAN','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
+    lyDo TEXT NOT NULL,
+    hinhAnhMinhChung VARCHAR(500),
+    ghiChuXuLy VARCHAR(500),
+    ngayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ghiChuNoiBo VARCHAR(1000),
+    CONSTRAINT FK_YeuCauHauMai_DonHang FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang),
+    CONSTRAINT FK_YeuCauHauMai_ChiTiet FOREIGN KEY (maChiTietDonHang) REFERENCES ChiTietDonHang(maChiTiet),
+    INDEX IDX_HauMai_DonHang (maDonHang, ngayTao),
+    INDEX IDX_HauMai_TrangThai (trangThai)
+);
+
+CREATE TABLE LichSuHauMai (
+    maLichSu VARCHAR(50) PRIMARY KEY,
+    maYeuCau VARCHAR(50) NOT NULL,
+    trangThai ENUM('CHO_TIEP_NHAN','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL,
+    ghiChu VARCHAR(500),
+    thoiGian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_LichSuHauMai_YeuCau FOREIGN KEY (maYeuCau) REFERENCES YeuCauHauMai(maYeuCau) ON DELETE CASCADE,
+    INDEX IDX_LichSuHauMai_YeuCau (maYeuCau, thoiGian)
 );
 
 CREATE TABLE DanhGia (

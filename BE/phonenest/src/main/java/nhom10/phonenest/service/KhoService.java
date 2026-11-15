@@ -365,6 +365,16 @@ public class KhoService {
             DonHang order,
             String actorId,
             String ghiChu) {
+        thayDoiTon(variant, delta, type, order, null, actorId, ghiChu);
+    }
+
+    public void thayDoiTonDoiTra(PhienBanSanPham variant, int delta, YeuCauDoiTra request,
+                                 String actorId, String ghiChu) {
+        thayDoiTon(variant, delta, LoaiBienDongKho.DOI_TRA, null, request, actorId, ghiChu);
+    }
+
+    private void thayDoiTon(PhienBanSanPham variant, int delta, LoaiBienDongKho type,
+                            DonHang order, YeuCauDoiTra request, String actorId, String ghiChu) {
 
         PhienBanSanPham p = lockVariant(
                 variant.getMaPhienBan()
@@ -398,7 +408,7 @@ public class KhoService {
                 before,
                 after,
                 order,
-                null,
+                request,
                 actorId,
                 ghiChu
         );
@@ -564,6 +574,7 @@ public class KhoService {
             int tonTruoc,
             int tonSau,
             String maDonHang,
+            String maYeuCau,
             String nguoiThucHien,
             LocalDateTime thoiGian,
             String ghiChu) {
@@ -586,6 +597,8 @@ public class KhoService {
                             ? null
                             : b.getDonHang()
                               .getMaDonHang(),
+
+                    b.getYeuCau() == null ? null : b.getYeuCau().getMaYeuCau(),
 
                     b.getNguoiThucHien() == null
                             ? null

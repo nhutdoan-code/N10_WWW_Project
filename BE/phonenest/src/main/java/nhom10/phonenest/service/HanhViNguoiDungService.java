@@ -254,7 +254,7 @@ public class HanhViNguoiDungService {
         LocalDateTime end = denNgay != null ? denNgay.atTime(23, 59, 59) : null;
 
         // 1. Group by event type
-        List<Object[]> grouped = hanhViRepository.countGroupedByLoaiHanhVi(start, end, maKh);
+        List<Object[]> grouped = hanhViRepository.countGroupedFiltered(start, end, maKh, loai);
         Map<String, Long> theoLoai = new LinkedHashMap<>();
         long tongLuot = 0;
         for (Object[] row : grouped) {
@@ -267,19 +267,19 @@ public class HanhViNguoiDungService {
         }
 
         // 2. Top viewed products
-        List<HanhViDto.TopProductStats> topView = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_VIEW, start, end);
+        List<HanhViDto.TopProductStats> topView = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_VIEW, start, end, maKh);
 
         // 3. Top clicked products
-        List<HanhViDto.TopProductStats> topClick = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_CLICK, start, end);
+        List<HanhViDto.TopProductStats> topClick = layTopSanPhamTheoLoai(LoaiHanhViNguoiDung.PRODUCT_CLICK, start, end, maKh);
 
         // 4. Top keywords
-        List<Object[]> keywordRows = hanhViRepository.findTopKeywords(start, end, PageRequest.of(0, 10));
+        List<Object[]> keywordRows = hanhViRepository.findTopKeywordsFiltered(start, end, maKh, PageRequest.of(0, 10));
         List<HanhViDto.TopKeywordStats> topTuKhoa = keywordRows.stream()
                 .map(r -> new HanhViDto.TopKeywordStats(r[0] != null ? r[0].toString() : "", ((Number) r[1]).longValue()))
                 .toList();
 
         // 5. Recent events (Batch fetch product names to avoid N+1)
-        List<HanhViNguoiDung> recent = hanhViRepository.findAllByOrderByThoiGianDesc(PageRequest.of(0, 20));
+        List<HanhViNguoiDung> recent = hanhViRepository.findRecentFiltered(start, end, maKh, loai, PageRequest.of(0, 20));
         Set<String> recentProductIds = recent.stream()
                 .map(HanhViNguoiDung::getMaSanPham)
                 .filter(id -> id != null && !id.isBlank())
@@ -314,8 +314,8 @@ public class HanhViNguoiDungService {
         );
     }
 
-    private List<HanhViDto.TopProductStats> layTopSanPhamTheoLoai(LoaiHanhViNguoiDung loai, LocalDateTime start, LocalDateTime end) {
-        List<Object[]> rows = hanhViRepository.findTopProductsByLoai(loai, start, end, PageRequest.of(0, 10));
+    private List<HanhViDto.TopProductStats> layTopSanPhamTheoLoai(LoaiHanhViNguoiDung loai, LocalDateTime start, LocalDateTime end, String maKh) {
+        List<Object[]> rows = hanhViRepository.findTopProductsFiltered(loai, start, end, maKh, PageRequest.of(0, 10));
         Set<String> pIds = rows.stream()
                 .map(r -> r[0] != null ? r[0].toString() : "")
                 .filter(s -> !s.isBlank())

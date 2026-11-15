@@ -365,6 +365,7 @@ section > h3 { font-size: 1.2rem; margin: 28px 0 14px; }
 .sidebar a:hover, .sidebar button:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .sidebar .spacer { flex: 1; min-height: 16px; }
 .admin-content { padding: 28px 36px 56px; overflow-x: auto; min-width: 0; }
+.analytics-cleanup-controls { align-items: flex-end; }
 .admin-content > h2:first-child { margin-top: 0; font-size: 1.5rem; font-weight: 800; }
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .stat { display: flex; flex-direction: column; gap: 4px; }

@@ -70,6 +70,10 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 **Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET `?q=&loc=&page=0&size=10`, trả về `content`, `totalElements`, `totalPages`; `GET /stats`, `GET /history`, `GET /{ma}/history`, `POST /{ma}/import`, `POST /batch-import` nhận `{ items: [{ sku, soLuong }], ghiChu }`, `PUT /{ma}/adjust`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
 
+**Admin analytics:** `/admin/analytics/behavior` lọc theo `tuNgay`, `denNgay`, `loaiHanhVi`, `maKh`; `/admin/analytics/preferences/{maKh}` xem sở thích tổng hợp; `DELETE /admin/analytics/cleanup?soNgayLuuTru=90` xóa sự kiện cũ sau khi admin xác nhận. Giao diện tại `/admin/analytics`.
+
+**Xử lý hoàn tiền hậu mãi:** sau khi nhận hàng trả, `POST /admin/returns/{ma}/restock` cộng lại đúng số lượng SKU, liên kết biến động kho với yêu cầu và ghi người thao tác. Với yêu cầu trả hàng/hoàn tiền, cửa hàng chuyển tiền ngoài ứng dụng rồi gọi `POST /admin/returns/{ma}/refund` với `{ "hinhThuc": "MOMO|CHUYEN_KHOAN|TIEN_MAT|KHAC", "maGiaoDich": "..." }` để lưu đối soát. Backend không tự chuyển tiền; yêu cầu không thể hoàn tất nếu chưa ghi nhận nhập kho và giao dịch hoàn tiền.
+
 ## Hủy đơn hàng (UC013)
 `PUT /api/customer/orders/{ma}/cancel` body `{ "lyDo": "...", "ghiChu": "..." }` (`lyDo` chọn từ danh sách 7 lý do phổ biến; `ghiChu` bắt buộc khi chọn "Lý do khác"). Chỉ hủy được khi đơn **Chờ xác nhận** hoặc **Đang xử lý**; đơn Đang giao / Đã giao bị từ chối với thông báo "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy." Hệ thống kiểm tra lại trạng thái trong CSDL, đổi sang Đã hủy, lưu vào bảng `HuyDonHang` (lý do, ghi chú, ngày hủy), cộng lại tồn kho và gửi thông báo. Kho được trừ lúc đặt hàng nên hủy (khách hoặc admin) đều hoàn kho.
 Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema.sql`.

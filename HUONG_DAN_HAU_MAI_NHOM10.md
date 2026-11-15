@@ -59,7 +59,9 @@ Backend sử dụng cấu hình database trong `BE/phonenest/src/main/resources/
 
 Đổi/trả: `CHO_DUYET -> DA_DUYET / TU_CHOI -> DANG_XU_LY -> HOAN_TAT` (có thể hoàn tất từ `DA_DUYET`). Bảo hành/khiếu nại: `CHO_TIEP_NHAN -> DANG_XU_LY -> HOAN_TAT` hoặc từ chối khi đang chờ/đang xử lý. Admin phải cung cấp lý do nếu từ chối.
 
-**Lưu ý:** `HOAN_TAT` đổi/trả chỉ ghi nhận hoàn tất xử lý, **không tự động thanh toán tiền hoàn qua MoMo/ngân hàng**. Phần hoàn tiền và nhập kho thực tế cần quy trình kiểm tra riêng trước khi triển khai thương mại.
+**Quy trình xử lý đổi/trả:** Admin duyệt và chuyển yêu cầu sang đang xử lý; sau khi nhận, kiểm tra hàng trả về, chọn **Xác nhận đã nhận hàng và nhập kho** để cộng đúng SKU/số lượng và ghi lịch sử biến động kho. Với yêu cầu trả hàng/hoàn tiền, thực hiện chuyển tiền qua MoMo/ngân hàng theo quy trình cửa hàng, sau đó lưu hình thức và mã giao dịch/đối soát trong mục **Đối soát hoàn tiền**. Chỉ hoàn tất yêu cầu sau khi nhập kho và ghi nhận hoàn tiền. Hệ thống lưu vết nghiệp vụ và đối soát; thao tác chuyển tiền vẫn được thực hiện ở cổng MoMo/ngân hàng, không tự gửi lệnh thanh toán từ PhoneNest.
+
+Các API admin bổ sung: `POST /api/admin/returns/{ma}/restock` và `POST /api/admin/returns/{ma}/refund` (JSON `{ "hinhThuc": "MOMO", "maGiaoDich": "..." }`). Cần chạy `DB/migrations/14_return_refund_restock_admin.sql` sau migration 13 trên database đang sử dụng.
 
 ## Demo nhanh
 

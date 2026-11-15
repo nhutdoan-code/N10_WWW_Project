@@ -20,8 +20,10 @@ DB/
 │   ├── 07_password_reset_otp.sql           # Quản lý mã OTP đặt lại mật khẩu
 │   ├── 08_checkout_idempotency.sql         # Idempotency cho checkout (PNE-004)
 │   ├── 09_voucher_usage_concurrency.sql    # Concurrency và giới hạn lượt voucher (PNE-003)
-│   ├── 10_return_refund_restock.sql        # (Dự kiến từ fix/return-refund-restock - PNE-005)
-│   └── 11_user_behavior_tracking.sql       # User Behavior Tracking phục vụ Spring AI
+│   ├── 11_user_behavior_tracking.sql       # User Behavior Tracking phục vụ Spring AI
+│   ├── 12_after_sales.sql                  # Yêu cầu bảo hành/khiếu nại và lịch sử
+│   ├── 13_after_sales_update_time.sql      # Thời điểm cập nhật và ghi chú nội bộ
+│   └── 14_return_refund_restock_admin.sql  # Ghi nhận hoàn tiền và nhập lại kho hậu mãi
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -32,14 +34,14 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` đã tích hợp đầy đủ 100% schema của 33 bảng, toàn bộ ràng buộc khóa chính, khóa ngoại, chỉ mục, check constraint và 1.703 bản ghi seed ban đầu.
+File `DB/phonenest_full.sql` tích hợp schema 35 bảng, migrations 03, 05–09, 11–14 và dữ liệu seed ban đầu, bao gồm hậu mãi, ghi nhận hoàn tiền và nhập lại kho. Với database mới/trống, chỉ cần import file này; không chạy thêm migrations 12–14 sau đó.
 
 > [!WARNING] **QUY TẮC AN TOÀN KHI IMPORT:**
 > 1. **Khuyến cáo sao lưu**: Luôn sao lưu database hiện có trước khi thực hiện bất kỳ thao tác nạp dữ liệu nào (`mariadb-dump -u root -p --databases BanDienThoai > backup_bandienthoai.sql`).
 > 2. **Chỉ dùng cho database mới/trống**: `phonenest_full.sql` hoàn toàn **KHÔNG** chứa lệnh `DROP DATABASE` hay `CREATE DATABASE`, và **KHÔNG** chỉ định cứng `USE <db>`.
 > 3. **Cơ chế bảo vệ 2 lớp ngăn chặn tác động database không trống:**
 >    - **Lớp 1 (Fail-fast Pre-check):** Ngay đầu file `phonenest_full.sql`, một truy vấn kiểm tra tự động `information_schema.TABLES` sẽ kích hoạt lỗi hủy lệnh ngay lập tức (`ERROR 1103`) nếu database đích đang chứa bất kỳ bảng nào, ngăn chặn triệt để tình trạng ghi đè hoặc tạo bảng chắp vá trên database có sẵn dữ liệu.
->    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 33 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
+>    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 35 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
 > 4. Tuyệt đối không dùng `INSERT IGNORE` hay `REPLACE INTO`.
 
 **Quy trình kiểm tra database đích trống và import an toàn:**
@@ -77,8 +79,10 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 7. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/07_password_reset_otp.sql`
 8. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/08_checkout_idempotency.sql`
 9. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/09_voucher_usage_concurrency.sql`
-10. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/10_return_refund_restock.sql` *(khi merge PNE-005)*
-11. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/11_user_behavior_tracking.sql`
+10. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/11_user_behavior_tracking.sql`
+11. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/12_after_sales.sql`
+12. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/13_after_sales_update_time.sql`
+13. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/14_return_refund_restock_admin.sql`
 
 ---
 
