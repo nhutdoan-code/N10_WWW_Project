@@ -221,8 +221,13 @@ export default function CheckoutPage() {
       if (!muaNgay) reset();
 
       if (payment === 'VI_DIEN_TU') {
-        const momo = await orderService.createMomoPayment(order.maDonHang);
-        window.location.assign(momo.payUrl);
+        try {
+          const momo = await orderService.createMomoPayment(order.maDonHang);
+          window.location.assign(momo.payUrl);
+        } catch (err) {
+          toast(`Đơn hàng đã được tạo nhưng chưa thể khởi tạo thanh toán MoMo: ${errorMessage(err)}`, 'warning');
+          navigate(`/orders/${order.maDonHang}`);
+        }
         return;
       }
 

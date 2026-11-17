@@ -183,6 +183,32 @@ class CheckoutIdempotencyServiceTest {
     }
 
     @Test
+    @DisplayName("Test 3b: Replay checkout giỏ hàng sau khi giỏ đã được xóa vẫn trả lại đơn đã tạo")
+    void test03b_cartCheckoutReplayAfterCartWasCleared_ReturnsCompletedOrder() throws Exception {
+        DonHangDto.Checkout req = new DonHangDto.Checkout(
+                PhuongThucTt.COD, "DC001", null, null, null, null
+        );
+        String fingerprint = idempotencyService.computeFingerprint(USER_ID, req);
+        DonHangDto expected = createSampleDto("DH001");
+
+        CheckoutIdempotency existing = new CheckoutIdempotency();
+        existing.setId(100L);
+        existing.setUserId(USER_ID);
+        existing.setIdempotencyKey(VALID_KEY);
+        existing.setRequestHash(fingerprint);
+        existing.setStatus(IdempotencyStatus.SUCCESS);
+        existing.setOrderId("DH001");
+        existing.setResponsePayload(objectMapper.writeValueAsString(expected));
+
+        when(repository.findByUserIdAndIdempotencyKey(USER_ID, VALID_KEY)).thenReturn(Optional.of(existing));
+
+        DonHangDto result = idempotencyService.executeIdempotentCheckout(USER_ID, VALID_KEY, req);
+        assertThat(result.maDonHang()).isEqualTo("DH001");
+        assertThat(result.tongTien()).isEqualTo(expected.tongTien());
+        verify(donHangService, never()).datHang(anyString(), any(), any());
+    }
+
+    @Test
     @DisplayName("Test 4: Hai khách khác nhau dùng cùng key không ảnh hưởng nhau")
     void test04_twoDifferentUsers_SameKey_BothSucceed() {
         String userA = "KH001";
