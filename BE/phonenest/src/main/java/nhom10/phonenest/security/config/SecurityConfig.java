@@ -35,35 +35,18 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(e -> e
-                        .authenticationEntryPoint((request, response, ex) ->
-                                writeJson(response, HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để tiếp tục"))
-                        .accessDeniedHandler((request, response, ex) ->
-                                writeJson(response, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này")))
+                        .authenticationEntryPoint((req, res, ex) -> writeJson(res, HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để sử dụng ChatBox"))
+                        .accessDeniedHandler((req, res, ex) -> writeJson(res, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này"))
+                )
                 .authorizeHttpRequests(auth -> auth
-                        // Spring Security 6 also filters ERROR dispatch; keep /error reachable so real
-                        // application errors are not masked as 401.
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/tracking/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/payment/momo/ipn").permitAll()
-                        // Public catalogue: read-only.
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/products", "/api/products/**",
-                                "/api/categories", "/api/categories/**",
-                                "/api/brands", "/api/brands/**",
-                                "/api/search", "/api/search/**",
-                                "/api/locations", "/api/locations/**").permitAll()
-                        // Public AI assistant: exposes only catalogue/voucher/shipping data.
-                        .requestMatchers(HttpMethod.POST, "/api/chat").permitAll()
-                        // Public tracking endpoint (records anonymous and authenticated user behavior).
-                        .requestMatchers(HttpMethod.POST, "/api/tracking/events").permitAll()
-                        // Management surface.
+                        .requestMatchers("/error", "/uploads/**", "/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/tracking/**", "/api/payment/momo/ipn").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**", "/api/search/**", "/api/locations/**").permitAll()
+                        .requestMatchers("/api/chat/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Customer self-service surface (identity always comes from the JWT subject).
-                        .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
-                        .requestMatchers("/api/notifications/**").hasRole("CUSTOMER")
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/customer/**", "/api/notifications/**").hasRole("CUSTOMER")
+                        .anyRequest().authenticated()
+                )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -73,10 +56,10 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    private static void writeJson(HttpServletResponse response, HttpStatus status, String message) throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"message\":\"" + message.replace("\"", "\\\"") + "\"}");
+    private static void writeJson(HttpServletResponse res, HttpStatus status, String message) throws IOException {
+        res.setStatus(status.value());
+        res.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        res.getWriter().write("{\"message\":\"" + message.replace("\"", "\\\"") + "\"}");
     }
 }

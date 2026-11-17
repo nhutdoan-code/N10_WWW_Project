@@ -1,3 +1,4 @@
+
 import { createContext, useEffect, useState } from 'react';
 import { STORAGE_KEYS } from '../config/constants';
 import { cartService } from '../service/cartService';
@@ -11,6 +12,7 @@ export function CartProvider({ children }) {
   const { user, isCustomer } = useAuth();
   const [items, setItems] = useState([]);
 
+  // Lấy giỏ hàng khi đăng nhập hoặc đổi tài khoản
   useEffect(() => {
     const guest = storage.get(KEY) || [];
 
@@ -20,10 +22,12 @@ export function CartProvider({ children }) {
     }
 
     const request = guest.length
-        ? cartService.sync(guest.map((i) => ({
-          maPhienBan: i.phienBan.maPhienBan,
-          soLuong: i.soLuong,
-        })))
+        ? cartService.sync(
+            guest.map((i) => ({
+              maPhienBan: i.phienBan.maPhienBan,
+              soLuong: i.soLuong,
+            }))
+        )
         : cartService.get();
 
     request
@@ -31,40 +35,69 @@ export function CartProvider({ children }) {
           storage.remove(KEY);
           setItems(cart.items || []);
         })
-        .catch(() => setItems([]));
+        .catch((error) => {
+          console.error('Lỗi tải giỏ hàng:', error);
+          setItems([]);
+        });
   }, [user?.maTk, isCustomer]);
 
+  // Lưu giỏ hàng khách chưa đăng nhập
   const saveGuest = (next) => {
     storage.set(KEY, next);
     setItems(next);
   };
 
-  // Thêm phiên bản
+  // [THÊM MỚI] Đồng bộ giỏ hàng từ database
+  const refresh = async () => {
+    if (!isCustomer) return;
+
+    const cart = await cartService.get();
+    setItems(cart.items || []);
+  };
+
+  // Thêm phiên bản vào giỏ hàng
   const add = async (sp, phienBan, soLuong = 1) => {
-    if (!phienBan) throw new Error('Vui lòng chọn phiên bản sản phẩm');
+    if (!phienBan) {
+      throw new Error('Vui lòng chọn phiên bản sản phẩm');
+    }
+
     const qty = Number(soLuong);
+
     if (!Number.isInteger(qty) || qty < 1) {
       throw new Error('Số lượng không hợp lệ');
     }
 
     if (isCustomer) {
-      const cart = await cartService.add(phienBan.maPhienBan, qty);
+      const cart = await cartService.add(
+          phienBan.maPhienBan,
+          qty
+      );
+
       setItems(cart.items || []);
       return;
     }
-    const current = items.find((i) => i.phienBan.maPhienBan === phienBan.maPhienBan);
-    const totalQty = (current?.soLuong || 0) + qty;
-    if (totalQty > Number(phienBan.soLuongTon)) {
-      throw new Error(`Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`);
-    }
-    saveGuest(
-      current
-        ? items.map((i) =>
+
+    const current = items.find(
+        (i) =>
             i.phienBan.maPhienBan === phienBan.maPhienBan
-              ? { ...i, soLuong: totalQty }
-              : i
-          )
-        : [...items, { sanPham: sp, phienBan, soLuong: qty }]
+    );
+
+    const totalQty = (current?.soLuong || 0) + qty;
+
+    if (totalQty > Number(phienBan.soLuongTon)) {
+      throw new Error(
+          `Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`
+      );
+    }
+
+    saveGuest(
+        current
+            ? items.map((i) =>
+                i.phienBan.maPhienBan === phienBan.maPhienBan
+                    ? { ...i, soLuong: totalQty }
+                    : i
+            )
+            : [...items, { sanPham: sp, phienBan, soLuong: qty }]
     );
   };
 
@@ -83,11 +116,17 @@ export function CartProvider({ children }) {
     }
 
     if (qty > Number(phienBan.soLuongTon)) {
-      throw new Error(`Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`);
+      throw new Error(
+          `Chỉ còn ${phienBan.soLuongTon} sản phẩm trong kho`
+      );
     }
 
     if (isCustomer) {
-      const cart = await cartService.update(phienBan.maPhienBan, qty);
+      const cart = await cartService.update(
+          phienBan.maPhienBan,
+          qty
+      );
+
       setItems(cart.items || []);
       return;
     }
@@ -112,7 +151,9 @@ export function CartProvider({ children }) {
     }
 
     saveGuest(
-        items.filter((i) => i.phienBan.maPhienBan !== maPhienBan)
+        items.filter(
+            (i) => i.phienBan.maPhienBan !== maPhienBan
+        )
     );
   };
 
@@ -126,14 +167,48 @@ export function CartProvider({ children }) {
     }
   };
 
-  const replace = (cart) => setItems(cart.items || []);
-  const reset = () => setItems([]);
+  // Thay thế dữ liệu giỏ hàng
+  const replace = (cart) => {
+    setItems(cart.items || []);
+  };
 
-  const count = items.reduce((sum, i) => sum + i.soLuong, 0);
+  // Xóa dữ liệu giỏ hàng trên giao diện
+  const reset = () => {
+    setItems([]);
+  };
 
-  const total = items.reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? i.sanPham?.giaBan ?? 0) * i.soLuong, 0);
+  // Tổng số sản phẩm
+  const count = items.reduce(
+      (sum, i) => sum + i.soLuong,
+      0
+  );
+
+  // Tổng tiền
+  const total = items.reduce(
+      (sum, i) =>
+          sum +
+          Number(
+              i.phienBan?.giaBan ?? i.sanPham?.giaBan ?? 0
+          ) *
+          i.soLuong,
+      0
+  );
+
   return (
-      <CartContext.Provider value={{ items, count, total, add, setQuantity, remove, clear, replace, reset }}>
+      <CartContext.Provider
+          value={{
+            items,
+            count,
+            total,
+            add,
+            setQuantity,
+            remove,
+            clear,
+            replace,
+            reset,
+            refresh, // Đồng bộ giỏ hàng ngay lập tức
+          }}
+      >
         {children}
       </CartContext.Provider>
   );

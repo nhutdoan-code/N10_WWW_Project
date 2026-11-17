@@ -1223,3 +1223,127 @@ td.row { display: table-cell; white-space: nowrap; } td.row > .btn + .btn { marg
 .admin-order-customer-info strong {
   color: #334155;
 }
+
+/* Thanh công cụ ChatBox */
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf0f5;
+}
+
+/* Nút chức năng */
+.chat-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chat-toolbar-btn:hover {
+  background: #f1f5ff;
+  border-color: #a5b4fc;
+  color: #244ee8;
+}
+
+/* Nút lịch sử đang được mở */
+.chat-toolbar-btn.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #244ee8;
+}
+
+/* Nút tạo cuộc trò chuyện mới */
+.chat-toolbar-btn.new-chat-btn {
+  margin-left: auto;
+  background: #2454e8;
+  border-color: #2454e8;
+  color: #ffffff;
+}
+
+.chat-toolbar-btn.new-chat-btn:hover {
+  background: #1d43c2;
+  border-color: #1d43c2;
+}
+
+/* Danh sách lịch sử */
+.chat-history-list {
+  padding: 12px;
+  background: #f8faff;
+  border-bottom: 1px solid #e8edf5;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.chat-history-list > b {
+  display: block;
+  margin-bottom: 10px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.chat-history-list > p {
+  margin: 8px 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* Từng cuộc hội thoại */
+.chat-history-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border: 1px solid #e8edf5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #475569;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.chat-history-item:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #244ee8;
+}
+
+.chat-history-item.active {
+  background: #eef2ff;
+  border-color: #8da5ff;
+  color: #244ee8;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 380px) {
+  .chat-toolbar {
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .chat-toolbar-btn {
+    padding: 0 8px;
+    gap: 5px;
+    font-size: 11px;
+  }
+}
+

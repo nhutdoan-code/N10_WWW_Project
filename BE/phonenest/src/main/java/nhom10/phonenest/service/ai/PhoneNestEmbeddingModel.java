@@ -55,14 +55,14 @@ public class PhoneNestEmbeddingModel implements EmbeddingModel {
                 this.baseUrl, this.modelName, this.dimensions);
     }
 
-    public PhoneNestEmbeddingModel() {
-        this("http://127.0.0.1:11434", "bge-m3", 1024);
-    }
+//    public PhoneNestEmbeddingModel() {
+//        this("http://127.0.0.1:11434", "bge-m3", 1024);
+//    }
 
     @Override
     public float[] embed(String text) {
         if (text == null || text.isBlank()) {
-            return new float[dimensions];
+            throw new IllegalArgumentException("Không thể tạo embedding từ nội dung rỗng.");
         }
         try {
             Map<String, Object> reqBody = Map.of(
@@ -74,7 +74,7 @@ public class PhoneNestEmbeddingModel implements EmbeddingModel {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/embeddings"))
                     .header("Content-Type", "application/json; charset=UTF-8")
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(120))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
@@ -91,22 +91,32 @@ public class PhoneNestEmbeddingModel implements EmbeddingModel {
 
             int size = embNode.size();
             float[] vec = new float[size];
+            if (vec.length != dimensions) {
+                throw new IllegalStateException(
+                        "Sai kích thước embedding! Mong đợi: "
+                                + dimensions + ", thực tế: " + vec.length
+                );
+            }
             for (int i = 0; i < size; i++) {
                 vec[i] = (float) embNode.get(i).asDouble();
             }
             return vec;
         } catch (Exception e) {
-            log.error("Lỗi khi tạo embedding từ Ollama ({}) cho text: {}", e.getMessage(), text);
+            log.error("Lỗi khi tạo embedding từ Ollama. Model: {}, lỗi: {}", modelName, e.getMessage());
             throw new RuntimeException("Ollama embedding không khả dụng tại " + baseUrl + " (model: " + modelName + "): " + e.getMessage(), e);
         }
     }
 
     @Override
     public float[] embed(Document document) {
-        if (document == null || document.getText() == null) {
-            return new float[dimensions];
+        if (document == null) {
+            throw new IllegalArgumentException("Document không được null.");
         }
-        return embed(document.getText());
+        String text = document.getText();
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Nội dung document không được rỗng.");
+        }
+        return embed(text);
     }
 
     @Override
@@ -134,7 +144,6 @@ public class PhoneNestEmbeddingModel implements EmbeddingModel {
     public int dimensions() {
         return dimensions;
     }
-
     public boolean isAvailable() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -142,9 +151,29 @@ public class PhoneNestEmbeddingModel implements EmbeddingModel {
                     .timeout(Duration.ofSeconds(3))
                     .GET()
                     .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.statusCode() == 200;
+            HttpResponse<String> response = httpClient.send(
+                    request,
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            if (response.statusCode() != 200) {
+                return false;
+            }
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode models = root.get("models");
+            if (models == null || !models.isArray()) {
+                return false;
+            }
+            for (JsonNode model : models) {
+                String name = model.path("name").asText("");
+                // Chấp nhận cả bge-m3 và bge-m3:latest
+                if (name.equals(modelName)
+                        || name.startsWith(modelName + ":")) {
+                    return true;
+                }
+            }
+            return false;
         } catch (Exception e) {
+            log.warn("Không thể kiểm tra Ollama embedding: {}", e.getMessage());
             return false;
         }
     }

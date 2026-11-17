@@ -2,221 +2,381 @@ package nhom10.phonenest.service.ai;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import nhom10.phonenest.dto.SanPhamDto;
 import nhom10.phonenest.dto.SemanticSearchResultDto;
-import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.TrangThaiSanPham;
 import nhom10.phonenest.mapper.SanPhamMapper;
 import nhom10.phonenest.repository.SanPhamRepository;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.*;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.text.Normalizer;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 import java.util.stream.Collectors;
 
-/**
- * Semantic Product Search Service powered by real pretrained neural vector embeddings.
- * <p>
- * Pipeline:
- * Query -> Ollama EmbeddingModel -> Dense 1024-d Vector -> VectorStore Cosine Similarity ->
- * Structured Constraints Filter -> MariaDB Anti-Hallucination Check -> Factual Highlights.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SemanticSearchService {
 
     private static final Pattern PATTERN_BUDGET = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(triệu|tr)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Set<String> STOP_WORDS = Set.of(
+            "toi", "minh", "muon", "can", "tim", "mua", "cho", "hoi", "tu", "co", "la", "va",
+            "duoi", "tren", "tam", "khoang", "gia", "dien", "thoai", "san", "pham", "may",
+            "hang", "nao", "gi", "khong", "voi", "mot", "cai", "chiec", "nhe", "tot"
+    );
 
     private final SanPhamRepository sanPhamRepository;
     private final PhoneNestEmbeddingModel embeddingModel;
     private final ProductSemanticDocumentBuilder documentBuilder;
+    private final VectorStore vectorStore;
+    private final JdbcTemplate jdbcTemplate;
 
-    private VectorStore vectorStore;
-    private boolean initialized = false;
+    private volatile boolean initialized = false;
+    private volatile boolean syncTableReady = false;
 
     @EventListener(ApplicationReadyEvent.class)
     public synchronized void onApplicationReady() {
         try {
-            if (embeddingModel.isAvailable()) {
-                reindexAll();
-            } else {
-                log.warn("Ollama embedding server chưa sẵn sàng lúc khởi động. Sẽ thử lập chỉ mục lại khi có truy vấn.");
-            }
+            if (isEmbeddingAvailable()) reindexAll();
+            else log.warn("Ollama chưa sẵn sàng. Sẽ thử đồng bộ khi có truy vấn.");
         } catch (Exception e) {
-            log.warn("Chưa thể khởi tạo Vector Store lúc khởi động: {}", e.getMessage());
+            log.warn("Không thể khởi tạo Vector Store: {}", e.getMessage());
         }
     }
 
-    private synchronized VectorStore getVectorStore() {
-        if (vectorStore == null) {
-            vectorStore = new PhoneNestVectorStore(embeddingModel);
-        }
-        return vectorStore;
+    private synchronized void ensureSyncTable() {
+        if (syncTableReady) return;
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS product_embedding_sync (
+                    ma_san_pham VARCHAR(100) PRIMARY KEY,
+                    content_hash CHAR(64) NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )""");
+        syncTableReady = true;
     }
 
-    @Transactional(readOnly = true)
-    public synchronized int reindexAll() {
-        log.info("Bắt đầu tái lập chỉ mục Vector Store cho sản phẩm PhoneNest bằng model {}...", embeddingModel.getModelName());
-        VectorStore newStore = new PhoneNestVectorStore(embeddingModel);
-
-        List<SanPham> activeProducts = sanPhamRepository.findAll().stream()
-                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
-                .toList();
-
-        List<Document> docs = new ArrayList<>();
-        for (SanPham sp : activeProducts) {
-            try {
-                Document doc = documentBuilder.build(sp);
-                docs.add(doc);
-            } catch (Exception e) {
-                log.warn("Bỏ qua sản phẩm {} khi lập chỉ mục: {}", sp.getMaSanPham(), e.getMessage());
-            }
-        }
-
-        if (!docs.isEmpty()) {
-            newStore.add(docs);
-        }
-
-        this.vectorStore = newStore;
-        this.initialized = true;
-        log.info("Tái lập chỉ mục Vector Store hoàn tất: {} sản phẩm được đánh chỉ mục bằng pretrained embedding.", docs.size());
-        return docs.size();
-    }
-
-    public synchronized void indexProduct(SanPham sp) {
-        if (sp == null) return;
-        VectorStore store = getVectorStore();
+    private String calculateHash(Document doc) {
         try {
-            store.delete(List.of(sp.getMaSanPham()));
-            if (sp.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH) {
-                Document doc = documentBuilder.build(sp);
-                store.add(List.of(doc));
-                log.info("Đã cập nhật vector store cho sản phẩm {}", sp.getMaSanPham());
-            }
+            StringBuilder sb = new StringBuilder(doc.getText());
+            new TreeMap<>(doc.getMetadata()).forEach((k, v) -> sb.append("|").append(k).append(":").append(v));
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            log.warn("Lỗi khi cập nhật vector store cho sản phẩm {}: {}", sp.getMaSanPham(), e.getMessage());
+            throw new IllegalStateException("Không thể tạo hash sản phẩm", e);
         }
+    }
+
+    private String findStoredHash(String maSanPham) {
+        return jdbcTemplate.query("SELECT content_hash FROM product_embedding_sync WHERE ma_san_pham = ?",
+                rs -> rs.next() ? rs.getString(1) : null, maSanPham);
+    }
+
+    private void saveHash(String maSanPham, String hash) {
+        jdbcTemplate.update("""
+                INSERT INTO product_embedding_sync (ma_san_pham, content_hash) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE content_hash = VALUES(content_hash), updated_at = CURRENT_TIMESTAMP""",
+                maSanPham, hash);
+    }
+
+    private boolean syncDocument(SanPham sp) {
+        String id = sp.getMaSanPham();
+        Document doc = documentBuilder.build(sp);
+        String newHash = calculateHash(doc);
+        if (newHash.equals(findStoredHash(id))) return false;
+
+        vectorStore.delete(List.of(id));
+        vectorStore.add(List.of(doc));
+        saveHash(id, newHash);
+        return true;
     }
 
     public synchronized void removeProduct(String maSanPham) {
-        if (maSanPham == null) return;
+        if (maSanPham == null || maSanPham.isBlank()) return;
         try {
-            getVectorStore().delete(List.of(maSanPham));
-            log.info("Đã gỡ sản phẩm {} khỏi vector store", maSanPham);
+            ensureSyncTable();
+            vectorStore.delete(List.of(maSanPham));
+            jdbcTemplate.update("DELETE FROM product_embedding_sync WHERE ma_san_pham = ?", maSanPham);
+            log.info("Đã gỡ sản phẩm {} khỏi Vector Store", maSanPham);
         } catch (Exception e) {
-            log.warn("Lỗi khi gỡ sản phẩm {} khỏi vector store: {}", maSanPham, e.getMessage());
+            log.warn("Lỗi khi gỡ sản phẩm {}: {}", maSanPham, e.getMessage());
         }
+    }
+
+    public synchronized int reindexAll() {
+        if (!isEmbeddingAvailable()) {
+            initialized = false;
+            return 0;
+        }
+        ensureSyncTable();
+        log.info("Bắt đầu đồng bộ sản phẩm vào MariaDB Vector Store...");
+
+        Set<String> activeIds = new HashSet<>();
+        int indexedCount = 0, changedCount = 0;
+
+        for (SanPham sp : sanPhamRepository.findAllWithPhienBans()) {
+            if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) continue;
+            String id = sp.getMaSanPham();
+            activeIds.add(id);
+            try {
+                if (syncDocument(sp)) {
+                    changedCount++;
+                    log.info("Đã cập nhật embedding sản phẩm {}", id);
+                }
+                indexedCount++;
+            } catch (Exception e) {
+                log.warn("Không thể đồng bộ sản phẩm {}: {}", id, e.getMessage());
+            }
+        }
+
+        List<String> staleIds = jdbcTemplate.queryForList("SELECT ma_san_pham FROM product_embedding_sync", String.class)
+                .stream().filter(id -> !activeIds.contains(id)).toList();
+
+        if (!staleIds.isEmpty()) {
+            vectorStore.delete(staleIds);
+            jdbcTemplate.batchUpdate("DELETE FROM product_embedding_sync WHERE ma_san_pham = ?", staleIds, 100, (ps, id) -> ps.setString(1, id));
+        }
+
+        initialized = true;
+        log.info("Đồng bộ hoàn tất: {} sản phẩm, {} sản phẩm cần embedding lại.", indexedCount, changedCount);
+        return indexedCount;
+    }
+
+    public synchronized void indexProduct(SanPham sp) {
+        if (sp == null || sp.getMaSanPham() == null) return;
+        try {
+            ensureSyncTable();
+            SanPham product = sanPhamRepository.findByIdWithPhienBans(sp.getMaSanPham()).orElse(null);
+            if (product == null || product.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) {
+                removeProduct(sp.getMaSanPham());
+                return;
+            }
+            if (syncDocument(product)) log.info("Đã đồng bộ embedding sản phẩm {}", product.getMaSanPham());
+        } catch (Exception e) {
+            log.warn("Lỗi cập nhật embedding sản phẩm {}: {}", sp.getMaSanPham(), e.getMessage());
+        }
+    }
+
+    private String normalize(String input) {
+        if (input == null) return "";
+        String res = Normalizer.normalize(input.toLowerCase(Locale.ROOT).replace('đ', 'd'), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return res.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
+    }
+
+    private boolean containsPhrase(String source, String phrase) {
+        return source != null && phrase != null && !source.isBlank() && !phrase.isBlank()
+                && (" " + source + " ").contains(" " + phrase + " ");
+    }
+
+    private String resolveBrand(String query) {
+        String normalizedQuery = normalize(query);
+        if (normalizedQuery.isBlank()) return null;
+
+        String bestBrand = null;
+        int bestLength = 0;
+
+        for (SanPham sp : sanPhamRepository.findAll()) {
+            if (sp.getThuongHieu() == null) continue;
+            String brand = sp.getThuongHieu().getTenThuongHieu();
+            String normBrand = normalize(brand);
+            String normName = normalize(sp.getTenMay());
+
+            if (!normBrand.isBlank() && normBrand.length() > bestLength && containsPhrase(normalizedQuery, normBrand)) {
+                bestBrand = brand;
+                bestLength = normBrand.length();
+            }
+            if (!normName.isBlank() && normName.length() > bestLength && containsPhrase(normalizedQuery, normName)) {
+                bestBrand = brand;
+                bestLength = normName.length();
+            }
+        }
+        return bestBrand;
+    }
+
+    private Constraints parseConstraints(String query) {
+        String lower = query.toLowerCase(Locale.ROOT);
+        String brand = resolveBrand(query);
+        BigDecimal targetBudget = null, maxBudget = null;
+
+        Matcher matcher = PATTERN_BUDGET.matcher(lower);
+        if (matcher.find()) {
+            try {
+                double val = Double.parseDouble(matcher.group(1).replace(',', '.'));
+                BigDecimal amount = BigDecimal.valueOf(Math.round(val * 1_000_000));
+
+                if (List.of("dưới", "duoi", "tối đa", "toi da", "không quá", "khong qua").stream().anyMatch(lower::contains)) {
+                    maxBudget = amount;
+                } else if (List.of("khoảng", "khoang", "tầm", "tam").stream().anyMatch(lower::contains)) {
+                    targetBudget = amount;
+                    maxBudget = amount.multiply(BigDecimal.valueOf(1.25));
+                } else {
+                    targetBudget = amount;
+                }
+            } catch (Exception e) {
+                log.debug("Không thể phân tích ngân sách: {}", e.getMessage());
+            }
+        }
+        return new Constraints(brand, targetBudget, maxBudget);
+    }
+
+    private boolean hasAvailableVariant(SanPham sp) {
+        return !documentBuilder.getPhienBanConHang(sp).isEmpty();
+    }
+
+    private BigDecimal getAvailablePrice(SanPham sp) {
+        return documentBuilder.getGiaThapNhat(sp);
+    }
+
+    private boolean matchesConstraints(SanPham sp, Constraints c) {
+        if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH || !hasAvailableVariant(sp)) return false;
+        if (c.requiredBrand != null) {
+            String brand = sp.getThuongHieu() != null ? sp.getThuongHieu().getTenThuongHieu() : "";
+            if (!normalize(brand).equals(normalize(c.requiredBrand))) return false;
+        }
+        return c.maxBudget == null || getAvailablePrice(sp).compareTo(c.maxBudget) <= 0;
+    }
+
+    private double evaluateConstraintFit(SanPham sp, Constraints c) {
+        double score = 1.0;
+        BigDecimal price = getAvailablePrice(sp);
+
+        if (c.targetBudget != null && c.targetBudget.compareTo(BigDecimal.ZERO) > 0) {
+            double ratio = price.doubleValue() / c.targetBudget.doubleValue();
+            score += (ratio >= 0.8 && ratio <= 1.2) ? 1.0 : (ratio >= 0.6 && ratio <= 1.5) ? 0.5 : -0.5;
+        } else if (c.maxBudget != null) {
+            score += price.compareTo(c.maxBudget) <= 0 ? 1.0 : -1.0;
+        }
+        return Math.max(score + (hasAvailableVariant(sp) ? 0.3 : 0.0), 0.0);
+    }
+
+    private String explainFit(SanPham sp, double vectorScore) {
+        List<String> specs = extractSpecs(sp, true);
+        return specs.isEmpty()
+                ? "Độ tương đồng ngữ nghĩa: " + Math.round(vectorScore * 100) + "%"
+                : "Thông số kỹ thuật: " + String.join(", ", specs);
+    }
+
+    private List<String> extractSpecs(SanPham sp, boolean detailed) {
+        List<String> list = new ArrayList<>();
+        if (sp.getChip() != null && !sp.getChip().isBlank()) list.add("Chip " + sp.getChip());
+        if (sp.getTanSoQuet() != null && sp.getTanSoQuet() >= (detailed ? 61 : 120)) list.add("Màn hình " + sp.getTanSoQuet() + "Hz");
+        if (sp.getCameraSau() != null && !sp.getCameraSau().isBlank()) list.add((detailed ? "Camera sau " : "Camera ") + sp.getCameraSau());
+        if (sp.getPin() != null) list.add("Pin " + sp.getPin() + "mAh");
+        if (detailed && sp.getCongSuatSac() != null && sp.getCongSuatSac() > 20) list.add("Sạc nhanh " + sp.getCongSuatSac() + "W");
+        return list;
     }
 
     @Transactional(readOnly = true)
     public List<SemanticSearchResultDto> search(String query, Integer limit) {
+        if (query == null || query.isBlank()) return List.of();
         int maxResults = (limit != null && limit > 0) ? Math.min(limit, 20) : 5;
-        if (query == null || query.isBlank()) {
-            return List.of();
+        Constraints constraints = parseConstraints(query);
+
+        if (!isEmbeddingAvailable()) {
+            log.warn("Ollama không khả dụng. Chuyển sang KEYWORD_FALLBACK.");
+            return fallbackSearch(query, maxResults, constraints);
         }
+        if (!initialized) reindexAll();
 
-        // Check if embedding model is available
-        if (!embeddingModel.isAvailable()) {
-            log.warn("Ollama embedding model '{}' không khả dụng tại {}. Kích hoạt KEYWORD_FALLBACK.",
-                    embeddingModel.getModelName(), embeddingModel.getBaseUrl());
-            return fallbackSearch(query, maxResults);
-        }
-
-        // Ensure store is populated
-        if (!initialized || ((PhoneNestVectorStore) getVectorStore()).size() == 0) {
-            reindexAll();
-        }
-
-        StructuredConstraints constraints = parseConstraints(query);
-
-        List<Document> rawCandidates;
+        List<Document> candidates;
         try {
-            SearchRequest req = SearchRequest.builder()
+            candidates = vectorStore.similaritySearch(SearchRequest.builder()
                     .query(query)
                     .topK(Math.max(maxResults * 4, 15))
-                    .similarityThreshold(0.0) // retrieve candidates and rank mathematically
-                    .build();
-            rawCandidates = getVectorStore().similaritySearch(req);
+                    .similarityThreshold(0.0)
+                    .build());
         } catch (Exception e) {
-            log.warn("Vector similarity search thất bại ({}), chuyển sang fallback: {}", e.getClass().getSimpleName(), e.getMessage());
-            return fallbackSearch(query, maxResults);
+            log.warn("Vector search thất bại: {}", e.getMessage());
+            return fallbackSearch(query, maxResults, constraints);
         }
 
-        if (rawCandidates.isEmpty()) {
-            return fallbackSearch(query, maxResults);
-        }
+        if (candidates == null || candidates.isEmpty()) return fallbackSearch(query, maxResults, constraints);
 
-        // Rank and filter candidates
         List<ScoredCandidate> scored = new ArrayList<>();
-        for (Document doc : rawCandidates) {
-            Optional<SanPham> opt = sanPhamRepository.findById(doc.getId());
-            if (opt.isEmpty()) continue; // Anti-hallucination check: product must exist in MariaDB
-
-            SanPham sp = opt.get();
-            if (sp.getTrangThai() != TrangThaiSanPham.DANG_KINH_DOANH) continue;
+        for (Document doc : candidates) {
+            SanPham sp = sanPhamRepository.findById(doc.getId()).orElse(null);
+            if (sp == null || !matchesConstraints(sp, constraints)) continue;
 
             double vectorScore = doc.getScore() != null ? doc.getScore() : 0.5;
-            double fitScore = evaluateConstraintFit(sp, constraints);
-
-            // Hard pruning for strict explicit brand mismatch if requested in query
-            if (constraints.requiredBrand != null) {
-                String brand = sp.getThuongHieu() != null ? sp.getThuongHieu().getTenThuongHieu().toLowerCase() : "";
-                if (!brand.contains(constraints.requiredBrand.toLowerCase())) {
-                    continue; // Skip products not belonging to requested brand
-                }
-            }
-
-            // Hard pruning for strict upper bound budget if clearly specified
-            if (constraints.maxBudget != null && sp.getGiaBan().compareTo(constraints.maxBudget.multiply(BigDecimal.valueOf(1.25))) > 0) {
-                continue; // Exceeds budget ceiling
-            }
-
-            double finalScore = (vectorScore * 0.70) + (fitScore * 0.30);
-            scored.add(new ScoredCandidate(sp, finalScore, vectorScore, explainFit(sp, vectorScore)));
+            double finalScore = vectorScore * 0.70 + evaluateConstraintFit(sp, constraints) * 0.30;
+            scored.add(new ScoredCandidate(sp, finalScore, explainFit(sp, vectorScore)));
         }
 
-        if (scored.isEmpty()) {
-            return fallbackSearch(query, maxResults);
-        }
+        return scored.isEmpty() ? fallbackSearch(query, maxResults, constraints) : toDtoList(scored, maxResults, "VECTOR_SEMANTIC");
+    }
 
-        // Sort by final score descending
-        scored.sort(Comparator.comparingDouble(ScoredCandidate::finalScore).reversed());
+    private List<SemanticSearchResultDto> fallbackSearch(String query, int limit, Constraints constraints) {
+        log.info("Thực hiện fallback keyword search: '{}'", query);
+        Set<String> keywords = Arrays.stream(normalize(query).split("\\s+"))
+                .filter(w -> w.length() >= 2 && !STOP_WORDS.contains(w))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        return scored.stream()
-                .limit(maxResults)
+        if (keywords.isEmpty()) return List.of();
+
+        List<ScoredCandidate> scored = sanPhamRepository.findAllWithPhienBans().stream()
+                .filter(sp -> matchesConstraints(sp, constraints))
+                .map(sp -> {
+                    String text = normalize(String.join(" ",
+                            Objects.toString(sp.getTenMay(), ""),
+                            sp.getThuongHieu() != null ? sp.getThuongHieu().getTenThuongHieu() : "",
+                            Objects.toString(sp.getMoTa(), ""),
+                            Objects.toString(sp.getChip(), ""),
+                            Objects.toString(sp.getCameraSau(), ""),
+                            Objects.toString(sp.getHeDieuHanh(), "")
+                    ));
+                    long matched = keywords.stream().filter(w -> containsPhrase(text, w)).count();
+                    return new ScoredCandidate(sp, (double) matched / keywords.size(), "Kết quả tìm kiếm từ dữ liệu PhoneNest");
+                })
+                .filter(c -> c.finalScore > 0)
+                .toList();
+
+        return toDtoList(scored, limit, "KEYWORD_FALLBACK");
+    }
+
+    private List<SemanticSearchResultDto> toDtoList(List<ScoredCandidate> list, int limit, String mode) {
+        return list.stream()
+                .sorted(Comparator.comparingDouble(ScoredCandidate::finalScore).reversed())
+                .limit(limit)
                 .map(c -> new SemanticSearchResultDto(
                         SanPhamMapper.toDto(c.product),
                         Math.round(c.finalScore * 1000.0) / 1000.0,
                         c.explanation,
-                        extractKeyHighlights(c.product),
-                        "VECTOR_SEMANTIC"
+                        extractSpecs(c.product, false),
+                        mode
                 ))
                 .toList();
     }
 
     public Map<String, Object> getStatus() {
+        boolean available = isEmbeddingAvailable();
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("provider", "Ollama");
         status.put("model", embeddingModel.getModelName());
         status.put("baseUrl", embeddingModel.getBaseUrl());
         status.put("dimensions", embeddingModel.dimensions());
-        boolean available = embeddingModel.isAvailable();
         status.put("available", available);
-        status.put("indexedDocuments", vectorStore != null ? ((PhoneNestVectorStore) vectorStore).size() : 0);
-        status.put("mode", available ? "VECTOR_SEMANTIC" : "KEYWORD_FALLBACK");
-        if (!available) {
-            status.put("reason", "Không thể kết nối đến Ollama tại " + embeddingModel.getBaseUrl() + ". Đảm bảo dịch vụ 'ollama serve' đang chạy.");
+        status.put("initialized", initialized);
+
+        try {
+            ensureSyncTable();
+            Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM product_embedding_sync", Long.class);
+            status.put("indexedDocuments", count != null ? count : 0);
+        } catch (Exception e) {
+            status.put("indexedDocuments", 0);
         }
+
+        status.put("mode", available ? "VECTOR_SEMANTIC" : "KEYWORD_FALLBACK");
+        if (!available) status.put("reason", "Không thể kết nối Ollama tại " + embeddingModel.getBaseUrl());
         return status;
     }
 
@@ -224,134 +384,6 @@ public class SemanticSearchService {
         return embeddingModel != null && embeddingModel.isAvailable();
     }
 
-    private StructuredConstraints parseConstraints(String query) {
-        String lower = query.toLowerCase(Locale.ROOT);
-        StructuredConstraints sc = new StructuredConstraints();
-
-        // 1. Deterministic Brand detection
-        if (lower.contains("iphone") || lower.contains("apple")) {
-            sc.requiredBrand = "Apple";
-        } else if (lower.contains("samsung") || lower.contains("galaxy")) {
-            sc.requiredBrand = "Samsung";
-        } else if (lower.contains("xiaomi") || lower.contains("redmi") || lower.contains("poco")) {
-            sc.requiredBrand = "Xiaomi";
-        } else if (lower.contains("oppo")) {
-            sc.requiredBrand = "OPPO";
-        } else if (lower.contains("vivo")) {
-            sc.requiredBrand = "Vivo";
-        }
-
-        // 2. Deterministic Budget extraction
-        Matcher m = PATTERN_BUDGET.matcher(lower);
-        if (m.find()) {
-            try {
-                double val = Double.parseDouble(m.group(1).replace(',', '.'));
-                BigDecimal amount = BigDecimal.valueOf((long) (val * 1_000_000));
-                if (lower.contains("dưới") || lower.contains("tối đa") || lower.contains("không quá")) {
-                    sc.maxBudget = amount;
-                } else if (lower.contains("khoảng") || lower.contains("tầm") || lower.contains("tầm giá")) {
-                    sc.targetBudget = amount;
-                    sc.minBudget = amount.multiply(BigDecimal.valueOf(0.7));
-                    sc.maxBudget = amount.multiply(BigDecimal.valueOf(1.25));
-                } else {
-                    sc.targetBudget = amount;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        return sc;
-    }
-
-    private double evaluateConstraintFit(SanPham sp, StructuredConstraints sc) {
-        double score = 1.0;
-        BigDecimal price = sp.getGiaBan();
-
-        // Budget evaluation
-        if (sc.targetBudget != null && sc.targetBudget.compareTo(BigDecimal.ZERO) > 0) {
-            double ratio = price.doubleValue() / sc.targetBudget.doubleValue();
-            if (ratio >= 0.8 && ratio <= 1.2) {
-                score += 1.0;
-            } else if (ratio >= 0.6 && ratio <= 1.5) {
-                score += 0.5;
-            } else {
-                score -= 0.5;
-            }
-        } else if (sc.maxBudget != null) {
-            if (price.compareTo(sc.maxBudget) <= 0) {
-                score += 1.0;
-            } else {
-                score -= 1.0;
-            }
-        }
-
-        // Stock availability boost
-        if (sp.getSoLuongTon() > 0) {
-            score += 0.3;
-        }
-
-        return Math.max(score, 0.0);
-    }
-
-    /**
-     * Explains the match using ONLY factual retrieved specifications.
-     * NO artificial/fake justifications.
-     */
-    private String explainFit(SanPham sp, double vectorScore) {
-        List<String> specs = new ArrayList<>();
-        if (sp.getChip() != null && !sp.getChip().isBlank()) {
-            specs.add("Chip " + sp.getChip());
-        }
-        if (sp.getTanSoQuet() != null && sp.getTanSoQuet() > 60) {
-            specs.add("Màn hình " + sp.getTanSoQuet() + "Hz");
-        }
-        if (sp.getCameraSau() != null && !sp.getCameraSau().isBlank()) {
-            specs.add("Camera sau " + sp.getCameraSau());
-        }
-        if (sp.getPin() != null) {
-            specs.add("Pin " + sp.getPin() + "mAh");
-        }
-        if (sp.getCongSuatSac() != null && sp.getCongSuatSac() > 20) {
-            specs.add("Sạc nhanh " + sp.getCongSuatSac() + "W");
-        }
-        if (specs.isEmpty()) {
-            return "Độ tương đồng ngữ nghĩa: " + Math.round(vectorScore * 100) + "%";
-        }
-        return "Thông số kỹ thuật: " + String.join(", ", specs);
-    }
-
-    private List<String> extractKeyHighlights(SanPham sp) {
-        List<String> hl = new ArrayList<>();
-        if (sp.getChip() != null && !sp.getChip().isBlank()) hl.add("Chip " + sp.getChip());
-        if (sp.getCameraSau() != null && !sp.getCameraSau().isBlank()) hl.add("Camera " + sp.getCameraSau());
-        if (sp.getPin() != null) hl.add("Pin " + sp.getPin() + "mAh");
-        if (sp.getTanSoQuet() != null && sp.getTanSoQuet() >= 120) hl.add("Màn hình " + sp.getTanSoQuet() + "Hz");
-        return hl;
-    }
-
-    private List<SemanticSearchResultDto> fallbackSearch(String query, int limit) {
-        log.info("Thực hiện fallback keyword search cho query: '{}'", query);
-        return sanPhamRepository.findAll().stream()
-                .filter(s -> s.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
-                .filter(s -> s.getTenMay().toLowerCase().contains(query.toLowerCase())
-                        || (s.getThuongHieu() != null && s.getThuongHieu().getTenThuongHieu().toLowerCase().contains(query.toLowerCase())))
-                .limit(limit)
-                .map(s -> new SemanticSearchResultDto(
-                        SanPhamMapper.toDto(s),
-                        0.5,
-                        "Kết quả tìm kiếm phù hợp từ kho PhoneNest",
-                        extractKeyHighlights(s),
-                        "KEYWORD_FALLBACK"
-                ))
-                .toList();
-    }
-
-    private static class StructuredConstraints {
-        String requiredBrand;
-        BigDecimal targetBudget;
-        BigDecimal minBudget;
-        BigDecimal maxBudget;
-    }
-
-    private record ScoredCandidate(SanPham product, double finalScore, double vectorScore, String explanation) {}
+    private record Constraints(String requiredBrand, BigDecimal targetBudget, BigDecimal maxBudget) {}
+    private record ScoredCandidate(SanPham product, double finalScore, String explanation) {}
 }

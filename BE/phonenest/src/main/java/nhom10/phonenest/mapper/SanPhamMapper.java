@@ -27,6 +27,7 @@ public final class SanPhamMapper {
         // Chỉ variant đang kinh doanh mới được tính vào giá/tồn hiển thị.
         List<PhienBanSanPham> active = s.getPhienBans().stream()
                 .filter(x -> x.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH)
+                .filter(x -> x.getSoLuongTon() > 0)
                 .toList();
 
         PhienBanSanPham p = active.stream()
