@@ -68,6 +68,8 @@ cp application-local.properties.example application-local.properties   # KHÔNG 
 | `MOMO_*` | không | Chỉ cần khi thử thanh toán MoMo (IPN phải là URL HTTPS công khai) |
 | `APPROVAL_SEPARATION_OF_DUTIES` | không | `true` = Admin vừa mở khóa biến thể không được tự phê duyệt nó. Mặc định `false` (hiện mới có một Admin) |
 
+**Thử thanh toán MoMo sandbox.** Lấy `partnerCode`, `accessKey` và `secretKey` từ tài khoản merchant/test do MoMo cấp; không dùng khóa production và không gửi khóa vào chat hoặc commit vào Git. Điền các biến `MOMO_*` trong `application-local.properties.example` vào `application-local.properties`. Mặc định backend gọi endpoint sandbox; `MOMO_REDIRECT_URL` trỏ về FE, còn `MOMO_IPN_URL` phải là URL HTTPS công khai trỏ tới backend (localhost không nhận được IPN). Khi MoMo chuyển khách quay lại, FE hiển thị trạng thái chờ và tự kiểm tra IPN tối đa khoảng một phút; trạng thái thanh toán trong backend chỉ được xác nhận từ IPN có chữ ký hợp lệ, không dựa vào URL redirect.
+
 **Tài khoản database.** Không dùng `root` cho ứng dụng, test hay E2E. Dùng tài khoản chỉ có `SELECT, INSERT, UPDATE, DELETE`
 trên database của mình (xem `DB/admin/create_restricted_accounts_DRAFT.sql`). Toàn bộ test backend (334) và E2E (20) đã chạy
 được bằng tài khoản như vậy. Ứng dụng dùng mức cô lập `READ COMMITTED` (cấu hình sẵn): tính đúng đắn dựa vào khóa dòng
