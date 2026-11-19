@@ -66,7 +66,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 - `POST /api/chat` nhận thêm `visitorId` tùy chọn. Trợ lý dùng lượt xem/thêm giỏ và tìm kiếm gần đây (30 ngày, tối đa 100 sự kiện) để ưu tiên sản phẩm liên quan; lịch sử hội thoại không được ghi vào bảng tracking. Khách chưa có lịch sử vẫn nhận gợi ý hiện tại như cũ.
 - Với CSDL đang chạy, chỉ cần thực thi `DB/04_user_tracking.sql`; không cần xóa hoặc tạo lại dữ liệu.
 
-**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
+**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`, `POST /{ma}/momo`, `GET /{ma}/payment-status`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications`, `PUT /api/notifications/{ma}/read | read-all`
 
 **Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET `?q=&loc=&page=0&size=10`, trả về `content`, `totalElements`, `totalPages`; `GET /stats`, `GET /history`, `GET /{ma}/history`, `POST /{ma}/import`, `POST /batch-import` nhận `{ items: [{ sku, soLuong }], ghiChu }`, `PUT /{ma}/adjust`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
 
@@ -91,6 +91,12 @@ Bảng `HuyDonHang` (lý do, ghi chú, ngày hủy) nằm sẵn trong `01_schema
 - **Mua ngay**: trang chi tiết sản phẩm (chỉ hiện khi đã đăng nhập Customer) chuyển sang `/checkout?mua={maSanPham}&sl={soLuong}`. `GET /checkout/preview` và `POST /orders` nhận thêm `maSanPham`, `soLuong` (tùy chọn); khi có thì chỉ đặt sản phẩm đó, không đọc và không xóa giỏ hàng.
 - `GET /api/customer/checkout/preview?maDiaChi=...` trả về `items` (dòng hàng), tạm tính, phí giao hàng, thời gian giao dự kiến và danh sách voucher đang hiệu lực (kèm `apDungDuoc`, `lyDo` nếu chưa dùng được, `soTienGiam`). FE tự chọn sẵn voucher giảm nhiều nhất cho mỗi loại, khách có thể đổi hoặc bỏ chọn.
 - `POST /api/customer/orders` nhận thêm `maKmVanChuyen`; BE kiểm tra lại toàn bộ điều kiện và lưu `giamGia`, `phiVanChuyen`, `giamPhiVanChuyen` vào đơn.
+
+## Thanh toán MoMo
+- Chọn `phuongThucTt: "VI_DIEN_TU"` khi gọi `POST /api/customer/orders` để tạo đơn. Sau đó gọi `POST /api/customer/orders/{ma}/momo`; response gồm `payUrl` để chuyển khách sang cổng MoMo.
+- `GET /api/customer/orders/{ma}/payment-status` trả về trạng thái giao dịch của đơn. FE có thể gọi lại endpoint này khi khách được chuyển về từ MoMo.
+- MoMo gọi `POST /api/payment/momo/ipn` (không yêu cầu JWT). Backend chỉ cập nhật trạng thái sau khi xác thực chữ ký và đối chiếu số tiền với đơn; kết quả redirect trên trình duyệt không phải xác nhận thanh toán.
+- Cấu hình sandbox qua `MOMO_ENDPOINT`, `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL` và `MOMO_IPN_URL`. Không đưa khóa vào FE hoặc Git. IPN phải là HTTPS công khai có thể truy cập từ MoMo; xem [hướng dẫn cấu hình local](./docs/HUONG_DAN_CAU_HINH_LOCAL.md).
 
 ## Địa chỉ giao hàng (tỉnh / phường sau sáp nhập)
 - Danh mục theo Nghị quyết 202/2025/QH15: 34 tỉnh/thành và 3.321 phường/xã/đặc khu, nằm trong `02_data.sql` (bảng `TinhThanh`, `PhuongXa`).
