@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ProductImage from '../components/ProductImage';
 import StatusBadge from '../components/StatusBadge';
@@ -80,9 +80,12 @@ function CartQuantity({ soLuong, max, disabled, onChange }) {
 }
 
 export default function CartPage() {
-  const { items, total, count, setQuantity, remove, clear } = useCart();
+  const { items, count, setQuantity, remove, clear } = useCart();
   const { isCustomer } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
+  // Chọn sản phẩm để thanh toán: lưu các dòng KHÔNG được chọn, dòng mới thêm mặc định được chọn.
+  const [boChon, setBoChon] = useState(() => new Set());
 
   const run = async (action, message) => {
     try {
@@ -93,17 +96,8 @@ export default function CartPage() {
     }
   };
 
-  const toWishlist = (item) => {
-    const sp = item.sanPham;
-    return run(async () => {
-      await wishlistService.add(sp.maSanPham);
-      await remove(item);
-    }, 'Đã chuyển sang danh sách yêu thích');
-  };
-
   const hasDiscontinued = hasDiscontinuedItems(items);
   const hasUnapproved = hasUnapprovedItems(items);
-  const hasBlockedOrDiscontinued = hasDiscontinued || hasUnapproved;
   // Dòng còn mua được nhưng số lượng trong giỏ đã vượt tồn kho hiện tại (tồn giảm sau khi thêm vào giỏ).
   const overStockItems = items.filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i)
     && i.soLuong > Number(i.phienBan?.soLuongTon ?? 0));
@@ -113,11 +107,39 @@ export default function CartPage() {
     .filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i))
     .reduce((sum, i) => sum + i.soLuong, 0);
 
+  const keyOf = (i) => i.phienBan?.maPhienBan || i.sanPham?.maSanPham;
+  const isLockedItem = (i) => isItemDiscontinued(i) || isItemPendingReview(i) || isItemBlocked(i);
+  const chonDuoc = items.filter((i) => !isLockedItem(i));
+  const daChon = chonDuoc.filter((i) => !boChon.has(keyOf(i)));
+  const chuaChon = items.filter((i) => !daChon.includes(i));
+  const tongDaChon = daChon.reduce((s, i) => s + Number(i.phienBan?.giaBan ?? 0) * i.soLuong, 0);
+  const soLuongDaChon = daChon.reduce((s, i) => s + i.soLuong, 0);
+  const chonTatCa = chonDuoc.length > 0 && daChon.length === chonDuoc.length;
+  const toanBoGio = daChon.length === items.length;
+  const doiChon = (i) => setBoChon((prev) => {
+    const next = new Set(prev);
+    const k = keyOf(i);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
+  const doiChonTatCa = () => setBoChon(chonTatCa ? new Set(chonDuoc.map(keyOf)) : new Set());
+  const vuotTonDaChon = daChon.filter((i) => i.soLuong > Number(i.phienBan?.soLuongTon ?? 0));
+  // Chuyển các sản phẩm chưa chọn sang Yêu thích (thay cho nút "Để sau" trước đây).
+  const luuChuaChon = () => run(async () => {
+    for (const item of chuaChon.filter((i) => !isLockedItem(i))) {
+      await wishlistService.add(item.sanPham.maSanPham);
+      await remove(item);
+    }
+    setBoChon(new Set());
+  }, 'Đã chuyển sản phẩm chưa chọn sang Yêu thích');
+
   if (items.length === 0) {
     return (
-      <p className="muted">
-        Giỏ hàng trống. <Link to="/">Tiếp tục mua sắm</Link>
-      </p>
+      <div className="empty-state">
+        <h2>Giỏ hàng trống</h2>
+        <p className="muted">Chọn điện thoại bạn thích rồi bấm “Thêm vào giỏ”, sản phẩm sẽ hiện ở đây.</p>
+        <Link to="/" className="btn btn-primary">Tiếp tục mua sắm</Link>
+      </div>
     );
   }
 
@@ -128,21 +150,37 @@ export default function CartPage() {
       </h2>
 
       {hasUnapproved && (
-        <div className="alert alert-warning unapproved-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="alert alert-warning unapproved-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: 'var(--warn-soft)', color: 'var(--warn)', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="alert-triangle" size={20} />
           <span><strong>{DISCONTINUED_MESSAGES.APPROVAL_CART_BANNER}</strong></span>
         </div>
       )}
 
       {!hasUnapproved && hasDiscontinued && (
-        <div className="alert alert-warning discontinued-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="alert alert-warning discontinued-cart-banner" style={{ margin: '0 0 16px 0', padding: '12px 16px', background: 'var(--warn-soft)', color: 'var(--warn)', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="alert-triangle" size={20} />
           <span><strong>{DISCONTINUED_MESSAGES.CART_BANNER}</strong></span>
         </div>
       )}
 
       <div className="cart-layout">
-        <div className="section">
+        <div className="section cart-list">
+          <div className="cart-list-head">
+            <label className="cart-check">
+              <input type="checkbox" checked={chonTatCa} onChange={doiChonTatCa} disabled={chonDuoc.length === 0} />
+              <span>Chọn tất cả ({chonDuoc.length})</span>
+            </label>
+            <button
+              type="button"
+              className="btn btn-sm btn-danger"
+              onClick={() =>
+                window.confirm('Xóa toàn bộ giỏ hàng?') &&
+                run(clear, 'Đã xóa toàn bộ giỏ hàng')
+              }
+            >
+              <Icon name="trash" size={15} /> Xóa tất cả
+            </button>
+          </div>
           {items.map((item) => {
             const { sanPham: sp, phienBan: pb, soLuong } = item;
             const isDiscontinued = isItemDiscontinued(item);
@@ -154,7 +192,16 @@ export default function CartPage() {
             const subtotal = price * soLuong;
 
             return (
-              <div key={pb?.maPhienBan || sp?.maSanPham} className="cart-item">
+              <div key={pb?.maPhienBan || sp?.maSanPham} className={`cart-item ${!isLocked && !boChon.has(keyOf(item)) ? 'is-selected' : ''}`}>
+                <label className="cart-check" title={isLocked ? 'Sản phẩm này không thể thanh toán' : 'Chọn để thanh toán'}>
+                  <input
+                    type="checkbox"
+                    checked={!isLocked && !boChon.has(keyOf(item))}
+                    disabled={isLocked}
+                    onChange={() => doiChon(item)}
+                    aria-label={`Chọn ${sp.tenMay} để thanh toán`}
+                  />
+                </label>
                 <Link to={`/products/${sp.maSanPham}`}>
                   <ProductImage src={anhTheoPhienBan(sp, pb)} alt={sp.tenMay} />
                 </Link>
@@ -201,7 +248,7 @@ export default function CartPage() {
                   )}
 
                   {isPending && (
-                    <small className="error" style={{ display: 'block', marginTop: '4px', fontWeight: 500, color: '#b45309' }}>
+                    <small className="error" style={{ display: 'block', marginTop: '4px', fontWeight: 500, color: 'var(--warn)' }}>
                       Sản phẩm này đang tạm ngừng nhận đơn và không thể thanh toán. Vui lòng xóa khỏi giỏ hàng.
                     </small>
                   )}
@@ -232,25 +279,16 @@ export default function CartPage() {
                       onChange={(next) => run(() => setQuantity(item, next))}
                     />
 
-                    {isCustomer && !isLocked && (
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => toWishlist(item)}
-                      >
-                        Để sau
-                      </button>
-                    )}
 
                     <button
                       type="button"
-                      className="link-btn"
+                      className="btn btn-sm btn-danger cart-remove"
                       onClick={() => run(async () => {
                         await remove(item);
                         trackingService.trackRemoveFromCart(sp?.maSanPham, pb?.maPhienBan);
                       })}
                     >
-                      Xóa
+                      <Icon name="trash" size={15} /> Xóa
                     </button>
                   </div>
                 </div>
@@ -264,47 +302,61 @@ export default function CartPage() {
         <aside className="side">
           <div className="summary">
             <div className="row between">
-              <span>Tạm tính ({payableCount} sản phẩm)</span>
-              <span>{formatPrice(total)}</span>
+              <span>Đã chọn {soLuongDaChon} / {payableCount} sản phẩm</span>
+              <span>{formatPrice(tongDaChon)}</span>
             </div>
 
             <div className="row between total">
-              <b>Tổng cộng</b>
-              <b className="price">{formatPrice(total)}</b>
+              <b>Tổng thanh toán</b>
+              <b className="price">{formatPrice(tongDaChon)}</b>
             </div>
 
             <p className="muted">
               Nhập mã khuyến mãi và chọn địa chỉ ở bước thanh toán.
             </p>
 
-            {hasBlockedOrDiscontinued ? (
+            {daChon.length === 0 ? (
+              <button type="button" className="btn btn-primary btn-lg" disabled>
+                Chọn sản phẩm để thanh toán
+              </button>
+            ) : toanBoGio ? (
+              hasOverStock ? (
+                <>
+                  <button type="button" className="btn btn-primary btn-lg" disabled>
+                    Thanh toán
+                  </button>
+                  <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
+                    Có {overStockItems.length} sản phẩm vượt số lượng tồn kho. Vui lòng giảm số lượng trước khi thanh toán.
+                  </small>
+                </>
+              ) : (
+                <Link to="/checkout" className="btn btn-primary btn-lg">
+                  {isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}
+                </Link>
+              )
+            ) : vuotTonDaChon.length > 0 ? (
+              <>
+                <button type="button" className="btn btn-primary btn-lg" disabled>Thanh toán {daChon.length} sản phẩm đã chọn</button>
+                <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
+                  Có {vuotTonDaChon.length} sản phẩm đã chọn vượt tồn kho. Vui lòng giảm số lượng.
+                </small>
+              </>
+            ) : (
               <>
                 <button
                   type="button"
                   className="btn btn-primary btn-lg"
-                  disabled
-                  title={hasUnapproved ? DISCONTINUED_MESSAGES.APPROVAL_CART_BANNER : DISCONTINUED_MESSAGES.CART_BANNER}
-                  style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                  onClick={() => navigate('/checkout', { state: { chon: daChon.map((i) => i.phienBan.maPhienBan) } })}
                 >
-                  Thanh toán
+                  {isCustomer ? `Thanh toán ${daChon.length} sản phẩm đã chọn` : 'Đăng nhập để thanh toán'}
                 </button>
-                <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
-                  {DISCONTINUED_MESSAGES.CHECKOUT_ACTION_DISABLED}
-                </small>
+                <small className="muted cart-select-note">Sản phẩm chưa chọn vẫn được giữ trong giỏ hàng.</small>
+                {isCustomer && chuaChon.some((i) => !isLockedItem(i)) && (
+                  <button type="button" className="btn btn-ghost btn-sm cart-later" onClick={luuChuaChon}>
+                    <Icon name="heart" size={15} /> Chuyển sản phẩm chưa chọn sang Yêu thích
+                  </button>
+                )}
               </>
-            ) : hasOverStock ? (
-              <>
-                <button type="button" className="btn btn-primary btn-lg" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-                  Thanh toán
-                </button>
-                <small className="error" style={{ display: 'block', marginTop: '8px', textAlign: 'center' }}>
-                  Có {overStockItems.length} sản phẩm vượt số lượng tồn kho. Vui lòng giảm số lượng trước khi thanh toán.
-                </small>
-              </>
-            ) : (
-              <Link to="/checkout" className="btn btn-primary btn-lg">
-                {isCustomer ? 'Thanh toán' : 'Đăng nhập để thanh toán'}
-              </Link>
             )}
           </div>
 
@@ -314,17 +366,6 @@ export default function CartPage() {
               sau khi bạn đăng nhập.
             </p>
           )}
-
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={() =>
-              window.confirm('Xóa toàn bộ giỏ hàng?') &&
-              run(clear, 'Đã xóa toàn bộ giỏ hàng')
-            }
-          >
-            Xóa tất cả
-          </button>
         </aside>
       </div>
     </>

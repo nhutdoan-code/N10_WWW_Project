@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import CategoryTree from '../components/CategoryTree';
-import HeroSlider from '../components/HeroSlider';
+import HeroStage from '../components/HeroStage';
 import Icon from '../components/Icon';
 import ProductCard from '../components/ProductCard';
 import ProductImage from '../components/ProductImage';
 import ProductFilters from '../components/ProductFilters';
-import { PRICE_RANGES, SORT_OPTIONS } from '../config/constants';
+import { PRICE_RANGES, RATING_OPTIONS, SORT_OPTIONS } from '../config/constants';
 import useFetch from '../hooks/useFetch';
 import { productService } from '../service/productService';
 import { productStatus } from '../utils/stock';
@@ -133,34 +133,67 @@ export default function HomePage() {
         ? [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
         : [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 
-  const slide = (id, tone, tag, title, text, cta, to, p) => ({
-    id, tone, tag, title, text, cta, to, image: p?.anhChinh, price: p && formatGiaCongBo(p.giaBan),
-  });
+  // Các bộ lọc đang áp dụng, hiển thị dạng thẻ để người dùng gỡ nhanh từng điều kiện.
+  const boLocDangDung = [
+    maTh && { key: 'hang', label: brands?.find((b) => b.maThuongHieu === maTh)?.tenThuongHieu || 'Hãng' },
+    ram && { key: 'ram', label: `RAM ${ram} GB` },
+    boNho && { key: 'bonho', label: Number(boNho) >= 1024 ? `${Number(boNho) / 1024} TB` : `${boNho} GB` },
+    rating && { key: 'sao', label: RATING_OPTIONS.find((r) => r.value === rating)?.label || `Từ ${rating} sao` },
+    price > 0 && { key: 'gia', label: range?.label },
+    chiConHang && { key: 'conhang', label: 'Còn hàng' },
+  ].filter(Boolean);
+
+  // Banner: mỗi banner một sản phẩm khác nhau (tránh lặp khi một máy đứng đầu nhiều danh sách).
+  const daChon = new Set();
+  const chonKhac = (...ds) => {
+    for (const list of ds) {
+      const p = list.find((x) => !daChon.has(x.maSanPham));
+      if (p) { daChon.add(p.maSanPham); return p; }
+    }
+    return null;
+  };
+  const spFlagship = chonKhac(danhGia);
+  const spBanChay = chonKhac(conHang);
+  const spGiaTot = chonKhac(giaTot);
   const slides = [
-    slide('flagship', 'blue', 'Flagship nổi bật', danhGia[0]?.tenMay || 'Điện thoại chính hãng', 'Hiệu năng đỉnh cao, camera chuyên nghiệp. Xem chi tiết và so sánh cấu hình ngay.', 'Xem chi tiết', danhGia[0] ? `/products/${danhGia[0].maSanPham}` : '/', danhGia[0]),
-    slide('hot', 'violet', 'Bán chạy nhất tuần', conHang[0]?.tenMay || 'Mẫu máy được chọn nhiều', 'Được khách hàng PhoneNest chọn mua nhiều nhất, sẵn hàng và giao nhanh.', 'Mua ngay', conHang[0] ? `/products/${conHang[0].maSanPham}` : '/', conHang[0]),
-    slide('cheap', 'orange', 'Giá tốt dưới 10 triệu', giaTot[0]?.tenMay || 'Giá tốt mỗi ngày', 'Cấu hình đủ dùng, pin bền, giá mềm cho học sinh sinh viên và gia đình.', 'Xem ngay', '/?gia=2', giaTot[0]),
-    slide('promo', 'teal', 'Ưu đãi khách hàng mới', 'Voucher tự động áp dụng khi thanh toán', 'Đăng ký tài khoản để nhận ưu đãi: hệ thống tự chọn mã giảm giá và mã vận chuyển tốt nhất cho bạn.', 'Đăng ký ngay', '/register', null),
-  ];
+    spFlagship && { id: 'flagship', tag: 'Flagship nổi bật', product: spFlagship, to: `/products/${spFlagship.maSanPham}`, cta: 'Mua' },
+    spBanChay && { id: 'hot', tag: 'Bán chạy nhất tuần', product: spBanChay, to: `/products/${spBanChay.maSanPham}`, cta: 'Mua' },
+    spGiaTot && { id: 'cheap', tag: 'Giá tốt dưới 10 triệu', product: spGiaTot, to: `/products/${spGiaTot.maSanPham}`, cta: 'Mua' },
+    {
+      id: 'promo',
+      tag: 'Ưu đãi khách hàng mới',
+      title: 'Giảm 10% cho đơn đầu tiên',
+      text: 'Đăng ký tài khoản, hệ thống tự chọn mã giảm giá và mã vận chuyển tốt nhất khi bạn thanh toán.',
+      note: 'Mã KHACHMOI10 tự áp dụng',
+      to: '/register',
+      cta: 'Đăng ký',
+    },
+  ].filter(Boolean);
+
 
   return (
     <>
       {macDinh && (
         <>
-          <section className="hero-grid">
-            <HeroSlider slides={slides} />
-            <aside className="hero-side">
-              <h3>Bán chạy nhất</h3>
-              {conHang.slice(0, 4).map((p, i) => (
-                <Link key={p.maSanPham} to={`/products/${p.maSanPham}`} className="rank-item">
-                  <b className="rank-no">{i + 1}</b>
-                  <ProductImage src={p.anhChinh} alt="" />
-                  <span><em>{p.tenMay}</em><strong>{formatGiaCongBo(p.giaBan)}</strong></span>
-                </Link>
-              ))}
-              <button className="rank-more" onClick={() => document.getElementById('tat-ca')?.scrollIntoView({ behavior: 'smooth' })}>Xem tất cả sản phẩm</button>
-            </aside>
-          </section>
+          <HeroStage slides={slides} />
+
+          {conHang.length > 0 && (
+            <section className="top-sellers" aria-label="Bán chạy nhất">
+              <div className="top-sellers-head">
+                <h3>Bán chạy nhất</h3>
+                <button className="rank-more" onClick={() => document.getElementById('tat-ca')?.scrollIntoView({ behavior: 'smooth' })}>Xem tất cả sản phẩm</button>
+              </div>
+              <div className="top-sellers-list">
+                {conHang.slice(0, 4).map((p, i) => (
+                  <Link key={p.maSanPham} to={`/products/${p.maSanPham}`} className="rank-item">
+                    <b className="rank-no">{i + 1}</b>
+                    <ProductImage src={p.anhChinh} alt="" />
+                    <span><em>{p.tenMay}</em><strong>{formatGiaCongBo(p.giaBan)}</strong></span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="services">
             {SERVICES.map((s) => (
@@ -192,29 +225,27 @@ export default function HomePage() {
 
       <section className="block" id="tat-ca">
         <div className="block-head">
-          <h2>{q ? `Kết quả cho "${q}"` : maLoai ? categories?.find((c) => c.maLoai === maLoai)?.tenLoai || 'Sản phẩm' : 'Tất cả điện thoại'}</h2>
+          <h2>{q ? `Kết quả cho "${q}"` : maLoai ? categories?.find((c) => c.maLoai === maLoai)?.tenLoai || 'Sản phẩm' : maTh ? `Điện thoại ${brands?.find((b) => b.maThuongHieu === maTh)?.tenThuongHieu || ''}`.trim() : 'Tất cả điện thoại'}</h2>
           <span className="count">{products ? <><b>{products.length}</b> sản phẩm</> : 'Đang tải...'}</span>
         </div>
         <div className="shop">
           {categories && (
-              <aside className="card">
-                {categories && (
-                    <>
-                      <h3>Danh mục</h3>
-                      <CategoryTree categories={filteredCategories} value={maLoai} onChange={(v) => setFilter('loai', v)}/>
-                    </>
-                )}
+              <aside className="card shop-filters" aria-label="Bộ lọc và danh mục">
                 <ProductFilters
                     brands={brands || []}
                     values={{hang: maTh, ram, bonho: boNho, conhang: chiConHang, sao: rating}}
                     onChange={setFilter}
                     onReset={xoaLoc}
                 />
+                <div className="shop-categories">
+                  <h3>Danh mục</h3>
+                  <CategoryTree categories={filteredCategories} value={maLoai} onChange={(v) => setFilter('loai', v)}/>
+                </div>
               </aside>
           )}
           <div>
             <div className="toolbar">
-              <div className="chips">
+              <div className="chips" role="group" aria-label="Mức giá">
                 {PRICE_RANGES.map((r, i) => (
                     <button key={r.label} className={price === i ? 'chip active' : 'chip'}
                             onClick={() => setFilter('gia', i || '')}>{r.label}</button>
@@ -226,6 +257,16 @@ export default function HomePage() {
                 ))}
               </select>
             </div>
+            {boLocDangDung.length > 0 && (
+              <div className="active-filters" aria-label="Bộ lọc đang áp dụng">
+                {boLocDangDung.map((f) => (
+                  <button type="button" key={f.key} className="active-filter" onClick={() => setFilter(f.key, '')} aria-label={`Bỏ lọc ${f.label}`}>
+                    {f.label}<span aria-hidden="true">×</span>
+                  </button>
+                ))}
+                <button type="button" className="link-btn" onClick={xoaLoc}>Xóa tất cả</button>
+              </div>
+            )}
             {error && <p className="error">{error}</p>}
             {products?.length === 0 && <p className="muted">Không có sản phẩm phù hợp. Thử đổi mức giá hoặc danh mục khác.</p>}
             <div className="grid">

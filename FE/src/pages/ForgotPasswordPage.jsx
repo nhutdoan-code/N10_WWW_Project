@@ -46,9 +46,9 @@ export default function ForgotPasswordPage() {
     padding: '12px',
     marginTop: '8px',
     marginBottom: '16px',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '16px',
+    border: '1px solid var(--line-strong)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '15px',
   };
 
   const passwordWrapperStyle = {
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
     padding: '4px',
     border: 'none',
     background: 'transparent',
-    color: '#666',
+    color: 'var(--muted)',
     cursor: 'pointer',
   };
 
@@ -172,7 +172,7 @@ export default function ForgotPasswordPage() {
                         height: '5px',
                         flex: 1,
                         borderRadius: '5px',
-                        background: step >= n ? '#1769aa' : '#e5e7eb',
+                        background: step >= n ? 'var(--brand)' : 'var(--line)',
                       }}
                   />
               ))}

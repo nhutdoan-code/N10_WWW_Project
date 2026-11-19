@@ -73,40 +73,6 @@ export default function LoginPage() {
 
     return (
         <>
-            <style>{`
-        .login-password-field {
-          position: relative;
-        }
-
-        .login-password-field input {
-          padding-right: 46px !important;
-          box-sizing: border-box;
-        }
-
-        .login-password-toggle {
-          position: absolute;
-          right: 10px;
-          top: 37px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 4px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          color: #6b7280;
-          cursor: pointer;
-        }
-
-        .login-password-toggle:hover {
-          color: #1769aa;
-        }
-
-        .login-password-toggle:focus-visible {
-          outline: 2px solid #1769aa;
-          outline-offset: 2px;
-        }
-      `}</style>
 
             <form className="form auth" onSubmit={submit}>
                 <h2>Đăng nhập</h2>

@@ -9,4 +9,6 @@ export const productService = {
   categories: () => api.get('/categories'),
   brands: () => api.get('/brands'),
   search: (q) => api.get('/search', { params: { q } }),
+  // Từ khóa tìm nhiều và sản phẩm xem nhiều (30 ngày) từ dữ liệu hành vi.
+  popular: (limit = 12) => api.get('/search/popular', { params: { limit } }),
 };

@@ -180,7 +180,7 @@ export default function ProductDetailPage() {
       <b>{sp.tenMay}</b>
     </nav>
     {isNgungKD && (
-      <div className="alert alert-warning discontinued-product-banner" style={{ margin: '16px 0', padding: '14px 18px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="alert alert-warning discontinued-product-banner" style={{ margin: '16px 0', padding: '14px 18px', background: 'var(--warn-soft)', color: 'var(--warn)', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="alert-triangle" size={22} />
           <span><strong>{DISCONTINUED_MESSAGES.DETAIL_BANNER}</strong></span>
@@ -190,7 +190,7 @@ export default function ProductDetailPage() {
     )}
     <div className="detail">
       <div>
-        <ProductImage className="detail-img" src={anhHienThi} alt={sp.tenMay} />
+        <ProductImage key={anhHienThi} className="detail-img" src={anhHienThi} alt={sp.tenMay} />
         <div className="thumbs">
           {dsAnh.map((anh) => {
             const url = anh.duongDan;
@@ -227,21 +227,21 @@ export default function ProductDetailPage() {
         <div className="price big">
           {isPending ? (
             <div>
-              <span style={{ color: '#b45309', fontWeight: 700, fontSize: '1.5rem' }}>Giá đang cập nhật</span>
-              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: '#8a5a00', fontWeight: 600 }}>
+              <span style={{ color: 'var(--warn)', fontWeight: 700, fontSize: '1.5rem' }}>Giá đang cập nhật</span>
+              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: 'var(--warn)', fontWeight: 600 }}>
                 (Tạm ngừng nhận đơn)
               </span>
             </div>
           ) : isBlocked ? (
             <div>
-              <span style={{ color: '#b91c1c', fontWeight: 700, fontSize: '1.5rem' }}>Không khả dụng</span>
-              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: '#a1241c', fontWeight: 600 }}>
+              <span style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '1.5rem' }}>Không khả dụng</span>
+              <span style={{ marginLeft: '12px', fontSize: '0.95rem', color: 'var(--danger)', fontWeight: 600 }}>
                 (Bị khóa bán)
               </span>
             </div>
           ) : giaCongBo == null ? (
             <div>
-              <span style={{ color: '#b45309', fontWeight: 700, fontSize: '1.5rem' }}>
+              <span style={{ color: 'var(--warn)', fontWeight: 700, fontSize: '1.5rem' }}>
                 {isNgungKD || isVarNgungKD ? 'Ngừng kinh doanh' : 'Giá đang cập nhật'}
               </span>
             </div>
@@ -249,12 +249,12 @@ export default function ProductDetailPage() {
             <>
               {formatPrice(giaBan)}
               {isNgungKD ? (
-                <span style={{ marginLeft: "12px", fontSize: "0.9rem", color: "#a1241c", fontWeight: 600 }}>
+                <span style={{ marginLeft: "12px", fontSize: "0.9rem", color: "var(--danger)", fontWeight: 600 }}>
                   {DISCONTINUED_MESSAGES.PRICE_NOTE}
                 </span>
               ) : (
                 phienBan?.giaNiemYet && Number(phienBan.giaNiemYet) > giaBan ? (
-                  <span style={{ marginLeft: "12px", textDecoration: "line-through", color: "#666" }}>
+                  <span style={{ marginLeft: "12px", textDecoration: "line-through", color: "var(--muted)", fontSize: "1.05rem", fontWeight: 500 }}>
                     {formatPrice(phienBan.giaNiemYet)}
                   </span>
                 ) : null
@@ -349,12 +349,12 @@ export default function ProductDetailPage() {
           ) : isPending ? (
             <>
               <StatusBadge status="PENDING_REVIEW" />
-              <span className="muted" style={{ marginLeft: '8px', color: '#8a5a00' }}>Tạm ngừng nhận đơn</span>
+              <span className="muted" style={{ marginLeft: '8px', color: 'var(--warn)' }}>Tạm ngừng nhận đơn</span>
             </>
           ) : isBlocked ? (
             <>
               <StatusBadge status="BLOCKED" />
-              <span className="muted" style={{ marginLeft: '8px', color: '#a1241c' }}>Không khả dụng</span>
+              <span className="muted" style={{ marginLeft: '8px', color: 'var(--danger)' }}>Không khả dụng</span>
             </>
           ) : (
             <>

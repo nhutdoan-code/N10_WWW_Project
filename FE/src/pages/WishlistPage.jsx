@@ -20,7 +20,13 @@ export default function WishlistPage() {
 
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error">{error}</p>;
-  if (products.length === 0) return <p className="muted">Chưa có sản phẩm yêu thích. <Link to="/">Xem sản phẩm</Link></p>;
+  if (products.length === 0) return (
+    <div className="empty-state">
+      <h2>Chưa có sản phẩm yêu thích</h2>
+      <p className="muted">Bấm “Yêu thích” ở trang chi tiết sản phẩm để lưu lại và xem sau.</p>
+      <Link to="/" className="btn btn-primary">Xem sản phẩm</Link>
+    </div>
+  );
 
   return (
     <>

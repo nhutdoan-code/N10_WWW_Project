@@ -126,7 +126,7 @@ export default function ReturnsPage() {
 
   return (
     <div className="checkout after-sales-page">
-      <h2>Trung tâm hậu mãi</h2>
+      <h2>Đổi trả &amp; bảo hành</h2>
       <p className="muted">Gửi yêu cầu đổi trả, bảo hành, khiếu nại và theo dõi kết quả xử lý ở cùng một nơi.</p>
 
       <section className="card after-sales-section">

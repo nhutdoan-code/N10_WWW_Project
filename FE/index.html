@@ -4,14 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
-    <meta name="theme-color" content="#0B1B3A" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      // Áp dụng giao diện sáng/tối trước khi React chạy để tránh nháy màn hình.
+      (function () {
+        var theme = 'light';
+        try {
+          var saved = localStorage.getItem('phonenest-theme');
+          if (saved === 'light' || saved === 'dark') theme = saved;
+          else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <title>PhoneNest - Điện thoại chính hãng</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Bộ lọc tách nền trắng của ảnh sản phẩm: vùng càng gần trắng càng trong suốt. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <filter id="pn-knockout" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -2.6 -2.6 -2.6 0 7.8" result="tach" />
+        <feComposite in="tach" in2="SourceGraphic" operator="in" />
+      </filter>
+    </svg>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

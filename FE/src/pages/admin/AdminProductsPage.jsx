@@ -118,8 +118,8 @@ export default function AdminProductsPage() {
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%',
-                background: '#e2e8f0',
-                color: '#64748b',
+                background: 'var(--surface-3)',
+                color: 'var(--muted)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 cursor: 'help',
@@ -203,7 +203,7 @@ export default function AdminProductsPage() {
           })}
           {!loading && products.length === 0 && (
             <tr>
-              <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+              <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
                 Không tìm thấy sản phẩm nào phù hợp.
               </td>
             </tr>
@@ -253,7 +253,7 @@ export default function AdminProductsPage() {
 
               <div
                 style={{
-                  background: '#f8f9fa',
+                  background: 'var(--surface-2)',
                   padding: '12px 16px',
                   borderRadius: '8px',
                   marginBottom: '16px',
@@ -270,7 +270,7 @@ export default function AdminProductsPage() {
                 </div>
                 <div className="row between" style={{ marginBottom: '6px' }}>
                   <span>Đơn hàng đang xử lý:</span>
-                  <b style={{ color: (impactData?.activeOrdersCount || 0) > 0 ? '#b91c1c' : '#15803d' }}>
+                  <b style={{ color: (impactData?.activeOrdersCount || 0) > 0 ? 'var(--danger)' : 'var(--ok)' }}>
                     {impactData?.activeOrdersCount ?? 0}
                   </b>
                 </div>
@@ -283,11 +283,11 @@ export default function AdminProductsPage() {
               {(impactData?.activeOrdersCount || 0) > 0 ? (
                 <div
                   style={{
-                    background: '#fef2f2',
+                    background: 'var(--danger-soft)',
                     border: '1px solid #f87171',
                     borderRadius: '8px',
                     padding: '10px 14px',
-                    color: '#991b1b',
+                    color: 'var(--danger)',
                     fontSize: '0.85rem',
                     marginBottom: '16px',
                   }}
@@ -340,13 +340,13 @@ export default function AdminProductsPage() {
             </p>
             <div
               style={{
-                background: '#f8fafc',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--line)',
                 borderRadius: '8px',
                 padding: '10px 14px',
                 marginBottom: '20px',
                 fontSize: '0.86rem',
-                color: '#475569',
+                color: 'var(--muted)',
               }}
             >
               💡 <b>Lưu ý:</b> Chỉ nên đồng bộ lại khi kết quả tư vấn chưa phản ánh đúng dữ liệu sản phẩm hiện tại.

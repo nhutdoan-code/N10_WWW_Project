@@ -31,13 +31,13 @@ const PRESETS = [
 ];
 
 const STATUS_COLORS = {
-  CHO_XAC_NHAN: '#eda100',
-  DA_XAC_NHAN: '#2a78d6',
-  DANG_CHUAN_BI: '#6250d6',
-  DANG_GIAO: '#eb6834',
-  CHO_KHACH_XAC_NHAN: '#2a9d8f',
-  DA_GIAO: '#1baf7a',
-  DA_HUY: '#e34948',
+  CHO_XAC_NHAN: '#e2ac35',
+  DA_XAC_NHAN: '#5fa884',
+  DANG_CHUAN_BI: '#8f9a94',
+  DANG_GIAO: '#b8862a',
+  CHO_KHACH_XAC_NHAN: '#3e6b59',
+  DA_GIAO: '#2f7a5a',
+  DA_HUY: '#c0392b',
 };
 
 const STATUS_LABELS = {

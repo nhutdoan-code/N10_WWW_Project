@@ -95,40 +95,6 @@ export default function RegisterPage() {
 
     return (
         <>
-            <style>{`
-        .register-password-field {
-          position: relative;
-        }
-
-        .register-password-field input {
-          padding-right: 46px !important;
-          box-sizing: border-box;
-        }
-
-        .register-password-toggle {
-          position: absolute;
-          right: 10px;
-          top: 37px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 4px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          color: #6b7280;
-          cursor: pointer;
-        }
-
-        .register-password-toggle:hover {
-          color: #1769aa;
-        }
-
-        .register-password-toggle:focus-visible {
-          outline: 2px solid #1769aa;
-          outline-offset: 2px;
-        }
-      `}</style>
 
             <form className="form auth" onSubmit={submit}>
                 <h2>Đăng ký tài khoản</h2>

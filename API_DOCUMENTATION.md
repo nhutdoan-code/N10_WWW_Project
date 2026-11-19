@@ -113,3 +113,24 @@ Mỗi đánh giá gắn với một dòng sản phẩm của một đơn hàng c
 5. Còn trong 30 ngày kể từ khi nhận hàng.
 6. Chưa đánh giá sản phẩm này trong đơn (có ràng buộc UNIQUE ở CSDL chống gửi trùng).
 Dữ liệu: 1 - 5 sao, nhận xét tối đa 1000 ký tự (bắt buộc từ 10 ký tự nếu chấm 1 - 2 sao), link ảnh phải là http(s). Khách đánh giá ở trang chi tiết đơn hàng; `GET /api/customer/reviews/order/{ma}` trả về trạng thái từng sản phẩm (được đánh giá / lý do chưa được / đánh giá đã gửi).
+
+---
+
+## Bổ sung (giao diện mới, 19/11/2026)
+
+### GET `/api/search/popular?limit=12` (công khai)
+Từ khóa được tìm nhiều và sản phẩm được xem nhiều trong 30 ngày, tổng hợp từ bảng `HanhViNguoiDung`. Không chứa thông tin cá nhân. Dùng cho cột "Được tìm nhiều trong 30 ngày" ở menu "Tất cả điện thoại".
+```json
+{ "soNgay": 30,
+  "tuKhoa": [{ "tuKhoa": "iphone 16", "luot": 9 }],
+  "sanPhamXemNhieu": [{ "maSanPham": "SP500498", "luot": 13 }] }
+```
+
+### GET `/api/customer/checkout/preview-selected?maDiaChi=...&chon=PB1&chon=PB2` (CUSTOMER)
+Xem trước thanh toán chỉ với các dòng giỏ hàng được chọn. Không thay đổi dữ liệu (transaction luôn rollback).
+
+### POST `/api/customer/orders/selected?chon=PB1&chon=PB2` (CUSTOMER)
+Header `Idempotency-Key`, body giống `POST /api/customer/orders`. Đặt hàng các dòng được chọn; các dòng chưa chọn được giữ lại trong giỏ. Dùng lại toàn bộ luồng đặt hàng hiện có (khóa tồn kho, voucher, phê duyệt bán, idempotency) trong cùng một transaction, lỗi ở bất kỳ bước nào sẽ rollback cả giỏ hàng.
+- 400: chưa chọn sản phẩm / dùng cùng "Mua ngay".
+- 409: dòng được chọn không còn trong giỏ (giỏ đã thay đổi).
+- Gửi lại cùng `Idempotency-Key` sau khi thành công: trả lại đơn đã tạo.

@@ -79,7 +79,7 @@ export default function AdminAnalyticsPage() {
     {data && !invalidRange && <>
       <div className="stats-grid"><div className="stat-card"><span>Tổng lượt tương tác</span><b>{formatNumber(data.tongLuot)}</b></div><div className="stat-card"><span>Sự kiện trong bảng gần đây</span><b>{formatNumber(data.suKienGanDay?.length || 0)}</b></div></div>
       <div className="grid-2" style={{ marginTop: 18 }}>
-        <section className="card"><h3>Lượt theo loại hành vi</h3><BarList items={eventRows} color="#4775e8" /></section>
+        <section className="card"><h3>Lượt theo loại hành vi</h3><BarList items={eventRows} color="var(--brand)" /></section>
         <section className="card"><h3>Từ khóa tìm kiếm phổ biến</h3>{data.topTuKhoa?.length ? <table className="table"><thead><tr><th>Từ khóa</th><th>Lượt tìm</th></tr></thead><tbody>{data.topTuKhoa.map(item => <tr key={item.tuKhoa}><td>{item.tuKhoa}</td><td>{formatNumber(item.count)}</td></tr>)}</tbody></table> : <p className="muted">Chưa có từ khóa tìm kiếm.</p>}</section>
       </div>
       <section className="card" style={{ marginTop: 18 }}>

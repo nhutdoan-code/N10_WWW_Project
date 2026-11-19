@@ -165,7 +165,7 @@ function formatFieldValue(val, key = '') {
             <div
               key={idx}
               style={{
-                background: '#f8f9fa',
+                background: 'var(--surface-2)',
                 border: '1px solid #e5e7eb',
                 borderRadius: '6px',
                 padding: '6px 10px',
@@ -173,7 +173,7 @@ function formatFieldValue(val, key = '') {
               }}
             >
               {item.tenMay && <div><b>{item.tenMay}</b> {item.maSanPham && <code>({item.maSanPham})</code>}</div>}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', color: '#4b5563', marginTop: '2px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', color: 'var(--muted)', marginTop: '2px' }}>
                 {item.soLuong != null && <span>Số lượng: <b>{item.soLuong}</b></span>}
                 {item.giaBan != null && <span>Đơn giá: <b>{Number(item.giaBan).toLocaleString('vi-VN')} ₫</b></span>}
                 {item.thanhTien != null && <span>Thành tiền: <b>{Number(item.thanhTien).toLocaleString('vi-VN')} ₫</b></span>}
@@ -688,7 +688,7 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {error && (
-        <div className="card" style={{ marginBottom: '16px', background: '#fef3f2', borderColor: '#fecdca' }}>
+        <div className="card" style={{ marginBottom: '16px', background: 'var(--danger-soft)', borderColor: 'var(--danger-line)' }}>
           <p className="error" style={{ margin: 0 }}>{error}</p>
         </div>
       )}

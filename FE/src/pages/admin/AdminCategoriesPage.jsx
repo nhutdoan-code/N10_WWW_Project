@@ -192,7 +192,7 @@ export default function AdminCategoriesPage() {
             })}
             {(!brands || brands.length === 0) && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
                   Không có thương hiệu nào.
                 </td>
               </tr>
@@ -287,7 +287,7 @@ export default function AdminCategoriesPage() {
 
               <div
                 style={{
-                  background: '#f8f9fa',
+                  background: 'var(--surface-2)',
                   padding: '12px 16px',
                   borderRadius: '8px',
                   marginBottom: '16px',
@@ -296,7 +296,7 @@ export default function AdminCategoriesPage() {
               >
                 <div className="row between">
                   <span>Số lượng sản phẩm thuộc thương hiệu này:</span>
-                  <b style={{ color: (impactBrandData?.productCount || 0) > 0 ? '#b91c1c' : '#15803d' }}>
+                  <b style={{ color: (impactBrandData?.productCount || 0) > 0 ? 'var(--danger)' : 'var(--ok)' }}>
                     {impactBrandData?.productCount ?? 0} sản phẩm
                   </b>
                 </div>
@@ -305,11 +305,11 @@ export default function AdminCategoriesPage() {
               {(impactBrandData?.productCount || 0) > 0 ? (
                 <div
                   style={{
-                    background: '#fef2f2',
+                    background: 'var(--danger-soft)',
                     border: '1px solid #f87171',
                     borderRadius: '8px',
                     padding: '10px 14px',
-                    color: '#991b1b',
+                    color: 'var(--danger)',
                     fontSize: '0.85rem',
                     marginBottom: '16px',
                   }}

@@ -1,12 +1,14 @@
+// Bảng màu biểu đồ lấy từ 3 màu thương hiệu (xanh rêu, vàng nghệ, xám than) ở các độ đậm khác nhau.
+// Giữ nguyên tên khóa cũ để không ảnh hưởng nơi sử dụng.
 export const COLORS = {
-  blue: '#2a78d6',
-  orange: '#eb6834',
-  aqua: '#1baf7a',
-  yellow: '#eda100',
-  violet: '#6250d6',
-  red: '#e34948',
-  magenta: '#e87ba4',
-  green: '#008300',
+  blue: '#2f7a5a',
+  orange: '#b8862a',
+  aqua: '#5fa884',
+  yellow: '#e2ac35',
+  violet: '#6f7b75',
+  red: '#c0392b',
+  magenta: '#a3ada8',
+  green: '#1f5641',
 };
 
 export const shortMoney = (n) => {

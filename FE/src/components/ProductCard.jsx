@@ -45,9 +45,9 @@ export default function ProductCard({ sp }) {
       {tags.length > 0 && <div className="spec-tags">{tags.map((t) => <span key={t}>{t}</span>)}</div>}
       
       {allPending ? (
-        <span className="price" style={{ color: '#b45309', fontSize: '1rem', fontWeight: 600 }}>Giá đang cập nhật</span>
+        <span className="price price-pending">Giá đang cập nhật</span>
       ) : allBlocked ? (
-        <span className="price" style={{ color: '#b91c1c', fontSize: '1rem', fontWeight: 600 }}>Không khả dụng</span>
+        <span className="price price-unavailable">Không khả dụng</span>
       ) : (
         giaHienThi == null ? (
           <span className="price price-pending">{isNgungKD ? 'Ngừng kinh doanh' : 'Giá đang cập nhật'}</span>

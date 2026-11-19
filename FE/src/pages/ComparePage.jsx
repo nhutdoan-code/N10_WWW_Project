@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import Icon from '../components/Icon';
 import ProductImage from '../components/ProductImage';
 import useToast from '../hooks/useToast';
 import useCompare from '../hooks/useCompare';
@@ -34,7 +35,13 @@ export default function ComparePage() {
     }
   };
 
-  if (ids.length === 0) return <p className="muted">Chưa chọn sản phẩm nào để so sánh. <Link to="/">Chọn sản phẩm</Link> (bấm nút ⇄).</p>;
+  if (ids.length === 0) return (
+    <div className="empty-state">
+      <h2>Chưa có sản phẩm để so sánh</h2>
+      <p className="muted">Bấm nút ⇄ trên thẻ sản phẩm để thêm tối đa 3 máy và xem cấu hình cạnh nhau.</p>
+      <Link to="/" className="btn btn-primary">Chọn sản phẩm</Link>
+    </div>
+  );
   if (loading) return <p className="muted">Đang tải...</p>;
   if (error) return <p className="error" role="alert">Không tải được sản phẩm so sánh: {error}</p>;
   if (!products) return <p className="muted">Đang tải...</p>;
@@ -43,7 +50,7 @@ export default function ComparePage() {
     <>
       <div className="row between">
         <h2>So sánh sản phẩm</h2>
-        <button className="btn" onClick={clear}>Xóa tất cả</button>
+        <button className="btn btn-sm btn-danger" onClick={clear}><Icon name="trash" size={15} /> Xóa tất cả</button>
       </div>
       {products.length < 2 && <p className="muted">Hãy chọn thêm ít nhất 1 sản phẩm nữa để so sánh.</p>}
       <div className="compare-table-wrap">
@@ -54,7 +61,7 @@ export default function ComparePage() {
             {products.map((p) => (
               <td key={p.maSanPham}>
                 <Link to={`/products/${p.maSanPham}`}><ProductImage className="thumb-lg" src={p.anhChinh} alt="" /><br /><b>{p.tenMay}</b></Link>
-                <br /><button className="btn btn-ghost" onClick={() => toggle(p.maSanPham)}>Bỏ</button>
+                <button type="button" className="btn btn-sm btn-danger compare-remove" onClick={() => toggle(p.maSanPham)} aria-label={`Bỏ ${p.tenMay} khỏi so sánh`}><Icon name="x" size={14} /> Bỏ khỏi so sánh</button>
               </td>
             ))}
             {canAdd && (

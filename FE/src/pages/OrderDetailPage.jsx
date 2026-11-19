@@ -170,7 +170,7 @@ export default function OrderDetailPage() {
             <div className="section">
               <h3>Thanh toán MoMo</h3>
               {paymentStatus?.status === 'DA_THANH_TOAN' ? (
-                <p style={{ color: '#16a34a', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công qua ví MoMo</p>
+                <p style={{ color: 'var(--ok)', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công qua ví MoMo</p>
               ) : paymentStatus?.status === 'CAN_HOAN_TIEN' ? (
                 <p className="muted">MoMo đã nhận thanh toán; cửa hàng đang đối soát hoàn tiền.</p>
               ) : paymentStatus?.status === 'DA_HOAN_TIEN' ? (
@@ -202,9 +202,9 @@ export default function OrderDetailPage() {
           )}
 
           {o.trangThai === 'DA_HUY' && paymentStatus?.status === 'CAN_HOAN_TIEN' && (
-            <div className="section" style={{ borderLeft: '4px solid #f59e0b', background: '#fffbeb', padding: '1rem', borderRadius: 8 }}>
-              <h3 style={{ color: '#b45309', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán MoMo</h3>
-              <p style={{ margin: 0, color: '#92400e' }}>
+            <div className="section" style={{ borderLeft: '4px solid #f59e0b', background: 'var(--warn-soft)', padding: '1rem', borderRadius: 8 }}>
+              <h3 style={{ color: 'var(--warn)', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán MoMo</h3>
+              <p style={{ margin: 0, color: 'var(--warn)' }}>
                 Đơn hàng đã hủy nhưng MoMo ghi nhận thanh toán thành công. Cửa hàng đang tiếp nhận để xử lý hoàn tiền hoặc đối soát cho bạn.
               </p>
             </div>

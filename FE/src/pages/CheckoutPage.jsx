@@ -28,7 +28,7 @@ function generateUUID() {
 }
 
 export default function CheckoutPage() {
-  const { items, total, reset } = useCart();
+  const { items: gioHang, total, reset, refresh } = useCart();
   const { data: addresses, reload: reloadAddresses } = useFetch(customerService.addresses);
 
   const [editingAddress, setEditingAddress] = useState(null);
@@ -62,6 +62,9 @@ export default function CheckoutPage() {
   const maPhienBanMua = location.state?.mua || params.get('mua');
   const slMua = Number(location.state?.sl || params.get('sl')) || 1;
   const muaNgay = Boolean(maPhienBanMua);
+  // Thanh toán một phần giỏ: danh sách mã phiên bản được chọn ở trang giỏ hàng.
+  const chonGio = !muaNgay && Array.isArray(location.state?.chon) && location.state.chon.length > 0 ? location.state.chon : null;
+  const items = chonGio ? gioHang.filter((i) => chonGio.includes(i.phienBan?.maPhienBan)) : gioHang;
   const hasDiscontinued = !muaNgay && hasDiscontinuedItems(items);
   const hasUnapproved = !muaNgay && hasUnapprovedItems(items);
   const {
@@ -70,10 +73,12 @@ export default function CheckoutPage() {
     error: loiPv,
     reload,
   } = useFetch(
-    () => maDiaChi
-      ? orderService.preview(maDiaChi, maPhienBanMua || undefined, muaNgay ? slMua : undefined)
-      : Promise.resolve(null),
-    [maDiaChi, maPhienBanMua, slMua]
+    () => !maDiaChi
+      ? Promise.resolve(null)
+      : chonGio
+        ? orderService.previewSelected(maDiaChi, chonGio)
+        : orderService.preview(maDiaChi, maPhienBanMua || undefined, muaNgay ? slMua : undefined),
+    [maDiaChi, maPhienBanMua, slMua, chonGio?.join(',')]
   );
   // 2B.7C: phai khai bao SAU useFetch (truoc day dung loiPv truoc khi khai bao -> trang checkout bi crash).
   const hasBlockedOrder = hasDiscontinued || hasUnapproved || Boolean(loiPv);
@@ -109,7 +114,7 @@ export default function CheckoutPage() {
       donGia: i.phienBan?.giaBan ?? i.sanPham.giaBan,
     }));
 
-  const tamTinh = pv ? Number(pv.tamTinh) : total;
+  const tamTinh = pv ? Number(pv.tamTinh) : (chonGio ? items.reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? 0) * i.soLuong, 0) : total);
   const phi = pv ? Number(pv.phiVanChuyen) : 0;
   const giamDh = vDh ? Number(vDh.soTienGiam) : 0;
   const giamVc = vVc ? Math.min(Number(vVc.soTienGiam), phi) : 0;
@@ -120,7 +125,7 @@ export default function CheckoutPage() {
     : 0;
 
   // Theo dõi sự thay đổi của payload: khi người dùng đổi lựa chọn, sinh key mới
-  const currentPayloadSig = `${maDiaChi}|${payment}|${vDh?.maKm || ''}|${vVc?.maKm || ''}|${maPhienBanMua || ''}|${muaNgay ? slMua : ''}|${muaNgay ? '' : items.map((i) => `${i.phienBan?.maPhienBan}:${i.soLuong}`).join(',')}`;
+  const currentPayloadSig = `${maDiaChi}|${payment}|${vDh?.maKm || ''}|${vVc?.maKm || ''}|${maPhienBanMua || ''}|${muaNgay ? slMua : ''}|${muaNgay ? '' : items.map((i) => `${i.phienBan?.maPhienBan}:${i.soLuong}`).join(',')}|${chonGio ? 'chon' : ''}`;
   const lastPayloadSigRef = useRef(null);
 
   useEffect(() => {
@@ -202,14 +207,17 @@ export default function CheckoutPage() {
     setDangDat(true);
 
     try {
-      const order = await orderService.checkout({
+      const duLieu = {
         phuongThucTt: payment,
         maDiaChi,
         maKm: vDh?.maKm,
         maKmVanChuyen: vVc?.maKm,
         maSanPham: maPhienBanMua || undefined,
         soLuong: muaNgay ? slMua : undefined,
-      }, idempotencyKeyRef.current);
+      };
+      const order = chonGio
+        ? await orderService.checkoutSelected(duLieu, chonGio, idempotencyKeyRef.current)
+        : await orderService.checkout(duLieu, idempotencyKeyRef.current);
 
       daDatThanhCongRef.current = true;
       try {
@@ -218,7 +226,9 @@ export default function CheckoutPage() {
       } catch {
         // ignore
       }
-      if (!muaNgay) reset();
+      // Thanh toán một phần: các sản phẩm chưa chọn vẫn nằm trong giỏ, tải lại giỏ từ máy chủ.
+      if (chonGio) refresh?.();
+      else if (!muaNgay) reset();
 
       if (payment === 'VI_DIEN_TU') {
         try {
@@ -275,11 +285,11 @@ export default function CheckoutPage() {
       <h2>Thanh toán</h2>
 
       {hasBlockedOrder && (
-        <div className="alert alert-warning discontinued-checkout-banner" style={{ margin: '0 0 20px 0', padding: '16px', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px' }}>
+        <div className="alert alert-warning discontinued-checkout-banner" style={{ margin: '0 0 20px 0', padding: '16px', background: 'var(--warn-soft)', color: 'var(--warn)', border: '1px solid #ffeeba', borderRadius: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
             <Icon name="alert-triangle" size={24} />
             <div style={{ flex: 1 }}>
-              <h4 style={{ margin: '0 0 6px 0', color: '#856404' }}>Không thể hoàn tất thanh toán</h4>
+              <h4 style={{ margin: '0 0 6px 0', color: 'var(--warn)' }}>Không thể hoàn tất thanh toán</h4>
               <p style={{ margin: '0 0 12px 0' }}>
                 {loiPv || (hasUnapproved ? DISCONTINUED_MESSAGES.APPROVAL_CHECKOUT_BANNER : DISCONTINUED_MESSAGES.CHECKOUT_BANNER)}
               </p>

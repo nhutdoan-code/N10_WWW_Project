@@ -27,12 +27,12 @@ export default function AccountMenu({ user, onLogout }) {
             <span className="muted">{user.email}</span>
           </div>
           <hr />
-          <Link to="/account">Thông tin tài khoản</Link>
-          <Link to="/account/addresses">Địa chỉ giao hàng</Link>
-          <Link to="/orders">Đơn hàng của tôi</Link>
-          <Link to="/returns">Hậu mãi: yêu cầu của tôi</Link>
+          <Link to="/account"><Icon name="user" size={17} /> Thông tin tài khoản</Link>
+          <Link to="/orders"><Icon name="box" size={17} /> Đơn hàng của tôi</Link>
+          <Link to="/returns"><Icon name="refresh" size={17} /> Đổi trả &amp; bảo hành</Link>
+          <Link to="/account/addresses"><Icon name="pin" size={17} /> Địa chỉ giao hàng</Link>
           <hr />
-          <button onClick={onLogout}>Đăng xuất</button>
+          <button onClick={onLogout} className="menu-logout">Đăng xuất</button>
         </div>
       )}
     </div>
