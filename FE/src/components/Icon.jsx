@@ -19,6 +19,8 @@ const PATHS = {
   left: 'm15 18-6-6 6-6',
   right: 'm9 18 6-6-6-6',
   sparkle: 'M12 3l1.9 5.6 5.6 1.9-5.6 1.9L12 18l-1.9-5.6-5.6-1.9 5.6-1.9z',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l4 2',
+  plus: 'M12 5v14M5 12h14',
 };
 
 export default function Icon({ name, size = 20 }) {

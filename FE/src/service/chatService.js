@@ -1,29 +1,27 @@
 import api from '../config/api';
 
-// Lấy hoặc tạo visitorId hợp lệ
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const getVisitorId = () => {
-  let visitorId = localStorage.getItem('visitorId');
-
-  // Nếu chưa có hoặc không đúng UUID v4 thì tạo mới
-  const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!visitorId || !uuidRegex.test(visitorId)) {
-    visitorId = crypto.randomUUID();
-    localStorage.setItem('visitorId', visitorId);
+  let id = localStorage.getItem('visitorId');
+  if (!id || !UUID_REGEX.test(id)) {
+    id = crypto.randomUUID();
+    localStorage.setItem('visitorId', id);
   }
-
-  return visitorId;
+  return id;
 };
 
 export const chatService = {
-  send: (message, history = [], visitorId, config = {}) => {
-    const id = getVisitorId();
-
-    return api.post('/chat', {
+  // Lịch sử hội thoại do backend lưu theo conversationId (null = bắt đầu hội thoại mới).
+  send: (message, conversationId = null, visitorId, config = {}) =>
+    api.post('/chat', {
       message,
-      history,
-      visitorId: id
-    }, config);
-  }
+      conversationId: conversationId || null,
+      visitorId: visitorId || getVisitorId(),
+    }, config),
+
+  getConversations: () => api.get('/chat/conversations'),
+
+  getMessages: (conversationId) =>
+    api.get(`/chat/conversations/${encodeURIComponent(conversationId)}/messages`),
 };

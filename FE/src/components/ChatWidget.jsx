@@ -4,10 +4,12 @@ import Icon from './Icon';
 import ProductImage from './ProductImage';
 import { chatService } from '../service/chatService';
 import { trackingService } from '../service/trackingService';
-import { formatGiaCongBo, formatPrice } from '../utils/format';
+import { formatGiaCongBo } from '../utils/format';
 import { getVisitorId } from '../utils/activityTracking';
 import useAuth from '../hooks/useAuth';
+import useCart from '../hooks/useCart';
 import {
+  DEFAULT_GREETING,
   getChatStorageKey,
   loadChatHistory,
   saveChatHistory,
@@ -20,8 +22,32 @@ const GOI_Y = [
   'Hiện có voucher nào?',
 ];
 
-function ChatSession({ sessionKey, open, setOpen }) {
+// Lưu id cuộc hội thoại đang mở (theo từng tài khoản) để tải lại trang vẫn tiếp tục đúng hội thoại.
+const conversationKey = (sessionKey) => `${sessionKey}_conversation`;
+
+function loadConversationId(sessionKey) {
+  try {
+    return sessionStorage.getItem(conversationKey(sessionKey)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveConversationId(sessionKey, id) {
+  try {
+    if (id) sessionStorage.setItem(conversationKey(sessionKey), id);
+    else sessionStorage.removeItem(conversationKey(sessionKey));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function ChatSession({ sessionKey, open, setOpen, onCartChanged }) {
   const [messages, setMessages] = useState(() => loadChatHistory(sessionKey));
+  const [conversationId, setConversationId] = useState(() => loadConversationId(sessionKey));
+  const [conversations, setConversations] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const bottom = useRef(null);
@@ -47,11 +73,61 @@ function ChatSession({ sessionKey, open, setOpen }) {
     bottom.current?.scrollIntoView({ block: 'end' });
   }, [messages, open, sending, sessionKey]);
 
+  useEffect(() => {
+    saveConversationId(sessionKey, conversationId);
+  }, [sessionKey, conversationId]);
+
+  const loadConversations = async () => {
+    try {
+      setLoadingHistory(true);
+      const data = await chatService.getConversations();
+      if (!isAbortedRef.current) setConversations(Array.isArray(data) ? data : []);
+    } catch {
+      if (!isAbortedRef.current) setConversations([]);
+    } finally {
+      if (!isAbortedRef.current) setLoadingHistory(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    if (!showHistory) loadConversations();
+    setShowHistory((v) => !v);
+  };
+
+  const newConversation = () => {
+    setConversationId(null);
+    setMessages([DEFAULT_GREETING]);
+    setText('');
+    setShowHistory(false);
+  };
+
+  const selectConversation = async (id) => {
+    try {
+      setLoadingHistory(true);
+      const data = await chatService.getMessages(id);
+      if (isAbortedRef.current) return;
+      const history = Array.isArray(data)
+        ? data.map((m) => ({
+          role: m.role?.toUpperCase() === 'USER' ? 'user' : 'assistant',
+          content: m.noiDung,
+        }))
+        : [];
+      setConversationId(id);
+      setMessages(history.length ? history : [DEFAULT_GREETING]);
+      setShowHistory(false);
+    } catch {
+      if (!isAbortedRef.current) {
+        setMessages((m) => [...m, { role: 'assistant', content: 'Không thể tải lịch sử cuộc hội thoại này.' }]);
+      }
+    } finally {
+      if (!isAbortedRef.current) setLoadingHistory(false);
+    }
+  };
+
   const send = async (content) => {
     const message = content.trim();
     if (!message || sending) return;
 
-    const history = messages.map(({ role, content: c }) => ({ role, content: c }));
     setMessages((prev) => [...prev, { role: 'user', content: message }]);
     setText('');
     setSending(true);
@@ -60,21 +136,27 @@ function ChatSession({ sessionKey, open, setOpen }) {
     abortControllerRef.current = controller;
 
     try {
-      const res = await chatService.send(
-        message,
-        history.slice(1),
-        getVisitorId(),
-        { signal: controller.signal }
-      );
+      // Lịch sử hội thoại được lưu và đọc ở backend theo conversationId của chính tài khoản.
+      const res = await chatService.send(message, conversationId, getVisitorId(), { signal: controller.signal });
 
       // If component unmounted or request was aborted/superseded, ignore response
       if (isAbortedRef.current) return;
 
+      if (res.conversationId) setConversationId(res.conversationId);
       setMessages((m) => [...m, { role: 'assistant', content: res.reply, products: res.products }]);
+
+      // Chatbot vừa thêm sản phẩm vào giỏ: đồng bộ lại số lượng trên header.
+      if (res.mode === 'CART_ADDED') {
+        onCartChanged?.();
+      }
     } catch (err) {
       if (isAbortedRef.current || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
         // Request was aborted due to session change/logout; do not show error in UI
         return;
+      }
+      if (err?.response?.status === 404 && conversationId) {
+        // Hội thoại không còn (đã xóa / không thuộc tài khoản): bắt đầu hội thoại mới.
+        setConversationId(null);
       }
       setMessages((m) => [
         ...m,
@@ -109,6 +191,44 @@ function ChatSession({ sessionKey, open, setOpen }) {
               <Icon name="close" size={18} />
             </button>
           </header>
+
+          <div className="chat-toolbar">
+            <button
+              type="button"
+              className={`chat-toolbar-btn${showHistory ? ' active' : ''}`}
+              onClick={toggleHistory}
+            >
+              <Icon name="history" size={16} />
+              <span>Lịch sử</span>
+            </button>
+            <button type="button" className="chat-toolbar-btn new-chat-btn" onClick={newConversation}>
+              <Icon name="plus" size={16} />
+              <span>Cuộc trò chuyện mới</span>
+            </button>
+          </div>
+
+          {showHistory && (
+            <div className="chat-history-list">
+              <b>Cuộc trò chuyện của bạn</b>
+              {loadingHistory ? (
+                <p>Đang tải lịch sử...</p>
+              ) : conversations.length === 0 ? (
+                <p>Chưa có cuộc trò chuyện nào.</p>
+              ) : (
+                conversations.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chat-history-item${conversationId === c.id ? ' active' : ''}`}
+                    onClick={() => selectConversation(c.id)}
+                  >
+                    {c.tieuDe || 'Cuộc trò chuyện mới'}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
           <div className="chat-body">
             {messages.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>
@@ -177,10 +297,12 @@ function ChatSession({ sessionKey, open, setOpen }) {
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const auth = useAuth();
+  const cart = useCart();
   const user = auth?.user;
   const isInitialized = auth ? (auth.isInitialized !== false && !auth.loading) : true;
 
-  const sessionKey = getChatStorageKey(user, isInitialized);
+  // ChatBox chỉ dành cho tài khoản đã đăng nhập (backend yêu cầu JWT cho /api/chat).
+  const sessionKey = user?.maTk ? getChatStorageKey(user, isInitialized) : null;
 
   if (!sessionKey) return null;
 
@@ -191,6 +313,7 @@ export default function ChatWidget() {
         sessionKey={sessionKey}
         open={open}
         setOpen={setOpen}
+        onCartChanged={() => cart?.refresh?.().catch(() => {})}
       />
     </div>
   );

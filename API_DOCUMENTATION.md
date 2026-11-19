@@ -36,7 +36,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Tìm kiếm và trợ lý chat (Spring AI)
 - `GET /api/search?q=` – tìm nhanh (dropdown, tối đa 5 kết quả).
-- `POST /api/chat` – khung chat tròn ở góc phải màn hình (khách vãng lai cũng dùng được). Body `{message, history}`; BE đưa danh sách sản phẩm, voucher, phí vận chuyển trong CSDL vào prompt cho `ChatClient`, trả về `{reply, products}` (tối đa 3 máy gợi ý, hiển thị dạng thẻ). Chưa có key hoặc lỗi → trả lời theo từ khoá (ngân sách "x triệu", phí giao hàng, voucher). Ô tìm kiếm trên đầu trang chỉ còn tìm theo từ khoá.
+- `POST /api/chat` – khung chat tròn ở góc phải màn hình, **chỉ hiện và chỉ gọi được khi đã đăng nhập** (CUSTOMER hoặc ADMIN; ẩn danh → 401). Body `{message, conversationId?, visitorId?}`; trả về `{reply, products, mode, conversationId}`. Lịch sử hội thoại lưu ở CSDL (`CuocHoiThoaiChat`, `TinNhanChat` – migration 21) theo tài khoản; không truyền `conversationId` → tạo hội thoại mới. `GET /api/chat/conversations` (hội thoại của tôi) · `GET /api/chat/conversations/{id}/messages` (404 nếu không thuộc tài khoản). Khách hàng có thể nhờ trợ lý thêm sản phẩm vào giỏ ("Thêm Redmi 13C màu đen vào giỏ hàng", `mode=CART_ADDED`; nhiều phiên bản → `CART_SELECT_VARIANT`), chỉ với biến thể được phép bán; Admin nhận `ADMIN_CART_DENIED`. Gemini được cấp công cụ tra cứu sản phẩm (`PhoneNestProductTools`); mọi số tiền trong câu trả lời AI vẫn phải thuộc giá công bố (ChatPriceGuard). Chưa có key hoặc lỗi → trả lời theo từ khoá.
 
 ## Chức năng theo file Word
 
@@ -58,7 +58,7 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 
 ## Endpoint chi tiết
 
-**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `POST /api/tracking/events` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` · `POST /api/chat`
+**Công khai**: `POST /api/auth/register | login | forgot-password | reset-password` · `POST /api/tracking/events` · `GET /api/products` (query `q, maLoai, min, max, sort` = `gia_asc | gia_desc | danh_gia | ban_chay`) · `GET /api/products/{ma}` · `/{ma}/related` · `/{ma}/reviews` · `/{ma}/questions` · `GET /api/categories` · `GET /api/search` (ChatBox `POST /api/chat` cần đăng nhập)
 
 ### Theo dõi hành vi và cá nhân hóa trợ lý
 - Frontend ghi nhận `PAGE_VIEW`, `PRODUCT_VIEW`, `SEARCH`, `ADD_TO_CART` qua `POST /api/tracking/events`; body gồm `visitorId` (UUID), `type` và đúng trường theo loại (`pageType`, `productId` hoặc `searchTerm`). Endpoint công khai; tài khoản Customer được gắn từ JWT phía máy chủ, không nhận mã tài khoản từ client.

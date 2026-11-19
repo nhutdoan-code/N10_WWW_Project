@@ -3,6 +3,7 @@ package nhom10.phonenest.service.ai;
 import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.entity.SanPham;
 import nhom10.phonenest.enums.TrangThaiSanPham;
+import nhom10.phonenest.service.PheDuyetBanHangPolicy;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
@@ -19,13 +20,33 @@ import java.util.*;
 @Component
 public class ProductSemanticDocumentBuilder {
 
+    /**
+     * Bien the co the ban qua chatbot: duoc phep ban (phe duyet con hieu luc + dang kinh doanh) va con ton.
+     * Chi dung gia DUOC CONG BO (2B.7D), khong bao gio dua gia noi bo chua duyet vao vector store.
+     */
+    public boolean phienBanCoTheBan(PhienBanSanPham p) {
+        return p != null
+                && PheDuyetBanHangPolicy.duocPhepBan(p)
+                && p.getSoLuongTon() > 0
+                && p.getGiaBan() != null
+                && p.getGiaBan().signum() > 0;
+    }
+
+    /** Cac phien ban thuc su ban duoc va con hang. */
+    public List<PhienBanSanPham> getPhienBanConHang(SanPham s) {
+        if (s == null || s.getPhienBans() == null) {
+            return List.of();
+        }
+        return s.getPhienBans().stream().filter(this::phienBanCoTheBan).toList();
+    }
+
     public Document build(SanPham s) {
         String ma = s.getMaSanPham();
         String tenMay = s.getTenMay();
         String hang = s.getThuongHieu() != null ? s.getThuongHieu().getTenThuongHieu() : "";
         String loai = s.getLoai() != null ? s.getLoai().getTenLoai() : "Điện thoại";
         // 2B.7D: chi dua gia DUOC CONG BO vao vector store / ngu canh chatbot.
-        BigDecimal giaBan = nhom10.phonenest.service.PheDuyetBanHangPolicy.giaCongBo(s);
+        BigDecimal giaBan = PheDuyetBanHangPolicy.giaCongBo(s);
         int tonKho = s.getSoLuongTon();
 
         // Extract RAM & Storage variations from variants
@@ -67,6 +88,17 @@ public class ProductSemanticDocumentBuilder {
 
         if (maxRam > 0 || maxRom > 0) {
             text.append("Bộ nhớ: RAM ").append(maxRam).append("GB, bộ nhớ trong ").append(maxRom).append("GB\n");
+        }
+
+        // Liet ke tung cau hinh thuc te (QuocLuu): giup AI tra loi dung mau sac / RAM / bo nho dang ban.
+        List<PhienBanSanPham> conHang = getPhienBanConHang(s);
+        if (!conHang.isEmpty()) {
+            text.append("Các phiên bản đang có hàng:\n");
+            for (PhienBanSanPham p : conHang) {
+                text.append("- RAM ").append(p.getRam()).append("GB, bộ nhớ trong ").append(p.getBoNho()).append("GB")
+                        .append(", màu ").append(Objects.toString(p.getMauSac(), "Chưa cập nhật"))
+                        .append(", giá ").append(PheDuyetBanHangPolicy.giaCongBo(p).toBigInteger()).append(" ₫\n");
+            }
         }
 
         if (s.getCameraSau() != null && !s.getCameraSau().isBlank()) {

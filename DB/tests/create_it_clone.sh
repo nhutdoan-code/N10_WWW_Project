@@ -20,6 +20,8 @@ DB="${PN_IT_DB_NAME:-phonenest_it_$(date +%Y%m%d%H%M%S)}"
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$DUMP"
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -N -B -D "$DB" < "$HERE/../migrations/15_add_sales_approval_status.sql" | head -1
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -N -B -D "$DB" < "$HERE/../migrations/16_add_approval_verification_data.sql" | head -1
+# Migration 21: lich su ChatBox + vector store MariaDB (ChatService luu hoi thoai cua tai khoan dang nhap).
+"$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/21_chat_history_vector_store.sql"
 echo
 echo "Clone san sang. Chay test:"
 echo "  export PHONENEST_IT_DB_URL=jdbc:mariadb://$HOST:$PORT/$DB"

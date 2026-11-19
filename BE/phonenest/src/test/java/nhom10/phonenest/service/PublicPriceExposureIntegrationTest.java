@@ -180,7 +180,8 @@ class PublicPriceExposureIntegrationTest extends ItHttpBase {
         List<String> cauHoi = new ArrayList<>(List.of("Redmi 13C giá bao nhiêu?", "Có Redmi 13C không?",
                 "Tư vấn điện thoại giá rẻ dưới 2 triệu"));
         for (String q : cauHoi) {
-            MvcResult r = goi(post("/api/chat"), null, Map.of("message", q));
+            // ChatBox yeu cau dang nhap (PR #25): goi bang tai khoan khach hang.
+            MvcResult r = goi(post("/api/chat"), customer, Map.of("message", q));
             String body = r.getResponse().getContentAsString();
             assertThat(r.getResponse().getStatus()).as(q + " -> " + body).isEqualTo(200);
             khongCoDauVet(body, "chat: " + q);

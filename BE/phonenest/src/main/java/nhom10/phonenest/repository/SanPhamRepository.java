@@ -1,3 +1,4 @@
+
 package nhom10.phonenest.repository;
 
 import jakarta.persistence.LockModeType;
@@ -25,8 +26,8 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
     long countByThuongHieuMaThuongHieu(String maThuongHieu);
 
     @Query("SELECT s FROM SanPham s " +
-           "WHERE (:pattern IS NULL OR LOWER(s.tenMay) LIKE :pattern OR LOWER(s.maSanPham) LIKE :pattern) " +
-           "ORDER BY s.maSanPham DESC")
+            "WHERE (:pattern IS NULL OR LOWER(s.tenMay) LIKE :pattern OR LOWER(s.maSanPham) LIKE :pattern) " +
+            "ORDER BY s.maSanPham DESC")
     List<SanPham> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
 
     @Query(value = """
@@ -59,4 +60,12 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
         WHERE s.maSanPham = :ma
     """)
     Optional<SanPham> findByIdWithPhienBans(@Param("ma") String ma);
+
+    /** Toan bo san pham kem danh sach phien ban (dong bo vector store cho chatbot). */
+    @Query("""
+        SELECT DISTINCT s
+        FROM SanPham s
+        LEFT JOIN FETCH s.phienBans
+    """)
+    List<SanPham> findAllWithPhienBans();
 }

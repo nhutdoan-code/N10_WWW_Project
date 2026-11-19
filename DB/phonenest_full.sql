@@ -1,9 +1,9 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..20 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..21 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20 (pn_migration_log có M12/M15/M16).
---   * 38 bảng. Dữ liệu demo (cập nhật 15/11/2026):
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21 (pn_migration_log có M12/M15/M16).
+--   * 42 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
 --       - 249 ảnh chụp sản phẩm thật theo màu (không ảnh quảng cáo / logo AI): đường dẫn /catalog/<maSanPham>/<mau>.webp, file nằm trong
@@ -5866,6 +5866,54 @@ SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 /*!40000 ALTER TABLE `YeuCauHauMai` ENABLE KEYS */;
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
+
+-- ====================================================================
+-- MIGRATION 21: lich su ChatBox + vector store MariaDB (xem DB/migrations/21_chat_history_vector_store.sql)
+-- ====================================================================
+-- 1. Vector store cua Spring AI MariaDBVectorStore (1024 chieu = Ollama bge-m3).
+--    id = maSanPham (khong phai UUID) nen dung VARCHAR.
+CREATE TABLE phonenest_vector_store (
+    id        VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    content   TEXT DEFAULT NULL,
+    metadata  LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (JSON_VALID(metadata)),
+    embedding VECTOR(1024) NOT NULL,
+    PRIMARY KEY (id),
+    VECTOR KEY phonenest_vector_store_embedding_idx (embedding)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. Dau van tay noi dung da embedding cua tung san pham: chi goi lai Ollama khi tai lieu thay doi.
+CREATE TABLE product_embedding_sync (
+    ma_san_pham  VARCHAR(100) NOT NULL,
+    content_hash CHAR(64) NOT NULL,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (ma_san_pham)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. Cuoc hoi thoai ChatBox (moi tai khoan chi thay hoi thoai cua minh).
+CREATE TABLE CuocHoiThoaiChat (
+    id          VARCHAR(36) NOT NULL,
+    maTk        VARCHAR(50) NOT NULL,
+    tieuDe      VARCHAR(255) DEFAULT NULL,
+    ngayTao     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ngayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    INDEX idx_chat_conversation_updated (maTk, ngayCapNhat),
+    CONSTRAINT fk_chat_conversation_account FOREIGN KEY (maTk) REFERENCES TaiKhoan (maTk) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. Tung tin nhan trong cuoc hoi thoai.
+CREATE TABLE TinNhanChat (
+    id             BIGINT NOT NULL AUTO_INCREMENT,
+    cuocHoiThoaiId VARCHAR(36) NOT NULL,
+    role           VARCHAR(20) NOT NULL,
+    noiDung        TEXT NOT NULL,
+    ngayTao        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    INDEX idx_chat_message_conversation (cuocHoiThoaiId, ngayTao),
+    CONSTRAINT fk_chat_message_conversation FOREIGN KEY (cuocHoiThoaiId) REFERENCES CuocHoiThoaiChat (id) ON DELETE CASCADE,
+    CONSTRAINT chk_chat_message_role CHECK (role IN ('USER', 'ASSISTANT'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

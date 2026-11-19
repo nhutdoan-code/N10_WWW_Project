@@ -55,8 +55,9 @@ public class SecurityConfig {
                                 "/api/brands", "/api/brands/**",
                                 "/api/search", "/api/search/**",
                                 "/api/locations", "/api/locations/**").permitAll()
-                        // Public AI assistant: exposes only catalogue/voucher/shipping data.
-                        .requestMatchers(HttpMethod.POST, "/api/chat").permitAll()
+                        // AI assistant: chi tai khoan da dang nhap (luu lich su hoi thoai theo tai khoan,
+                        // them gio hang chi danh cho CUSTOMER - kiem tra them trong ChatService).
+                        .requestMatchers("/api/chat", "/api/chat/**").hasAnyRole("CUSTOMER", "ADMIN")
                         // Public tracking endpoint (records anonymous and authenticated user behavior).
                         .requestMatchers(HttpMethod.POST, "/api/tracking/events").permitAll()
                         // Management surface.

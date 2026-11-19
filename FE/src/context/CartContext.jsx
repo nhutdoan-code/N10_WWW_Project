@@ -160,6 +160,13 @@ export function CartProvider({ children }) {
     }
   };
 
+  // Đồng bộ lại giỏ hàng từ server (vd. sau khi chatbot thêm sản phẩm vào giỏ).
+  const refresh = async () => {
+    if (!isCustomer) return;
+    const cart = await cartService.get();
+    setItems(cart.items || []);
+  };
+
   const replace = (cart) => setItems(cart.items || []);
   const reset = () => setItems([]);
 
@@ -170,7 +177,7 @@ export function CartProvider({ children }) {
     .filter((i) => !isItemDiscontinued(i) && !isItemUnapproved(i))
     .reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? i.sanPham?.giaBan ?? 0) * i.soLuong, 0);
   return (
-      <CartContext.Provider value={{ items, count, total, add, setQuantity, remove, clear, replace, reset }}>
+      <CartContext.Provider value={{ items, count, total, add, setQuantity, remove, clear, replace, reset, refresh }}>
         {children}
       </CartContext.Provider>
   );

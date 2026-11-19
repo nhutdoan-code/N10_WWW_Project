@@ -19,9 +19,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +37,11 @@ import java.util.stream.Collectors;
  * Pipeline:
  * Query -> Ollama EmbeddingModel -> Dense 1024-d Vector -> VectorStore Cosine Similarity ->
  * Structured Constraints Filter -> MariaDB Anti-Hallucination Check -> Factual Highlights.
+ * <p>
+ * Luu tru vector (QuocLuu): neu co bean {@code phoneNestMariaDbVectorStore} + JdbcTemplate (migration 21),
+ * embedding duoc luu trong bang {@code phonenest_vector_store} va chi tinh lai khi noi dung san pham thay doi
+ * (dau van tay SHA-256 trong {@code product_embedding_sync}). Neu khong co / loi CSDL (chua chay migration 21,
+ * unit test), tu dong dung vector store trong bo nho {@link PhoneNestVectorStore} nhu truoc.
  */
 @Slf4j
 @Service
@@ -47,6 +56,34 @@ public class SemanticSearchService {
 
     private VectorStore vectorStore;
     private boolean initialized = false;
+
+    /** Vector store luu trong MariaDB (tuy chon). null -> dung vector store trong bo nho. */
+    private VectorStore persistentStore;
+    private JdbcTemplate jdbcTemplate;
+    private volatile boolean persistentFailed = false;
+
+    @Autowired(required = false)
+    void setPersistentStore(@Qualifier("phoneNestMariaDbVectorStore") VectorStore store, JdbcTemplate jdbcTemplate) {
+        this.persistentStore = store;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    private boolean dungPersistent() {
+        return persistentStore != null && jdbcTemplate != null && !persistentFailed;
+    }
+
+    private void chuyenSangBoNho(Exception e) {
+        if (!persistentFailed) {
+            persistentFailed = true;
+            initialized = false;
+            log.warn("Không dùng được vector store MariaDB (đã chạy migration 21 chưa?): {}. Chuyển sang vector store trong bộ nhớ.",
+                    e.getMessage());
+        }
+    }
+
+    private static boolean laLoiCsdl(Exception e) {
+        return e instanceof org.springframework.dao.DataAccessException;
+    }
 
     /**
      * 2B.7D: reindexAll() duoc goi noi bo (self-invocation) nen @Transactional khong co hieu luc ->
@@ -76,14 +113,37 @@ public class SemanticSearchService {
     }
 
     private synchronized VectorStore getVectorStore() {
+        if (dungPersistent()) {
+            return persistentStore;
+        }
         if (vectorStore == null) {
             vectorStore = new PhoneNestVectorStore(embeddingModel);
         }
         return vectorStore;
     }
 
+    /** So tai lieu dang duoc lap chi muc (cho trang thai va kiem tra store rong). */
+    private long soTaiLieu() {
+        if (dungPersistent()) {
+            try {
+                Long n = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM product_embedding_sync", Long.class);
+                return n == null ? 0 : n;
+            } catch (Exception e) {
+                chuyenSangBoNho(e);
+            }
+        }
+        return vectorStore instanceof PhoneNestVectorStore mem ? mem.size() : 0;
+    }
+
     @Transactional(readOnly = true)
     public synchronized int reindexAll() {
+        if (dungPersistent()) {
+            try {
+                return dongBoPersistent();
+            } catch (Exception e) {
+                chuyenSangBoNho(e);
+            }
+        }
         log.info("Bắt đầu tái lập chỉ mục Vector Store cho sản phẩm PhoneNest bằng model {}...", embeddingModel.getModelName());
         VectorStore newStore = new PhoneNestVectorStore(embeddingModel);
 
@@ -99,8 +159,88 @@ public class SemanticSearchService {
         return docs.size();
     }
 
+    /**
+     * Dong bo bang phonenest_vector_store voi san pham dang kinh doanh: chi embedding lai san pham co noi dung
+     * thay doi, go san pham khong con kinh doanh.
+     */
+    private int dongBoPersistent() {
+        log.info("Bắt đầu đồng bộ sản phẩm vào MariaDB Vector Store bằng model {}...", embeddingModel.getModelName());
+        List<Document> docs = docTx != null ? docTx.execute(st -> taoTaiLieu()) : taoTaiLieu();
+        Set<String> activeIds = new HashSet<>();
+        int changed = 0;
+        for (Document doc : docs) {
+            activeIds.add(doc.getId());
+            try {
+                if (dongBoTaiLieu(doc)) changed++;
+            } catch (RuntimeException e) {
+                if (laLoiCsdl(e)) throw e;
+                log.warn("Không thể đồng bộ embedding sản phẩm {}: {}", doc.getId(), e.getMessage());
+            }
+        }
+        List<String> stale = jdbcTemplate.queryForList("SELECT ma_san_pham FROM product_embedding_sync", String.class)
+                .stream().filter(id -> !activeIds.contains(id)).toList();
+        if (!stale.isEmpty()) {
+            persistentStore.delete(stale);
+            jdbcTemplate.batchUpdate("DELETE FROM product_embedding_sync WHERE ma_san_pham = ?", stale, 100,
+                    (ps, id) -> ps.setString(1, id));
+        }
+        initialized = true;
+        log.info("Đồng bộ MariaDB Vector Store hoàn tất: {} sản phẩm, {} sản phẩm embedding lại, {} sản phẩm gỡ bỏ.",
+                docs.size(), changed, stale.size());
+        return docs.size();
+    }
+
+    /** true neu tai lieu thay doi va da embedding lai. */
+    private boolean dongBoTaiLieu(Document doc) {
+        String hash = bamNoiDung(doc);
+        String cu = jdbcTemplate.query("SELECT content_hash FROM product_embedding_sync WHERE ma_san_pham = ?",
+                rs -> rs.next() ? rs.getString(1) : null, doc.getId());
+        if (hash.equals(cu)) return false;
+        persistentStore.delete(List.of(doc.getId()));
+        persistentStore.add(List.of(doc));
+        jdbcTemplate.update("""
+                INSERT INTO product_embedding_sync (ma_san_pham, content_hash) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE content_hash = VALUES(content_hash), updated_at = CURRENT_TIMESTAMP""",
+                doc.getId(), hash);
+        return true;
+    }
+
+    private static String bamNoiDung(Document doc) {
+        try {
+            StringBuilder sb = new StringBuilder(Objects.toString(doc.getText(), ""));
+            new TreeMap<>(doc.getMetadata()).forEach((k, v) -> sb.append('|').append(k).append(':').append(v));
+            byte[] h = MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(h);
+        } catch (Exception e) {
+            throw new IllegalStateException("Không thể tạo dấu vân tay tài liệu sản phẩm", e);
+        }
+    }
+
+    private void xoaPersistent(String maSanPham) {
+        persistentStore.delete(List.of(maSanPham));
+        jdbcTemplate.update("DELETE FROM product_embedding_sync WHERE ma_san_pham = ?", maSanPham);
+    }
+
     public synchronized void indexProduct(SanPham sp) {
         if (sp == null) return;
+        if (dungPersistent()) {
+            try {
+                if (sp.getTrangThai() == TrangThaiSanPham.DANG_KINH_DOANH) {
+                    if (dongBoTaiLieu(documentBuilder.build(sp))) {
+                        log.info("Đã cập nhật embedding MariaDB cho sản phẩm {}", sp.getMaSanPham());
+                    }
+                } else {
+                    xoaPersistent(sp.getMaSanPham());
+                }
+                return;
+            } catch (RuntimeException e) {
+                if (!laLoiCsdl(e)) {
+                    log.warn("Lỗi khi cập nhật vector store cho sản phẩm {}: {}", sp.getMaSanPham(), e.getMessage());
+                    return;
+                }
+                chuyenSangBoNho(e);
+            }
+        }
         VectorStore store = getVectorStore();
         try {
             store.delete(List.of(sp.getMaSanPham()));
@@ -142,6 +282,15 @@ public class SemanticSearchService {
 
     public synchronized void removeProduct(String maSanPham) {
         if (maSanPham == null) return;
+        if (dungPersistent()) {
+            try {
+                xoaPersistent(maSanPham);
+                log.info("Đã gỡ sản phẩm {} khỏi vector store MariaDB", maSanPham);
+                return;
+            } catch (RuntimeException e) {
+                chuyenSangBoNho(e);
+            }
+        }
         try {
             getVectorStore().delete(List.of(maSanPham));
             log.info("Đã gỡ sản phẩm {} khỏi vector store", maSanPham);
@@ -165,7 +314,7 @@ public class SemanticSearchService {
         }
 
         // Ensure store is populated
-        if (!initialized || ((PhoneNestVectorStore) getVectorStore()).size() == 0) {
+        if (!initialized || soTaiLieu() == 0) {
             reindexAll();
         }
 
@@ -180,6 +329,9 @@ public class SemanticSearchService {
                     .build();
             rawCandidates = getVectorStore().similaritySearch(req);
         } catch (Exception e) {
+            if (dungPersistent() && laLoiCsdl(e)) {
+                chuyenSangBoNho(e);
+            }
             log.warn("Vector similarity search thất bại ({}), chuyển sang fallback: {}", e.getClass().getSimpleName(), e.getMessage());
             return fallbackSearch(query, maxResults);
         }
@@ -265,7 +417,8 @@ public class SemanticSearchService {
         status.put("dimensions", embeddingModel.dimensions());
         boolean available = embeddingModel.isAvailable();
         status.put("available", available);
-        status.put("indexedDocuments", vectorStore != null ? ((PhoneNestVectorStore) vectorStore).size() : 0);
+        status.put("indexedDocuments", soTaiLieu());
+        status.put("storage", dungPersistent() ? "MARIADB" : "IN_MEMORY");
         status.put("mode", available ? "VECTOR_SEMANTIC" : "KEYWORD_FALLBACK");
         if (!available) {
             status.put("reason", "Không thể kết nối đến Ollama tại " + embeddingModel.getBaseUrl() + ". Đảm bảo dịch vụ 'ollama serve' đang chạy.");

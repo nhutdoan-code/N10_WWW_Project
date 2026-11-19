@@ -55,7 +55,7 @@ File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất c�
 > 2. **Chỉ dùng cho database mới/trống**: `phonenest_full.sql` hoàn toàn **KHÔNG** chứa lệnh `DROP DATABASE` hay `CREATE DATABASE`, và **KHÔNG** chỉ định cứng `USE <db>`.
 > 3. **Cơ chế bảo vệ 2 lớp ngăn chặn tác động database không trống:**
 >    - **Lớp 1 (Fail-fast Pre-check):** Ngay đầu file `phonenest_full.sql`, một truy vấn kiểm tra tự động `information_schema.TABLES` sẽ kích hoạt lỗi hủy lệnh ngay lập tức (`ERROR 1103`) nếu database đích đang chứa bất kỳ bảng nào, ngăn chặn triệt để tình trạng ghi đè hoặc tạo bảng chắp vá trên database có sẵn dữ liệu.
->    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 38 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
+>    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 42 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
 > 4. Tuyệt đối không dùng `INSERT IGNORE` hay `REPLACE INTO`.
 
 **Quy trình kiểm tra database đích trống và import an toàn:**
@@ -97,6 +97,7 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 11. `mariadb -h 127.0.0.1 -P 3307 -u root -p < DB/migrations/11_user_behavior_tracking.sql`
 12. *(sau 12–18)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/19_new_customer_voucher.sql` — chỉ thêm dữ liệu voucher khách hàng mới, không đổi schema.
 13. *(sau 17–18)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/20_return_refund_restock_admin.sql` — thêm cột đối soát hoàn tiền / nhập lại kho cho đổi trả.
+14. *(sau 20)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/21_chat_history_vector_store.sql` — bảng lịch sử ChatBox (`CuocHoiThoaiChat`, `TinNhanChat`) và vector store sản phẩm trong MariaDB (`phonenest_vector_store`, `product_embedding_sync`). Cần MariaDB ≥ 11.7 (kiểu `VECTOR`). Bắt buộc để dùng ChatBox khi đã đăng nhập; vector store tự quay về bộ nhớ nếu thiếu bảng. Rollback: `21_chat_history_vector_store_rollback.sql`.
 
 ---
 
