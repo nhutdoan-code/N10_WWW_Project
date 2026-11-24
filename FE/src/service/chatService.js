@@ -17,7 +17,8 @@ export const chatService = {
     api.post('/chat', {
       message,
       conversationId: conversationId || null,
-      visitorId: visitorId || getVisitorId(),
+      // Backend chỉ nhận visitorId dạng UUID v4; id phiên của tracking ("sess_...") không hợp lệ -> dùng UUID riêng.
+      visitorId: visitorId && UUID_REGEX.test(visitorId) ? visitorId : getVisitorId(),
     }, config),
 
   getConversations: () => api.get('/chat/conversations'),

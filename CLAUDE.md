@@ -45,7 +45,7 @@ Database: import into an **empty** `BanDienThoai` DB (utf8mb4). `phonenest_full.
 - Payments: MoMo test gateway (`MomoPaymentService`, `PaymentController`), configured via `MOMO_*` env vars. IPN must be a public HTTPS URL; signature and amount are verified against the order before recording payment.
 
 ### AI
-- Chat: Spring AI `ChatClient` backed by Google Gemini (`spring.ai.model.chat=google-genai`, `gemini-2.5-flash`) in `ChatService`, personalized with `UserPreferenceAggregationService` (built from `HanhViNguoiDung` tracking events) and product recommendations. Chat history is isolated per user.
+- Chat: Spring AI `ChatClient` backed by Google Gemini (`spring.ai.model.chat=google-genai`, `gemini-3.8-flash`, override with `GEMINI_MODEL`) in `ChatService`, personalized with `UserPreferenceAggregationService` (built from `HanhViNguoiDung` tracking events) and product recommendations. Chat history is isolated per user.
 - Embeddings / semantic search: `service/ai/` — custom `PhoneNestEmbeddingModel` calls local Ollama `bge-m3` (1024 dims, `phonenest.ai.embedding.*` properties), `PhoneNestVectorStore` is an in-app vector store indexed at startup from `ProductSemanticDocumentBuilder`. If Ollama is down, `SemanticSearchService` falls back to keyword search instead of failing.
 
 ## Frontend architecture
