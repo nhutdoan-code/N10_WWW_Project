@@ -34,8 +34,13 @@ public class ChatCartService {
 
     private static final Pattern SO_LUONG = Pattern.compile("\\bthem\\s+(\\d+)\\b");
     private static final Pattern MA_SAN_PHAM = Pattern.compile("\\bsp\\s*\\d+\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RAM = Pattern.compile("\\b(\\d+)\\s*gb\\s*ram\\b");
-    private static final Pattern BO_NHO = Pattern.compile("\\b(\\d+)\\s*gb\\s*(rom|bo nho|luu tru)\\b");
+    // Moi cum dung luong "12gb", "512 gb", "1tb"; phan biet RAM / bo nho trong layDungLuong.
+    private static final Pattern DUNG_LUONG = Pattern.compile("(?<![a-z0-9])(\\d+)\\s*(gb|tb)(?![a-z0-9])");
+    private static final Pattern RAM_PHIA_SAU = Pattern.compile("^\\s*ram\\b");
+    private static final Pattern RAM_PHIA_TRUOC = Pattern.compile("(?:^|\\s)ram\\s*$");
+    private static final Pattern RAM_CUA_CUM_TRUOC = Pattern.compile("\\d+\\s*gb\\s*ram\\s*$");
+    /** RAM dien thoai khong qua 24GB; con so >= nguong nay (khong ghi "ram") la bo nho trong. */
+    private static final int NGUONG_BO_NHO_GB = 32;
     private static final Pattern THU_TU = Pattern.compile("\\b(?:thu|so)\\s*(\\d+)\\b");
     private static final String[] MAU_SAC = {"den", "trang", "xanh", "tim", "vang", "bac", "hong", "xam", "kem", "do", "nau"};
 
@@ -62,9 +67,7 @@ public class ChatCartService {
     public boolean laTiepTucChonPhienBan(String noiDung, List<Message> history) {
         if (noiDung == null || noiDung.isBlank() || history == null || history.isEmpty()) return false;
 
-        String text = chuanHoa(noiDung);
-        boolean coThongTinPhienBan = layMauSac(text) != null || RAM.matcher(text).find() || BO_NHO.matcher(text).find();
-        if (!coThongTinPhienBan) return false;
+        if (!coThongTinPhienBan(chuanHoa(noiDung))) return false;
 
         for (int i = history.size() - 1; i >= 0; i--) {
             if (history.get(i) instanceof AssistantMessage assistantMessage && assistantMessage.getText() != null && !assistantMessage.getText().isBlank()) {
@@ -103,7 +106,9 @@ public class ChatCartService {
 
         List<SanPhamDto> sanPhamTimDuoc = timSanPhamTheoMa(cauHoi, danhSachSanPham);
         if (sanPhamTimDuoc.isEmpty()) sanPhamTimDuoc = timSanPhamTheoTen(cauHoi, danhSachSanPham);
-        if (sanPhamTimDuoc.isEmpty() && laThamChieuLichSu(cauHoi)) {
+        // "may nay"... hoac dang tra loi cau hoi chon phien ban cua tro ly (chi gom mau / RAM / bo nho):
+        // lay san pham vua tu van. Khong suy tu lich su khi tro ly khong vua hoi chon phien ban, tranh them nham may cu.
+        if (sanPhamTimDuoc.isEmpty() && (laThamChieuLichSu(cauHoi) || laTiepTucChonPhienBan(cauHoi, history))) {
             sanPhamTimDuoc = timSanPhamTrongLichSu(history, danhSachSanPham);
         }
 
@@ -142,21 +147,14 @@ public class ChatCartService {
         }
 
         String cauHoiChuanHoa = chuanHoa(cauHoi);
-        String mauSac = layMauSac(cauHoiChuanHoa);
-        if (mauSac != null) {
-            phienBanConHang = phienBanConHang.stream().filter(pb -> chuanHoa(pb.mauSac()).contains(mauSac)).toList();
-        }
+        phienBanConHang = locTheoMauSac(cauHoiChuanHoa, phienBanConHang);
 
-        Matcher ramMatcher = RAM.matcher(cauHoiChuanHoa);
-        if (ramMatcher.find()) {
-            int ram = Integer.parseInt(ramMatcher.group(1));
-            phienBanConHang = phienBanConHang.stream().filter(pb -> Objects.equals(pb.ram(), ram)).toList();
+        DungLuong dungLuong = layDungLuong(cauHoiChuanHoa);
+        if (dungLuong.ram() != null) {
+            phienBanConHang = phienBanConHang.stream().filter(pb -> Objects.equals(pb.ram(), dungLuong.ram())).toList();
         }
-
-        Matcher boNhoMatcher = BO_NHO.matcher(cauHoiChuanHoa);
-        if (boNhoMatcher.find()) {
-            int boNho = Integer.parseInt(boNhoMatcher.group(1));
-            phienBanConHang = phienBanConHang.stream().filter(pb -> Objects.equals(pb.boNho(), boNho)).toList();
+        if (dungLuong.boNho() != null) {
+            phienBanConHang = phienBanConHang.stream().filter(pb -> Objects.equals(pb.boNho(), dungLuong.boNho())).toList();
         }
 
         if (phienBanConHang.isEmpty()) {
@@ -286,6 +284,68 @@ public class ChatCartService {
     }
 
     // 9. NHẬN DIỆN MÀU SẮC
+    /**
+     * Uu tien ten mau that cua phien ban xuat hien nguyen cum trong cau ("xanh da troi" -> Xanh da troi,
+     * khong lan sang Xanh la / Xanh navy); khop nhieu thi lay ten dai nhat. Khong co thi loc theo tu khoa mau chung.
+     */
+    private List<SanPhamDto.PhienBan> locTheoMauSac(String cauHoiChuanHoa, List<SanPhamDto.PhienBan> phienBans) {
+        int doDaiKhopNhat = 0;
+        for (SanPhamDto.PhienBan pb : phienBans) {
+            String mau = chuanHoa(pb.mauSac());
+            if (!mau.isBlank() && chuaCum(cauHoiChuanHoa, mau)) doDaiKhopNhat = Math.max(doDaiKhopNhat, mau.length());
+        }
+        if (doDaiKhopNhat > 0) {
+            int doDai = doDaiKhopNhat;
+            return phienBans.stream().filter(pb -> {
+                String mau = chuanHoa(pb.mauSac());
+                return mau.length() == doDai && chuaCum(cauHoiChuanHoa, mau);
+            }).toList();
+        }
+        String mauSac = layMauSac(cauHoiChuanHoa);
+        if (mauSac == null) return phienBans;
+        return phienBans.stream().filter(pb -> chuanHoa(pb.mauSac()).contains(mauSac)).toList();
+    }
+
+    private static boolean chuaCum(String text, String cum) {
+        return Pattern.compile("(?<![a-z0-9])" + Pattern.quote(cum) + "(?![a-z0-9])").matcher(text).find();
+    }
+
+    private boolean coThongTinPhienBan(String cauHoiChuanHoa) {
+        DungLuong dungLuong = layDungLuong(cauHoiChuanHoa);
+        return layMauSac(cauHoiChuanHoa) != null || dungLuong.ram() != null || dungLuong.boNho() != null;
+    }
+
+    // 9b. NHẬN DIỆN RAM / BỘ NHỚ
+    record DungLuong(Integer ram, Integer boNho) {}
+
+    /**
+     * "12gb ram", "ram 12gb" -> RAM; "512gb", "512gb bo nho", "1tb" -> bo nho (1TB = 1024GB nhu trong CSDL).
+     * Con so khong kem chu "ram": >= 32GB la bo nho, nho hon la RAM.
+     */
+    DungLuong layDungLuong(String cauHoiChuanHoa) {
+        Integer ram = null;
+        Integer boNho = null;
+        Matcher m = DUNG_LUONG.matcher(cauHoiChuanHoa);
+        while (m.find()) {
+            int giaTri;
+            try {
+                giaTri = Integer.parseInt(m.group(1));
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            boolean laTb = "tb".equals(m.group(2));
+            String truoc = cauHoiChuanHoa.substring(0, m.start());
+            boolean ghiRam = RAM_PHIA_SAU.matcher(cauHoiChuanHoa.substring(m.end())).find()
+                    || (RAM_PHIA_TRUOC.matcher(truoc).find() && !RAM_CUA_CUM_TRUOC.matcher(truoc).find());
+            if (!laTb && (ghiRam || giaTri < NGUONG_BO_NHO_GB)) {
+                if (ram == null) ram = giaTri;
+            } else if (boNho == null) {
+                boNho = laTb ? giaTri * 1024 : giaTri;
+            }
+        }
+        return new DungLuong(ram, boNho);
+    }
+
     private String layMauSac(String noiDung) {
         for (String mau : MAU_SAC) {
             if (Pattern.compile("(?<![a-z])" + Pattern.quote(mau) + "(?![a-z])").matcher(noiDung).find()) {
