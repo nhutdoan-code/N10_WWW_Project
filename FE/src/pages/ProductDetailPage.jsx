@@ -19,6 +19,7 @@ import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
 import { anhTheoPhienBan, danhSachAnhTheoPhienBan } from '../utils/image';
 import { productStatus } from '../utils/stock';
 import { SPEC_FIELDS, specValue } from '../utils/specs';
+import { mauHex } from '../utils/colorSwatch';
 import {
   isProductDiscontinued,
   isVariantDiscontinued,
@@ -319,17 +320,22 @@ export default function ProductDetailPage() {
                       <button
                         key={mau}
                         type="button"
-                        className={`variant-option ${active ? 'active' : ''} ${hetHangMau ? 'disabled' : ''}`}
+                        className={`variant-option color-option ${active ? 'active' : ''} ${hetHangMau ? 'disabled' : ''}`}
                         onClick={() => chonMauSac(mau)}
                         title={titleText}
+                        aria-pressed={active}
                         disabled={!isNgungKD && varNgungKD}
                       >
-                        {anhMau(pv) && <ProductImage className="variant-swatch" src={anhMau(pv)} alt="" />}
-                        <span>{mau}</span>
-                        {!isNgungKD && varNgungKD && <small className="muted"> (Ngừng KD)</small>}
-                        {!isNgungKD && !varNgungKD && varBlocked && <small className="muted"> (Khóa)</small>}
-                        {!isNgungKD && !varNgungKD && !varBlocked && varPending && <small className="muted"> (Chờ duyệt)</small>}
-                        {!isNgungKD && !varNgungKD && !varBlocked && !varPending && hetHangMau && <small className="muted"> (Hết hàng)</small>}
+                        {anhMau(pv)
+                          ? <ProductImage className="variant-swatch" src={anhMau(pv)} alt="" />
+                          : <span className="color-dot" style={{ background: mauHex(mau) }} aria-hidden="true" />}
+                        <span className="color-text">
+                          <span className="color-name">{mau}</span>
+                          {!isNgungKD && varNgungKD && <small className="muted">Ngừng KD</small>}
+                          {!isNgungKD && !varNgungKD && varBlocked && <small className="muted">Khóa bán</small>}
+                          {!isNgungKD && !varNgungKD && !varBlocked && varPending && <small className="muted">Chờ duyệt</small>}
+                          {!isNgungKD && !varNgungKD && !varBlocked && !varPending && hetHangMau && <small className="muted">Hết hàng</small>}
+                        </span>
                       </button>
                     );
                   })}

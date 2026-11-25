@@ -2,6 +2,7 @@ package nhom10.phonenest.service;
 
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.CheckoutDto;
+import nhom10.phonenest.dto.KetQuaPhiVanChuyen;
 import nhom10.phonenest.entity.*;
 import nhom10.phonenest.enums.*;
 import nhom10.phonenest.exception.AppException;
@@ -15,6 +16,7 @@ import nhom10.phonenest.util.DungLuongUtil;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -58,6 +60,11 @@ public class ThanhToanService {
     }
 
     public CheckoutDto xemTruoc(String maKh, String maDiaChi, String ma, Integer sl) {
+        return xemTruoc(maKh, maDiaChi, ma, sl, null);
+    }
+
+    /** {@code phuongThuc} (có thể null) chỉ dùng để tính phụ phí COD cho đơn giá trị lớn. */
+    public CheckoutDto xemTruoc(String maKh, String maDiaChi, String ma, Integer sl, PhuongThucTt phuongThuc) {
         Map<String, Integer> muc = mucMua(maKh, ma, sl);
         DiaChi dc = diaChiRepository.findById(maDiaChi).filter(x -> x.getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Địa chỉ giao hàng không hợp lệ"));
@@ -81,16 +88,22 @@ public class ThanhToanService {
         }).toList();
 
         BigDecimal tam = items.stream().map(i -> i.donGia().multiply(BigDecimal.valueOf(i.soLuong()))).reduce(BigDecimal.ZERO, BigDecimal::add);
-        PhiVanChuyen pvc = phiVanChuyenService.theoDiaChi(dc.getMaTinh());
-        BigDecimal phi = phiVanChuyenService.tinhPhi(pvc, tam);
+        KetQuaPhiVanChuyen vc = phiVanChuyenService.tinhChoDiaChi(dc, tam, phuongThuc, LocalDateTime.now());
         boolean moi = !donHangRepository.existsByKhachHangMaKhAndTrangThaiNot(maKh, TrangThaiDonHang.DA_HUY);
         // Chỉ liệt kê mã đang bật, đang trong thời gian hiệu lực và còn lượt; mã chưa đủ điều kiện
         // theo đơn (đơn tối thiểu, khách mới, giới hạn mỗi khách) vẫn hiện kèm lý do để khách biết.
         LocalDate homNay = LocalDate.now();
         List<CheckoutDto.Voucher> vs = khuyenMaiRepository.findAll().stream()
                 .filter(k -> hienThiOThanhToan(k, homNay, moi))
-                .map(k -> voucher(k, tam, phi, moi, maKh)).sorted(Comparator.comparing(CheckoutDto.Voucher::apDungDuoc).reversed().thenComparing(CheckoutDto.Voucher::soTienGiam, Comparator.reverseOrder())).toList();
-        return new CheckoutDto(tam, phi, pvc.getMienPhiTu(), diaChiService.tenTinh(dc.getMaTinh()), pvc.getThoiGianGiao(), vs, items);
+                .map(k -> voucher(k, tam, vc, moi, maKh)).sorted(Comparator.comparing(CheckoutDto.Voucher::apDungDuoc).reversed().thenComparing(CheckoutDto.Voucher::soTienGiam, Comparator.reverseOrder())).toList();
+        return new CheckoutDto(tam, vc.tongPhi(), vc.mienPhiTu(), diaChiService.tenTinh(dc.getMaTinh()), vc.thoiGianGiao(), vs, items, vc);
+    }
+
+    /** Lý do voucher vận chuyển không có tác dụng với đơn này (null = dùng được). */
+    static String lyDoKhongGiamPhi(KetQuaPhiVanChuyen phiVc) {
+        if (phiVc.mienPhi()) return "Đơn hàng đã được miễn phí vận chuyển";
+        if (phiVc.phiDuocGiam().signum() == 0) return "Khu vực này không thu phí giao hàng";
+        return null;
     }
 
     private PhienBanSanPham resolve(String ma) {
@@ -106,11 +119,13 @@ public class ThanhToanService {
                 && (k.getSoLuong() == null || k.getDaDung() < k.getSoLuong());
     }
 
-    private CheckoutDto.Voucher voucher(KhuyenMai k, BigDecimal tam, BigDecimal phi, boolean moi, String maKh) {
+    private CheckoutDto.Voucher voucher(KhuyenMai k, BigDecimal tam, KetQuaPhiVanChuyen phiVc, boolean moi, String maKh) {
         boolean vc = k.getLoai() == LoaiKhuyenMai.VAN_CHUYEN;
         String ly = khuyenMaiService.lyDoKhongDung(k, tam, moi, maKh);
-        if (ly == null && vc && phi.signum() == 0) ly = "Phí vận chuyển đã được miễn phí";
-        BigDecimal g = khuyenMaiService.tinhGiam(k, vc ? phi : tam);
-        return new CheckoutDto.Voucher(k.getMaKm(), k.getTenKm(), k.getLoai().name(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(), k.getDonToiThieu(), k.getNgayBatDau(), k.getNgayKetThuc(), k.getDieuKienApDung(), k.isChiKhachMoi(), ly == null, ly, g);
+        if (ly == null && vc) ly = lyDoKhongGiamPhi(phiVc);
+        // Voucher vận chuyển chỉ giảm phí giao hàng theo vùng, không giảm phí khai giá / phụ phí COD.
+        BigDecimal g = khuyenMaiService.tinhGiam(k, vc ? phiVc.phiDuocGiam() : tam);
+        return new CheckoutDto.Voucher(k.getMaKm(), k.getTenKm(), k.getLoai().name(), k.getPhanTramGiam(), k.getSoTienGiamToiDa(), k.getDonToiThieu(), k.getNgayBatDau(), k.getNgayKetThuc(), k.getDieuKienApDung(), k.isChiKhachMoi(), ly == null, ly, g,
+                k.getKieuGiam() == null ? KieuGiam.PHAN_TRAM.name() : k.getKieuGiam().name(), k.getSoTienGiamCoDinh());
     }
 }

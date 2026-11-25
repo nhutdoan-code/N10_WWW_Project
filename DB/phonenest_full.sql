@@ -1,8 +1,8 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..21 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..23 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23 (pn_migration_log có M12/M15/M16).
 --   * 42 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
@@ -12,7 +12,7 @@
 --       - 100 sản phẩm ngừng bán làm dữ liệu mẫu.
 --       - Tài khoản: admin@phonenest.vn, khach1@, khach2@, luuvanquoc9999@ (bộ cũ của bandienthoai) +
 --         admin@phonenest.com, an@, binh@, hoang@ (bộ cũ của phonenest_full.sql, mật khẩu giữ nguyên).
---       - Khách hàng, địa chỉ, 34 tỉnh / phường xã, phí vận chuyển, voucher.
+--       - Khách hàng, địa chỉ, 34 tỉnh / phường xã, phí vận chuyển theo 4 vùng (M22, đủ 34 tỉnh + mức mặc định), voucher theo M23 (giảm tiền mặt theo bậc / % có trần).
 --       - KHÔNG có đơn hàng / giỏ hàng / đánh giá cũ (dữ liệu thử nghiệm đã dọn).
 --
 -- QUY TẮC AN TOÀN
@@ -692,10 +692,14 @@ CREATE TABLE `DonHang` (
   `giamGia` decimal(15,2) NOT NULL DEFAULT 0.00,
   `phiVanChuyen` decimal(15,2) NOT NULL DEFAULT 0.00,
   `giamPhiVanChuyen` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `phiKhaiGia` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `phuPhiCod` decimal(15,2) NOT NULL DEFAULT 0.00,
   `tongThanhToan` decimal(15,2) NOT NULL DEFAULT 0.00,
   `ngayMua` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayCapNhat` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayGiao` datetime DEFAULT NULL,
+  `ngayGiaoDuKienTu` date DEFAULT NULL,
+  `ngayGiaoDuKienDen` date DEFAULT NULL,
   `ngayKhachXacNhan` datetime DEFAULT NULL,
   `nguoiXacNhan` varchar(50) DEFAULT NULL,
   `trangThai` enum('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
@@ -1116,7 +1120,9 @@ CREATE TABLE `KhuyenMai` (
   `maKm` varchar(50) NOT NULL,
   `tenKm` varchar(150) NOT NULL,
   `loai` enum('DON_HANG','VAN_CHUYEN') NOT NULL DEFAULT 'DON_HANG',
-  `phanTramGiam` decimal(5,2) NOT NULL,
+  `kieuGiam` enum('PHAN_TRAM','SO_TIEN') NOT NULL DEFAULT 'PHAN_TRAM',
+  `phanTramGiam` decimal(5,2) DEFAULT NULL,
+  `soTienGiamCoDinh` decimal(15,2) DEFAULT NULL,
   `soTienGiamToiDa` decimal(15,2) DEFAULT NULL,
   `donToiThieu` decimal(15,2) NOT NULL DEFAULT 0.00,
   `soLuong` int(11) DEFAULT NULL,
@@ -1128,20 +1134,23 @@ CREATE TABLE `KhuyenMai` (
   `dieuKienApDung` text DEFAULT NULL,
   `trangThaiHoatDong` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`maKm`),
-  CONSTRAINT `CK_KhuyenMai_DaDungNonNegative` CHECK (`daDung` >= 0)
+  CONSTRAINT `CK_KhuyenMai_DaDungNonNegative` CHECK (`daDung` >= 0),
+  CONSTRAINT `CK_KhuyenMai_KieuGiam` CHECK (`kieuGiam` = 'PHAN_TRAM' and `phanTramGiam` > 0 and `phanTramGiam` <= 100 and `soTienGiamToiDa` is not null or `kieuGiam` = 'SO_TIEN' and `soTienGiamCoDinh` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 /*!40000 ALTER TABLE `KhuyenMai` DISABLE KEYS */;
-INSERT INTO `KhuyenMai` VALUES
-('FREESHIP','Miễn phí vận chuyển','VAN_CHUYEN',100.00,30000.00,500000.00,NULL,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Đơn hàng từ 500.000đ, giảm tối đa 30.000đ phí giao hàng',1),
-('HETHAN20','Khuyến mãi đã hết hạn (dùng để thử lỗi)','DON_HANG',20.00,3000000.00,0.00,NULL,0,0,1,'2025-01-01 00:00:00','2025-12-31 00:00:00',NULL,1),
-('KHACHMOI10','Khách hàng mới giảm 10%','DON_HANG',10.00,NULL,0.00,NULL,0,1,1,'2026-01-01 00:00:00','2030-12-31 00:00:00','Dành cho khách hàng mới: giảm 10% cho đơn hàng đầu tiên, mỗi tài khoản dùng 1 lần',1),
-('NEST10','Giảm 10% đơn hàng','DON_HANG',10.00,2000000.00,0.00,NULL,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Áp dụng cho mọi đơn hàng',1),
-('SALE10TR','Giảm 8% cho đơn từ 10 triệu','DON_HANG',8.00,1500000.00,10000000.00,100,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Đơn hàng từ 10.000.000đ, số lượng có hạn',1),
-('SHIP50','Giảm 50% phí vận chuyển','VAN_CHUYEN',50.00,25000.00,0.00,NULL,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Áp dụng cho mọi đơn hàng',1),
-('WELCOME5','Chào bạn mới giảm 5%','DON_HANG',5.00,500000.00,0.00,NULL,0,1,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Chỉ dành cho đơn hàng đầu tiên',1);
+INSERT INTO `KhuyenMai` (maKm,tenKm,loai,kieuGiam,phanTramGiam,soTienGiamCoDinh,soTienGiamToiDa,donToiThieu,soLuong,daDung,chiKhachMoi,gioiHanMoiKhach,ngayBatDau,ngayKetThuc,dieuKienApDung,trangThaiHoatDong) VALUES
+('FLAGSHIP7','Siêu sale flagship giảm 7%','DON_HANG','PHAN_TRAM',7.00,NULL,1000000.00,25000000.00,100,0,0,1,'2026-11-25 00:00:00','2027-12-31 00:00:00','Giảm 7%, tối đa 1.000.000đ, cho đơn flagship từ 25.000.000đ. Số lượng có hạn (100 lượt)',1),
+('FREESHIP','Miễn phí vận chuyển','VAN_CHUYEN','PHAN_TRAM',100.00,NULL,50000.00,1000000.00,NULL,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Miễn phí giao hàng theo vùng, tối đa 50.000đ, cho đơn từ 1.000.000đ chưa đạt ngưỡng freeship. Không gồm phí khai giá và phụ phí COD',1),
+('GIAM150K','Giảm 150.000đ máy tầm trung','DON_HANG','SO_TIEN',NULL,150000.00,NULL,3000000.00,NULL,0,0,1,'2026-11-25 00:00:00','2027-12-31 00:00:00','Giảm thẳng 150.000đ cho đơn từ 3.000.000đ. Mỗi tài khoản dùng 1 lần',1),
+('GIAM400K','Giảm 400.000đ máy cận cao cấp','DON_HANG','SO_TIEN',NULL,400000.00,NULL,7000000.00,NULL,0,0,1,'2026-11-25 00:00:00','2027-12-31 00:00:00','Giảm thẳng 400.000đ cho đơn từ 7.000.000đ. Mỗi tài khoản dùng 1 lần',1),
+('GIAM800K','Giảm 800.000đ flagship','DON_HANG','SO_TIEN',NULL,800000.00,NULL,15000000.00,200,0,0,1,'2026-11-25 00:00:00','2027-12-31 00:00:00','Giảm thẳng 800.000đ cho đơn từ 15.000.000đ. Số lượng có hạn (200 lượt)',1),
+('HETHAN20','Khuyến mãi đã hết hạn (dùng để thử lỗi)','DON_HANG','PHAN_TRAM',5.00,NULL,300000.00,5000000.00,NULL,0,0,1,'2025-01-01 00:00:00','2025-12-31 00:00:00','Mã thử nghiệm đã hết hạn: giảm 5% tối đa 300.000đ cho đơn từ 5.000.000đ',1),
+('KHACHMOI150K','Quà khách hàng mới 150.000đ','DON_HANG','SO_TIEN',NULL,150000.00,NULL,1000000.00,NULL,0,1,1,'2026-11-25 00:00:00','2030-12-31 00:00:00','Dành cho đơn hàng đầu tiên của tài khoản, giảm 150.000đ cho đơn từ 1.000.000đ',1),
+('NEST5','Giảm 5% tối đa 300.000đ','DON_HANG','PHAN_TRAM',5.00,NULL,300000.00,5000000.00,NULL,0,0,1,'2026-11-25 00:00:00','2027-12-31 00:00:00','Giảm 5%, tối đa 300.000đ, cho đơn từ 5.000.000đ',1),
+('SHIP50','Giảm 50% phí vận chuyển','VAN_CHUYEN','PHAN_TRAM',50.00,NULL,25000.00,0.00,NULL,0,0,1,'2026-01-01 00:00:00','2027-12-31 00:00:00','Giảm 50% phí giao hàng theo vùng, tối đa 25.000đ, cho mọi đơn chưa đạt ngưỡng freeship. Không gồm phí khai giá và phụ phí COD',1);
 /*!40000 ALTER TABLE `KhuyenMai` ENABLE KEYS */;
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
@@ -1891,22 +1900,60 @@ SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 CREATE TABLE `PhiVanChuyen` (
   `maPhi` varchar(50) NOT NULL,
   `maTinh` varchar(10) DEFAULT NULL,
+  `vung` tinyint(4) DEFAULT NULL,
   `phiCoBan` decimal(15,2) NOT NULL,
+  `phuPhiXa` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `phuPhiDacKhu` decimal(15,2) NOT NULL DEFAULT 0.00,
   `mienPhiTu` decimal(15,2) DEFAULT NULL,
+  `soNgayGiaoToiThieu` int(11) DEFAULT NULL,
+  `soNgayGiaoToiDa` int(11) DEFAULT NULL,
   `thoiGianGiao` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`maPhi`),
   UNIQUE KEY `maTinh` (`maTinh`),
-  CONSTRAINT `FK_PhiVanChuyen_TinhThanh` FOREIGN KEY (`maTinh`) REFERENCES `TinhThanh` (`maTinh`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `FK_PhiVanChuyen_TinhThanh` FOREIGN KEY (`maTinh`) REFERENCES `TinhThanh` (`maTinh`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `CK_PhiVanChuyen_Vung` CHECK (`vung` is null or `vung` between 0 and 3),
+  CONSTRAINT `CK_PhiVanChuyen_SoNgay` CHECK (`soNgayGiaoToiThieu` is null or `soNgayGiaoToiDa` is null or `soNgayGiaoToiThieu` >= 0 and `soNgayGiaoToiThieu` <= `soNgayGiaoToiDa`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 /*!40000 ALTER TABLE `PhiVanChuyen` DISABLE KEYS */;
 INSERT INTO `PhiVanChuyen` VALUES
-('PVC01','79',25000.00,3000000.00,'1 - 2 ngày'),
-('PVC02','01',40000.00,5000000.00,'2 - 3 ngày'),
-('PVC03','48',40000.00,5000000.00,'2 - 3 ngày'),
-('PVC99',NULL,50000.00,10000000.00,'3 - 5 ngày');
+('PVC01','79',0,15000.00,15000.00,30000.00,3000000.00,0,1,'Trong ngày - 1 ngày'),
+('PVC02','01',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVC03','48',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVC99',NULL,NULL,50000.00,0.00,15000.00,5000000.00,3,5,'3 - 5 ngày'),
+('PVCT04','04',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT08','08',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT11','11',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT12','12',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT14','14',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT15','15',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT19','19',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT20','20',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT22','22',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT24','24',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT25','25',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT31','31',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT33','33',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT37','37',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT38','38',3,50000.00,0.00,15000.00,5000000.00,3,4,'3 - 4 ngày'),
+('PVCT40','40',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT42','42',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT44','44',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT46','46',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT51','51',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT52','52',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT56','56',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT66','66',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT68','68',2,40000.00,0.00,15000.00,5000000.00,2,3,'2 - 3 ngày'),
+('PVCT75','75',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT80','80',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT82','82',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT86','86',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT91','91',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT92','92',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày'),
+('PVCT96','96',1,30000.00,0.00,15000.00,3000000.00,1,2,'1 - 2 ngày');
 /*!40000 ALTER TABLE `PhiVanChuyen` ENABLE KEYS */;
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
@@ -5667,6 +5714,7 @@ CREATE TABLE `ThongBao` (
   `maTk` varchar(50) NOT NULL,
   `tieuDe` varchar(200) DEFAULT NULL,
   `noiDung` text NOT NULL,
+  `duongDan` varchar(255) DEFAULT NULL,
   `loai` varchar(50) DEFAULT NULL,
   `daDoc` tinyint(1) NOT NULL DEFAULT 0,
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),

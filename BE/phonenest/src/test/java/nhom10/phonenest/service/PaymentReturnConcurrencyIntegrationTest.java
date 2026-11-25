@@ -215,10 +215,10 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
     @Test
     @DisplayName("H1 Khach huy 5 lan + Admin huy dong thoi (COD, co voucher): 1 lan huy, hoan ton 1 lan, hoan luot voucher 1 lan")
     void h1_huyDongThoi() throws Exception {
-        jdbc.update("DELETE FROM sudungkhuyenmai WHERE maKh=? AND maKm='NEST10'", KHACH);
+        jdbc.update("DELETE FROM sudungkhuyenmai WHERE maKh=? AND maKm='GIAM150K'", KHACH);
         int tonTruoc = ton();
-        String don = datDon("COD", "NEST10");
-        int daDung0 = jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='NEST10'", Integer.class);
+        String don = datDon("COD", "GIAM150K");
+        int daDung0 = jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='GIAM150K'", Integer.class);
         assertThat(ton()).isEqualTo(tonTruoc - 1);
         List<Callable<Integer>> v = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
@@ -231,7 +231,7 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         assertThat(kq.stream().filter(s -> s == 200).count()).as(kq.toString()).isEqualTo(1);
         assertThat(ton()).isEqualTo(tonTruoc);
         assertThat(soDongKho(don, "HOAN_HUY_DON")).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='NEST10'", Integer.class)).isEqualTo(daDung0 - 1);
+        assertThat(jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='GIAM150K'", Integer.class)).isEqualTo(daDung0 - 1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sudungkhuyenmai WHERE maDonHang=?", Integer.class, don)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM huydonhang WHERE maDonHang=?", Integer.class, don)).isLessThanOrEqualTo(1);
     }
@@ -240,6 +240,9 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
     @DisplayName("V1 Voucher con 2 luot, 6 don dat dong thoi: dung 2 don dung duoc voucher, daDung khong vuot gioi han")
     void v1_voucherGioiHan() throws Exception {
         jdbc.update("UPDATE khuyenmai SET soLuong=daDung+2, gioiHanMoiKhach=100, trangThaiHoatDong=1, ngayKetThuc='2026-12-31' WHERE maKm='SHIP50'");
+        // M22: voucher vận chuyển không dùng được cho đơn đã freeship -> tạm nâng ngưỡng freeship để đơn có phí ship.
+        jdbc.update("UPDATE phivanchuyen SET mienPhiTu = mienPhiTu + 1000000000 WHERE mienPhiTu IS NOT NULL");
+        try {
         int daDung0 = jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='SHIP50'", Integer.class);
         List<Callable<Integer>> v = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -259,7 +262,10 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         int daDung = jdbc.queryForObject("SELECT daDung FROM khuyenmai WHERE maKm='SHIP50'", Integer.class);
         assertThat(daDung).as(kq.toString()).isEqualTo(daDung0 + 2);
         assertThat(kq.stream().filter(s -> s == 200 || s == 201).count()).as(kq.toString()).isEqualTo(2);
-        jdbc.update("UPDATE khuyenmai SET soLuong=NULL, gioiHanMoiKhach=1 WHERE maKm='SHIP50'");
+        } finally {
+            jdbc.update("UPDATE phivanchuyen SET mienPhiTu = mienPhiTu - 1000000000 WHERE mienPhiTu IS NOT NULL");
+            jdbc.update("UPDATE khuyenmai SET soLuong=NULL, gioiHanMoiKhach=1 WHERE maKm='SHIP50'");
+        }
     }
 
     // ================================================================== Doi tra / hoan tien

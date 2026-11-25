@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import useFetch from '../hooks/useFetch';
+import useScrollToHash from '../hooks/useScrollToHash';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
@@ -66,6 +67,7 @@ export default function ReturnsPage() {
       ...(hauMai || []),
     ].sort((a, b) => new Date(b.ngayTao) - new Date(a.ngayTao));
   });
+  useScrollToHash(!loading && requests != null);
 
   const donHopLe = useMemo(() => (orders || []).filter((o) => {
     const actions = getOrderActions(o.trangThai);
@@ -218,7 +220,7 @@ export default function ReturnsPage() {
         {error && <div className="error">Không tải được yêu cầu: {error} <button className="btn" onClick={reload}>Thử lại</button></div>}
         {!loading && !error && dangLoc.length === 0 && <p className="muted">Chưa có yêu cầu phù hợp.</p>}
         {dangLoc.map((r) => (
-          <article key={r.maYeuCau} className="card after-sales-request">
+          <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request">
             <div className="row between">
               <div><b>{LOAI[r.loai] || r.loai}</b> · <span className="muted">{r.maYeuCau}</span></div>
               <StatusBadge status={r.trangThai} />

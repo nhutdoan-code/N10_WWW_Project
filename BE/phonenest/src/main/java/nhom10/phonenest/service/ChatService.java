@@ -786,8 +786,14 @@ public class ChatService {
                                 .forEach(v -> { them(kq, v.giaBan()); them(kq, v.giaNiemYet()); });
                     }
                 });
-        khuyenMaiRepository.findAll().forEach(k -> { them(kq, k.getSoTienGiamToiDa()); them(kq, k.getDonToiThieu()); });
-        phiVanChuyenRepository.findAll().forEach(p -> { them(kq, p.getPhiCoBan()); them(kq, p.getMienPhiTu()); });
+        khuyenMaiRepository.findAll().forEach(k -> { them(kq, k.getSoTienGiamToiDa()); them(kq, k.getDonToiThieu()); them(kq, k.getSoTienGiamCoDinh()); });
+        phiVanChuyenRepository.findAll().forEach(p -> {
+            them(kq, p.getPhiCoBan()); them(kq, p.getMienPhiTu()); them(kq, p.getPhuPhiXa()); them(kq, p.getPhuPhiDacKhu());
+            if (p.getPhiCoBan() != null && p.getPhuPhiXa() != null) them(kq, p.getPhiCoBan().add(p.getPhuPhiXa()));
+            if (p.getPhiCoBan() != null && p.getPhuPhiDacKhu() != null) them(kq, p.getPhiCoBan().add(p.getPhuPhiDacKhu()));
+        });
+        // Các mốc cố định của công thức phí ship (khai giá / COD) được phép nhắc trong câu trả lời.
+        List.of("3000000", "50000", "15000", "10000000").forEach(v -> them(kq, new BigDecimal(v)));
         return kq;
     }
 
@@ -1078,6 +1084,7 @@ public class ChatService {
     private String voucherText() {
         LocalDate hom = LocalDate.now();
         String ds = khuyenMaiRepository.findAll().stream()
+                .filter(k -> k.isTrangThaiHoatDong() && (k.getSoLuong() == null || k.getDaDung() < k.getSoLuong()))
                 .filter(k -> !hom.isBefore(k.getNgayBatDau()) && !hom.isAfter(k.getNgayKetThuc()))
                 .map(this::moTaVoucher).collect(Collectors.joining("\n"));
         return ds.isEmpty() ? "Hiện chưa có voucher." : ds;
@@ -1085,21 +1092,31 @@ public class ChatService {
 
     private String moTaVoucher(KhuyenMai k) {
         String loai = k.getLoai().name().equals("VAN_CHUYEN") ? "phí vận chuyển" : "đơn hàng";
-        String toiDa = k.getSoTienGiamToiDa() == null ? "" : ", tối đa " + tien(k.getSoTienGiamToiDa());
         String toiThieu = k.getDonToiThieu() != null && k.getDonToiThieu().signum() > 0 ? ", đơn từ " + tien(k.getDonToiThieu()) : "";
-        return "- %s (%s): giảm %s%% %s%s%s".formatted(k.getMaKm(), k.getTenKm(), k.getPhanTramGiam().stripTrailingZeros().toPlainString(), loai, toiDa, toiThieu);
+        String khachMoi = k.isChiKhachMoi() ? ", chỉ khách mua lần đầu" : "";
+        if (k.getKieuGiam() == nhom10.phonenest.enums.KieuGiam.SO_TIEN) {
+            return "- %s (%s): giảm %s %s%s%s".formatted(k.getMaKm(), k.getTenKm(), tien(k.getSoTienGiamCoDinh()), loai, toiThieu, khachMoi);
+        }
+        String toiDa = k.getSoTienGiamToiDa() == null ? "" : ", tối đa " + tien(k.getSoTienGiamToiDa());
+        String phanTram = k.getPhanTramGiam() == null ? "0" : k.getPhanTramGiam().stripTrailingZeros().toPlainString();
+        return "- %s (%s): giảm %s%% %s%s%s%s".formatted(k.getMaKm(), k.getTenKm(), phanTram, loai, toiDa, toiThieu, khachMoi);
     }
 
     private String phiShipText() {
         String ds = phiVanChuyenRepository.findAll().stream()
-                .sorted(Comparator.comparing((PhiVanChuyen p) -> p.getMaTinh() == null))
-                .map(p -> "- %s: %s%s, giao %s".formatted(
+                .sorted(Comparator.comparing((PhiVanChuyen p) -> p.getVung() == null ? 99 : p.getVung()))
+                .map(p -> "- %s (%s): %s%s%s%s, giao %s".formatted(
                         p.getMaTinh() == null ? "Nơi khác" : tinhThanhRepository.findById(p.getMaTinh()).map(t -> t.getTenTinh()).orElse(p.getMaTinh()),
+                        PhiVanChuyenService.tenVung(p.getVung()),
                         tien(p.getPhiCoBan()),
+                        p.getPhuPhiXa() == null || p.getPhuPhiXa().signum() == 0 ? "" : ", xã ngoại thành +" + tien(p.getPhuPhiXa()),
+                        p.getPhuPhiDacKhu() == null || p.getPhuPhiDacKhu().signum() == 0 ? "" : ", đặc khu/đảo +" + tien(p.getPhuPhiDacKhu()),
                         p.getMienPhiTu() == null ? "" : " (miễn phí cho đơn từ " + tien(p.getMienPhiTu()) + ")",
                         p.getThoiGianGiao()
                 )).collect(Collectors.joining("\n"));
-        return ds.isEmpty() ? "Chưa có thông tin phí vận chuyển." : ds;
+        return ds.isEmpty() ? "Chưa có thông tin phí vận chuyển." : ds
+                + "\nĐơn chưa được miễn phí: cộng phí khai giá 0,5% giá trị hàng (tối đa 50.000 ₫) với đơn từ 3.000.000 ₫,"
+                + " và phụ phí 15.000 ₫ nếu thanh toán COD cho đơn trên 10.000.000 ₫. Voucher vận chuyển chỉ giảm phí giao hàng theo vùng.";
     }
 
     private String tien(BigDecimal n) {

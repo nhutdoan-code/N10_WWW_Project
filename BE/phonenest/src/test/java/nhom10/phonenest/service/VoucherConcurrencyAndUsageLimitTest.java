@@ -189,8 +189,7 @@ public class VoucherConcurrencyAndUsageLimitTest {
             return Optional.of(dc);
         });
         when(diaChiService.diaChiDayDu(any())).thenReturn("123 Lê Lợi, Q1, TP.HCM");
-        when(phiVanChuyenService.tinhPhi(any(), any())).thenReturn(new BigDecimal("30000"));
-        when(phiVanChuyenService.theoDiaChi(any())).thenReturn(null);
+        when(phiVanChuyenService.tinhChoDiaChi(any(), any(), any(), any())).thenReturn(nhom10.phonenest.support.TestShipping.phi(30000));
 
         when(thanhToanService.mucMua(anyString(), anyString(), anyInt())).thenAnswer(inv -> {
             String pbId = inv.getArgument(1);

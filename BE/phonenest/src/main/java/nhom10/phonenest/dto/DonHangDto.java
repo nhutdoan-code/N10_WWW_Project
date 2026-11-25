@@ -6,6 +6,7 @@ import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,7 +33,28 @@ public record DonHangDto(
         String lyDoHuy,
         LocalDateTime ngayKhachXacNhan,
         String nguoiXacNhan,
-        List<Dong> chiTiet ) {
+        List<Dong> chiTiet,
+        // M22: thành phần đã gồm trong phiVanChuyen + khoảng ngày giao dự kiến
+        BigDecimal phiKhaiGia,
+        BigDecimal phuPhiCod,
+        LocalDate ngayGiaoDuKienTu,
+        LocalDate ngayGiaoDuKienDen) {
+
+    /** Constructor trước M22 (không có chi tiết phí / ngày giao dự kiến), giữ cho test và caller cũ. */
+    public DonHangDto(
+            String maDonHang, String maKh, String maKm, String maKmVanChuyen,
+            LocalDateTime ngayMua, PhuongThucTt phuongThucTt, TrangThaiDonHang trangThai,
+            BigDecimal tamTinh, BigDecimal giamGia, BigDecimal phiVanChuyen,
+            BigDecimal giamPhiVanChuyen, BigDecimal tongTien, String diaChiGiaoHang,
+            LocalDateTime ngayCapNhat, LocalDateTime ngayGiao, String tenKhach,
+            String tenNguoiNhan, String soDienThoaiNhan,
+            String trangThaiDoiTra, String lyDoHuy, LocalDateTime ngayKhachXacNhan,
+            String nguoiXacNhan, List<Dong> chiTiet) {
+        this(maDonHang, maKh, maKm, maKmVanChuyen, ngayMua, phuongThucTt, trangThai,
+                tamTinh, giamGia, phiVanChuyen, giamPhiVanChuyen, tongTien,
+                diaChiGiaoHang, ngayCapNhat, ngayGiao, tenKhach, tenNguoiNhan, soDienThoaiNhan,
+                trangThaiDoiTra, lyDoHuy, ngayKhachXacNhan, nguoiXacNhan, chiTiet, null, null, null, null);
+    }
 
     /** Backward-compatible constructor for service tests and older internal callers. */
     public DonHangDto(

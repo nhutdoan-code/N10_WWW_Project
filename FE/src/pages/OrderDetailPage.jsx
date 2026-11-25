@@ -13,6 +13,7 @@ import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatPrice } from '../utils/format';
 import { getOrderActions } from '../utils/orderActions';
+import { formatKhoangNgayGiao } from '../utils/shipping';
 
 export default function OrderDetailPage() {
   const { ma } = useParams();
@@ -129,6 +130,8 @@ export default function OrderDetailPage() {
   const hasAfterSalesRequest = Boolean(o.trangThaiDoiTra) ||
     (existingRequests || []).some((req) => req.maDonHang === o.maDonHang);
   const huy = o.trangThai === 'DA_HUY';
+  const ngayGiaoDuKien = formatKhoangNgayGiao(o.ngayGiaoDuKienTu, o.ngayGiaoDuKienDen);
+  const dangChoGiao = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'].includes(o.trangThai);
   const muaLaiMotSanPham = (dong) => {
     if (!dong?.maPhienBan) {
       toast('Không xác định được phiên bản sản phẩm để mua lại.', 'error');
@@ -157,6 +160,9 @@ export default function OrderDetailPage() {
             ) : (
               <>
                 <OrderSteps trangThai={o.trangThai} />
+                {dangChoGiao && ngayGiaoDuKien && (
+                  <p className="ship-eta">Dự kiến giao hàng: <b>{ngayGiaoDuKien}</b></p>
+                )}
                 <p className="muted">Cập nhật lần cuối: {formatDate(o.ngayCapNhat || o.ngayMua)}</p>
                 {o.trangThai === 'CHO_KHACH_XAC_NHAN' && (
                     <p>Đơn hàng đã được giao{o.ngayGiao && ` lúc ${formatDate(o.ngayGiao)}`}. Vui lòng xác nhận nếu bạn đã nhận được hàng.</p>
@@ -272,6 +278,13 @@ export default function OrderDetailPage() {
           <div className="summary">
             <div className="row between"><span>Tạm tính</span><span>{formatPrice(o.tamTinh)}</span></div>
             <div className="row between"><span>Phí vận chuyển</span><span>{Number(o.phiVanChuyen) > 0 ? formatPrice(o.phiVanChuyen) : 'Miễn phí'}</span></div>
+            {(Number(o.phiKhaiGia) > 0 || Number(o.phuPhiCod) > 0) && (
+              <div className="ship-breakdown">
+                <div className="row between"><span>· Phí giao hàng</span><span>{formatPrice(Number(o.phiVanChuyen) - Number(o.phiKhaiGia || 0) - Number(o.phuPhiCod || 0))}</span></div>
+                {Number(o.phiKhaiGia) > 0 && <div className="row between"><span>· Phí khai giá (bảo hiểm)</span><span>{formatPrice(o.phiKhaiGia)}</span></div>}
+                {Number(o.phuPhiCod) > 0 && <div className="row between"><span>· Phụ phí COD</span><span>{formatPrice(o.phuPhiCod)}</span></div>}
+              </div>
+            )}
             {Number(o.giamPhiVanChuyen) > 0 && <div className="row between"><span>Giảm phí vận chuyển ({o.maKmVanChuyen})</span><span>- {formatPrice(o.giamPhiVanChuyen)}</span></div>}
             {Number(o.giamGia) > 0 && <div className="row between"><span>Giảm giá {o.maKm && `(${o.maKm})`}</span><span>- {formatPrice(o.giamGia)}</span></div>}
             <div className="row between total"><b>Tổng thanh toán</b><b className="price">{formatPrice(o.tongTien)}</b></div>

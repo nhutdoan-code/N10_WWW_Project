@@ -11,7 +11,9 @@ public record CheckoutDto(
         String khuVuc,
         String thoiGianGiao,
         List<Voucher> vouchers,
-        List<Dong> items) {
+        List<Dong> items,
+        // Chi tiết phí (phí vùng, khai giá, COD, freeship) và ngày giao dự kiến.
+        KetQuaPhiVanChuyen vanChuyen) {
 
     public record Dong(String maSanPham, String tenMay, String anhChinh, int soLuong, BigDecimal donGia) {
     }
@@ -30,6 +32,9 @@ public record CheckoutDto(
             boolean chiKhachMoi,
             boolean apDungDuoc,
             String lyDo,
-            BigDecimal soTienGiam) {
+            BigDecimal soTienGiam,
+            // M23: PHAN_TRAM | SO_TIEN; soTienGiamCoDinh chỉ có với SO_TIEN
+            String kieuGiam,
+            BigDecimal soTienGiamCoDinh) {
     }
 }

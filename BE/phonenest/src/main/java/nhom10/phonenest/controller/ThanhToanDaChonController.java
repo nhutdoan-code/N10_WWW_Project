@@ -3,6 +3,7 @@ package nhom10.phonenest.controller;
 import jakarta.validation.Valid;
 import nhom10.phonenest.dto.CheckoutDto;
 import nhom10.phonenest.dto.DonHangDto;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.service.ThanhToanDaChonService;
 import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,8 +31,9 @@ public class ThanhToanDaChonController {
     }
 
     @GetMapping("/checkout/preview-selected")
-    public CheckoutDto xemTruoc(@RequestParam String maDiaChi, @RequestParam List<String> chon) {
-        return thanhToanDaChonService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi, chon);
+    public CheckoutDto xemTruoc(@RequestParam String maDiaChi, @RequestParam List<String> chon,
+                                @RequestParam(required = false) PhuongThucTt phuongThucTt) {
+        return thanhToanDaChonService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi, chon, phuongThucTt);
     }
 
     @PostMapping("/orders/selected")

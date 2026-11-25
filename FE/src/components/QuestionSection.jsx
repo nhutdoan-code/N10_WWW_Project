@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useAuth from '../hooks/useAuth';
 import useFetch from '../hooks/useFetch';
+import useScrollToHash from '../hooks/useScrollToHash';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { productService } from '../service/productService';
@@ -11,6 +12,7 @@ export default function QuestionSection({ ma }) {
   const { data: questions, reload } = useFetch(() => productService.questions(ma), [ma]);
   const [text, setText] = useState('');
   const toast = useToast();
+  useScrollToHash(questions != null);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -25,7 +27,7 @@ export default function QuestionSection({ ma }) {
   };
 
   return (
-    <section>
+    <section id="hoi-dap">
       <h3>Hỏi đáp ({questions?.length || 0})</h3>
       {questions?.length === 0 && <p className="muted">Chưa có câu hỏi nào.</p>}
       {questions?.map((q) => (

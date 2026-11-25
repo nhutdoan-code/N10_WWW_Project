@@ -73,7 +73,8 @@ public class HoiDapService {
         Map<String, Object> duLieuTruoc = snapshot(h);
         h.setNoiDungTraLoi(noiDung.trim());
         h.setNgayTraLoi(LocalDate.now());
-        thongBaoService.gui(h.getMaKh(), "Câu hỏi của bạn về sản phẩm đã được trả lời");
+        thongBaoService.gui(h.getMaKh(), "Câu hỏi của bạn về sản phẩm đã được trả lời",
+                ThongBaoService.linkHoiDap(h.getMaSanPham()));
         nhatKyHoatDongService.ghi(HanhDongAudit.ANSWER_QUESTION, LoaiDoiTuongAudit.QUESTION,
                 ma, duLieuTruoc, snapshot(h));
         return toDto(h);

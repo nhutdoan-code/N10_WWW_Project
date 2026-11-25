@@ -80,7 +80,7 @@ class KhuyenMaiGioHangFixTest {
             when(kmRepo.findById("NEST10")).thenReturn(Optional.of(k));
             when(kmRepo.save(any(KhuyenMai.class))).thenAnswer(inv -> inv.getArgument(0));
             KhuyenMaiDto d = new KhuyenMaiDto("NEST10", "Giảm 10% (đổi tên)", LoaiKhuyenMai.DON_HANG, BigDecimal.TEN,
-                    null, BigDecimal.ZERO, null, 0, false, 1, k.getNgayBatDau(), k.getNgayKetThuc(), null, null);
+                    BigDecimal.valueOf(2_000_000), BigDecimal.ZERO, null, 0, false, 1, k.getNgayBatDau(), k.getNgayKetThuc(), null, null);
 
             KhuyenMaiDto kq = service.sua("NEST10", d);
 
@@ -242,15 +242,15 @@ class KhuyenMaiGioHangFixTest {
         @Mock private NhatKyHoatDongService nhatKy;
         @InjectMocks private KhuyenMaiService service;
 
-        /** Giống dữ liệu migration 19. */
+        /** Giống dữ liệu migration 23 (KHACHMOI150K thay cho KHACHMOI10). */
         private KhuyenMai khachMoi10() {
             KhuyenMai k = new KhuyenMai();
-            k.setMaKm("KHACHMOI10");
-            k.setTenKm("Khách hàng mới giảm 10%");
+            k.setMaKm("KHACHMOI150K");
+            k.setTenKm("Quà khách hàng mới 150.000đ");
             k.setLoai(LoaiKhuyenMai.DON_HANG);
-            k.setPhanTramGiam(BigDecimal.TEN);
-            k.setSoTienGiamToiDa(null);
-            k.setDonToiThieu(BigDecimal.ZERO);
+            k.setKieuGiam(nhom10.phonenest.enums.KieuGiam.SO_TIEN);
+            k.setSoTienGiamCoDinh(BigDecimal.valueOf(150_000));
+            k.setDonToiThieu(BigDecimal.valueOf(1_000_000));
             k.setChiKhachMoi(true);
             k.setGioiHanMoiKhach(1);
             k.setNgayBatDau(LocalDate.now().minusDays(1));
@@ -260,13 +260,13 @@ class KhuyenMaiGioHangFixTest {
         }
 
         @Test
-        @DisplayName("Tài khoản mới: dùng được, giảm đúng 10% không giới hạn trần")
+        @DisplayName("Tài khoản mới: dùng được, giảm cố định 150.000đ dù đơn giá trị cao")
         void taiKhoanMoiDuocGiam10() {
             KhuyenMai k = khachMoi10();
-            when(suDungRepo.findByKhuyenMaiMaKmAndKhachHangMaKhForCheck("KHACHMOI10", "KH1")).thenReturn(List.of());
+            when(suDungRepo.findByKhuyenMaiMaKmAndKhachHangMaKhForCheck("KHACHMOI150K", "KH1")).thenReturn(List.of());
 
             assertThat(service.lyDoKhongDung(k, BigDecimal.valueOf(30_000_000), true, "KH1")).isNull();
-            assertThat(service.tinhGiam(k, BigDecimal.valueOf(30_000_000))).isEqualByComparingTo("3000000");
+            assertThat(service.tinhGiam(k, BigDecimal.valueOf(30_000_000))).isEqualByComparingTo("150000");
         }
 
         @Test
@@ -280,7 +280,7 @@ class KhuyenMaiGioHangFixTest {
         @DisplayName("Mỗi tài khoản chỉ dùng 1 lần")
         void moiTaiKhoanMotLan() {
             KhuyenMai k = khachMoi10();
-            when(suDungRepo.findByKhuyenMaiMaKmAndKhachHangMaKhForCheck("KHACHMOI10", "KH1"))
+            when(suDungRepo.findByKhuyenMaiMaKmAndKhachHangMaKhForCheck("KHACHMOI150K", "KH1"))
                     .thenReturn(List.of(new nhom10.phonenest.entity.SuDungKhuyenMai()));
 
             assertThat(service.lyDoKhongDung(k, BigDecimal.valueOf(1_000_000), true, "KH1"))

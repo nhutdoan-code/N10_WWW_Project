@@ -162,7 +162,7 @@ class MomoPaymentServiceTest {
         assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
 
         verify(thanhToanRepository).save(payment);
-        verify(thongBaoService).gui(eq("KH001"), contains("DH001"));
+        verify(thongBaoService).gui(eq("KH001"), contains("DH001"), eq("/orders/DH001"));
         verify(thongBaoService, never()).guiQuanTri(anyString());
     }
 
@@ -186,7 +186,7 @@ class MomoPaymentServiceTest {
         assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
 
         verify(thanhToanRepository).save(payment);
-        verify(thongBaoService, never()).gui(anyString(), anyString());
+        verify(thongBaoService, never()).gui(anyString(), anyString(), any());
     }
 
     // =========================================================================
@@ -212,7 +212,7 @@ class MomoPaymentServiceTest {
 
         verify(thanhToanRepository).save(payment);
         verify(thongBaoService).guiQuanTri(contains("DH003"));
-        verify(thongBaoService).gui(eq("KH001"), contains("DH003"));
+        verify(thongBaoService).gui(eq("KH001"), contains("DH003"), eq("/orders/DH003"));
     }
 
     // =========================================================================
@@ -239,7 +239,7 @@ class MomoPaymentServiceTest {
 
         // Không gọi save và không gửi thông báo trùng
         verify(thanhToanRepository, never()).save(any());
-        verify(thongBaoService, never()).gui(anyString(), anyString());
+        verify(thongBaoService, never()).gui(anyString(), anyString(), any());
         verify(thongBaoService, never()).guiQuanTri(anyString());
     }
 
@@ -384,7 +384,7 @@ class MomoPaymentServiceTest {
 
         // Giả lập lỗi gửi thông báo (ví dụ lỗi mạng, DB thông báo quá tải)
         doThrow(new RuntimeException("Notification service temporary failure"))
-                .when(thongBaoService).gui(anyString(), anyString());
+                .when(thongBaoService).gui(anyString(), anyString(), any());
 
         Map<String, Object> payload = createIpnPayload("GD010", new BigDecimal("1500000"), "0", "Successful.");
 
@@ -506,7 +506,7 @@ class MomoPaymentServiceTest {
         assertThat(paymentA.getTrangThai()).isEqualTo(TrangThaiThanhToan.DA_THANH_TOAN);
         assertThat(paymentA.getMaGiaoDichMoMo()).isEqualTo("TRANS_A_999");
         verify(thanhToanRepository).save(paymentA);
-        verify(thongBaoService).gui(eq("KH001"), contains("DH014A"));
+        verify(thongBaoService).gui(eq("KH001"), contains("DH014A"), eq("/orders/DH014A"));
     }
 
     // =========================================================================
@@ -539,7 +539,7 @@ class MomoPaymentServiceTest {
 
         // Gửi thông báo khẩn cấp cho Quản trị viên và khách hàng để hoàn tiền thừa
         verify(thongBaoService).guiQuanTri(contains("CẢNH BÁO THANH TOÁN TRÙNG"));
-        verify(thongBaoService).gui(eq("KH001"), contains("DH014B"));
+        verify(thongBaoService).gui(eq("KH001"), contains("DH014B"), eq("/orders/DH014B"));
     }
 
     // =========================================================================

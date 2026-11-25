@@ -7,7 +7,20 @@ import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage, formatPrice } from '../../utils/format';
 
-const EMPTY = { maTinh: '', phiCoBan: '', mienPhiTu: '', thoiGianGiao: '' };
+const VUNG = [
+  { value: 0, label: 'Vùng 0 · Nội tỉnh TP.HCM' },
+  { value: 1, label: 'Vùng 1 · Lân cận & Miền Nam' },
+  { value: 2, label: 'Vùng 2 · Miền Trung & Tây Nguyên' },
+  { value: 3, label: 'Vùng 3 · Miền Bắc' },
+];
+
+const EMPTY = {
+  maTinh: '', vung: '', phiCoBan: '', phuPhiXa: 0, phuPhiDacKhu: 15000, mienPhiTu: '',
+  soNgayGiaoToiThieu: '', soNgayGiaoToiDa: '',
+};
+
+const soHoacNull = (v) => (v === '' || v == null ? null : Number(v));
+const phuPhi = (v) => (Number(v) > 0 ? `+${formatPrice(v)}` : '—');
 
 export default function AdminShippingPage() {
   const { data: list, reload } = useFetch(adminService.shippingFees);
@@ -32,8 +45,13 @@ export default function AdminShippingPage() {
     run(
       () => adminService.saveShippingFee(editing.maPhi, {
         ...editing,
+        vung: soHoacNull(editing.vung),
         phiCoBan: Number(editing.phiCoBan),
-        mienPhiTu: editing.mienPhiTu === '' || editing.mienPhiTu == null ? null : Number(editing.mienPhiTu),
+        phuPhiXa: soHoacNull(editing.phuPhiXa) ?? 0,
+        phuPhiDacKhu: soHoacNull(editing.phuPhiDacKhu) ?? 0,
+        mienPhiTu: soHoacNull(editing.mienPhiTu),
+        soNgayGiaoToiThieu: soHoacNull(editing.soNgayGiaoToiThieu),
+        soNgayGiaoToiDa: soHoacNull(editing.soNgayGiaoToiDa),
       }),
       'Đã lưu bảng phí'
     );
@@ -45,28 +63,42 @@ export default function AdminShippingPage() {
         <h2>Phí vận chuyển</h2>
         <button className="btn btn-primary" onClick={() => setEditing({ ...EMPTY })}>+ Thêm khu vực</button>
       </div>
-      <p className="muted">Phí tính theo tỉnh / thành phố của địa chỉ giao hàng. Nơi chưa có trong danh sách sẽ dùng mức mặc định.</p>
-      <table className="table">
-        <thead>
-          <tr><th>Khu vực</th><th>Phí giao hàng</th><th>Miễn phí từ</th><th>Thời gian giao</th><th></th></tr>
-        </thead>
-        <tbody>
-          {list?.map((p) => (
-            <tr key={p.maPhi}>
-              <td><b>{p.tenKhuVuc}</b></td>
-              <td>{formatPrice(p.phiCoBan)}</td>
-              <td>{p.mienPhiTu ? formatPrice(p.mienPhiTu) : 'Không áp dụng'}</td>
-              <td>{p.thoiGianGiao}</td>
-              <td><div className="row">
-                <button className="btn" onClick={() => setEditing(p)}>Sửa</button>
-                {p.maTinh && (
-                  <button className="btn btn-danger" onClick={() => window.confirm(`Xóa mức phí của ${p.tenKhuVuc}?`) && run(() => adminService.deleteShippingFee(p.maPhi), 'Đã xóa khu vực')}>Xóa</button>
-                )}
-              </div></td>
+      <p className="muted">
+        Kho đặt tại TP.HCM. Phí giao hàng tính theo tỉnh / thành phố và loại địa bàn của địa chỉ nhận
+        (phường = nội thành, xã = ngoại thành, đặc khu = huyện đảo, giao thêm 1–2 ngày). Đơn đạt ngưỡng “Miễn phí từ”
+        được miễn toàn bộ phí. Đơn chưa đạt ngưỡng cộng thêm phí khai giá 0,5% giá trị hàng (tối đa 50.000 ₫) với đơn từ
+        3.000.000 ₫ và phụ phí 15.000 ₫ khi thanh toán COD cho đơn trên 10.000.000 ₫. Voucher vận chuyển chỉ giảm phí giao hàng.
+        Đơn đặt sau 16:00 được tính ngày giao từ hôm sau. Tỉnh chưa có trong danh sách dùng mức mặc định.
+      </p>
+      <div className="table-wrap" style={{ overflowX: 'auto' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Khu vực</th><th>Vùng</th><th>Phường</th><th>Xã</th><th>Đặc khu</th>
+              <th>Miễn phí từ</th><th>Thời gian giao</th><th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {list?.map((p) => (
+              <tr key={p.maPhi}>
+                <td><b>{p.tenKhuVuc}</b></td>
+                <td>{p.tenVung}</td>
+                <td>{formatPrice(p.phiCoBan)}</td>
+                <td>{phuPhi(p.phuPhiXa)}</td>
+                <td>{phuPhi(p.phuPhiDacKhu)}</td>
+                <td>{p.mienPhiTu ? formatPrice(p.mienPhiTu) : 'Không áp dụng'}</td>
+                <td>{p.thoiGianGiao}</td>
+                <td><div className="row">
+                  <button className="btn" onClick={() => setEditing({ ...p, vung: p.vung ?? '' })}>Sửa</button>
+                  {p.maTinh && (
+                    <button className="btn btn-danger" onClick={() => window.confirm(`Xóa mức phí của ${p.tenKhuVuc}?`) && run(() => adminService.deleteShippingFee(p.maPhi), 'Đã xóa khu vực')}>Xóa</button>
+                  )}
+                </div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {editing && (
         <Modal title={editing.maPhi ? 'Sửa phí vận chuyển' : 'Thêm khu vực'} onClose={() => setEditing(null)}>
           <form className="form" onSubmit={submit}>
@@ -81,11 +113,25 @@ export default function AdminShippingPage() {
                 </select>
               </label>
             )}
+            <label className="field">
+              <span>Vùng giao hàng</span>
+              <select value={editing.vung} onChange={set('vung')}>
+                <option value="">Khu vực khác</option>
+                {VUNG.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+              </select>
+            </label>
             <div className="grid-2">
-              <FormField label="Phí giao hàng (₫)" type="number" min="0" value={editing.phiCoBan} onChange={set('phiCoBan')} required />
+              <FormField label="Phí giao đến phường (₫)" type="number" min="0" value={editing.phiCoBan} onChange={set('phiCoBan')} required />
               <FormField label="Miễn phí cho đơn từ (₫)" type="number" min="0" value={editing.mienPhiTu ?? ''} onChange={set('mienPhiTu')} />
             </div>
-            <FormField label="Thời gian giao dự kiến" value={editing.thoiGianGiao || ''} onChange={set('thoiGianGiao')} placeholder="vd: 2 - 3 ngày" />
+            <div className="grid-2">
+              <FormField label="Phụ phí xã ngoại thành (₫)" type="number" min="0" value={editing.phuPhiXa ?? ''} onChange={set('phuPhiXa')} />
+              <FormField label="Phụ phí đặc khu / đảo (₫)" type="number" min="0" value={editing.phuPhiDacKhu ?? ''} onChange={set('phuPhiDacKhu')} />
+            </div>
+            <div className="grid-2">
+              <FormField label="Giao nhanh nhất (ngày, 0 = trong ngày)" type="number" min="0" max="30" value={editing.soNgayGiaoToiThieu ?? ''} onChange={set('soNgayGiaoToiThieu')} required />
+              <FormField label="Giao chậm nhất (ngày)" type="number" min="0" max="30" value={editing.soNgayGiaoToiDa ?? ''} onChange={set('soNgayGiaoToiDa')} required />
+            </div>
             <button className="btn btn-primary">Lưu</button>
           </form>
         </Modal>

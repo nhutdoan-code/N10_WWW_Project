@@ -129,8 +129,13 @@ public class DonHangService {
         }
         d.setTamTinh(tam);
 
-        BigDecimal phi = phiVanChuyenService.tinhPhi(phiVanChuyenService.theoDiaChi(dc.getMaTinh()), tam);
+        KetQuaPhiVanChuyen vc = phiVanChuyenService.tinhChoDiaChi(dc, tam, req.phuongThucTt(), d.getNgayMua());
+        BigDecimal phi = vc.tongPhi();
         d.setPhiVanChuyen(phi);
+        d.setPhiKhaiGia(vc.phiKhaiGia());
+        d.setPhuPhiCod(vc.phuPhiCod());
+        d.setNgayGiaoDuKienTu(vc.ngayGiaoDuKienTu());
+        d.setNgayGiaoDuKienDen(vc.ngayGiaoDuKienDen());
 
         boolean moi = !donHangRepository.existsByKhachHangMaKhAndTrangThaiNot(maKh, TrangThaiDonHang.DA_HUY);
 
@@ -163,8 +168,13 @@ public class DonHangService {
 
         if (coMa(req.maKmVanChuyen())) {
             KhuyenMai k = dungVoucher(lockedVouchers, req.maKmVanChuyen(), LoaiKhuyenMai.VAN_CHUYEN, tam, moi, maKh);
+            String lyDo = ThanhToanService.lyDoKhongGiamPhi(vc);
+            if (lyDo != null) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Không áp dụng được mã " + k.getMaKm() + ": " + lyDo);
+            }
             d.setKhuyenMaiVanChuyen(k);
-            d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, phi));
+            // Chỉ giảm phí giao hàng theo vùng; phí khai giá và phụ phí COD không được giảm.
+            d.setGiamPhiVanChuyen(khuyenMaiService.tinhGiam(k, vc.phiDuocGiam()));
         }
 
         BigDecimal giamGia = d.getGiamGia() != null ? d.getGiamGia() : BigDecimal.ZERO;
@@ -331,7 +341,8 @@ public class DonHangService {
         if (quanTri) {
             auditTrangThai(d.getMaDonHang(), truoc, TrangThaiDonHang.DA_HUY);
             thongBaoService.gui(d.getKhachHang().getMaKh(),
-                    "Đơn hàng " + d.getMaDonHang() + " đã bị hủy. Lý do: " + req.lyDo());
+                    "Đơn hàng " + d.getMaDonHang() + " đã bị hủy. Lý do: " + req.lyDo(),
+                    ThongBaoService.linkDonHang(d.getMaDonHang()));
         }
         return mapper.toDto(d);
     }
@@ -411,7 +422,8 @@ public class DonHangService {
 
         thongBaoService.gui(
                 d.getKhachHang().getMaKh(),
-                "Đơn hàng " + ma + " chuyển sang trạng thái: " + moi.name()
+                "Đơn hàng " + ma + " chuyển sang trạng thái: " + moi.name(),
+                ThongBaoService.linkDonHang(ma)
         );
 
         return mapper.toDto(d);
@@ -448,7 +460,8 @@ public class DonHangService {
         thongBaoService.gui(
                 d.getKhachHang().getMaKh(),
                 "Đơn hàng " + ma
-                        + " đã được giao. Vui lòng xác nhận khi bạn đã nhận được hàng."
+                        + " đã được giao. Vui lòng xác nhận khi bạn đã nhận được hàng.",
+                ThongBaoService.linkDonHang(ma)
         );
 
         return mapper.toDto(d);
@@ -496,7 +509,8 @@ public class DonHangService {
         thongBaoService.gui(
                 maKh,
                 "Đơn hàng " + ma
-                        + " đã hoàn thành. Cảm ơn bạn đã mua sắm tại PhoneNest!"
+                        + " đã hoàn thành. Cảm ơn bạn đã mua sắm tại PhoneNest!",
+                ThongBaoService.linkDonHang(ma)
         );
 
         return mapper.toDto(d);
@@ -682,7 +696,8 @@ public class DonHangService {
 
     private void guiThongBaoSauCommit(String maKh, String maDonHang, BigDecimal tongTien) {
         Runnable notificationTask = () -> {
-            thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + maDonHang + " đang chờ xác nhận");
+            thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + maDonHang + " đang chờ xác nhận",
+                    ThongBaoService.linkDonHang(maDonHang));
             taiKhoanRepository.findById(maKh).ifPresent(tk -> emailService.gui(
                     tk.getEmail(),
                     "Xác nhận đơn hàng " + maDonHang,

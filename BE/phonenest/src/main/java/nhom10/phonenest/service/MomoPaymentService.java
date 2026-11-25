@@ -261,7 +261,8 @@ public class MomoPaymentService {
                 if (order.getKhachHang() != null && order.getKhachHang().getMaKh() != null) {
                     thongBaoService.gui(order.getKhachHang().getMaKh(),
                             "Thanh toán MoMo thành công cho đơn hàng " + order.getMaDonHang()
-                                    + " (" + amountStr + " VND). Đơn hàng đang được chờ xác nhận.");
+                                    + " (" + amountStr + " VND). Đơn hàng đang được chờ xác nhận.",
+                            ThongBaoService.linkDonHang(order.getMaDonHang()));
                 }
             } catch (Exception ex) {
                 log.error("Không thể gửi thông báo sau khi xử lý IPN thành công {}", order.getMaDonHang(), ex);
@@ -278,7 +279,8 @@ public class MomoPaymentService {
                 if (order.getKhachHang() != null && order.getKhachHang().getMaKh() != null) {
                     thongBaoService.gui(order.getKhachHang().getMaKh(),
                             "Đơn hàng " + order.getMaDonHang()
-                                    + " đã hủy nhưng MoMo ghi nhận thanh toán thành công. Nhân viên sẽ liên hệ để xử lý hoàn tiền cho bạn.");
+                                    + " đã hủy nhưng MoMo ghi nhận thanh toán thành công. Nhân viên sẽ liên hệ để xử lý hoàn tiền cho bạn.",
+                            ThongBaoService.linkDonHang(order.getMaDonHang()));
                 }
             } catch (Exception ex) {
                 log.error("Không thể gửi thông báo cho đơn đã hủy nhận tiền {}", order.getMaDonHang(), ex);
@@ -296,7 +298,8 @@ public class MomoPaymentService {
                     thongBaoService.gui(order.getKhachHang().getMaKh(),
                             "Đơn hàng " + order.getMaDonHang()
                                     + " ghi nhận thêm một giao dịch thanh toán MoMo thành công (" + amountStr + " VND, mã: " + orderId
-                                    + "). Do đơn hàng đã được thanh toán trước đó, cửa hàng sẽ liên hệ hỗ trợ hoàn tiền khoản thanh toán thừa này.");
+                                    + "). Do đơn hàng đã được thanh toán trước đó, cửa hàng sẽ liên hệ hỗ trợ hoàn tiền khoản thanh toán thừa này.",
+                            ThongBaoService.linkDonHang(order.getMaDonHang()));
                 }
             } catch (Exception ex) {
                 log.error("Không thể gửi thông báo thanh toán trùng cho đơn {}", order.getMaDonHang(), ex);

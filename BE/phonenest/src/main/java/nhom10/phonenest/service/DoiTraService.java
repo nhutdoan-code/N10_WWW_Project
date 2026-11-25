@@ -154,7 +154,8 @@ public class DoiTraService {
         yeuCau.setNgayCapNhat(java.time.LocalDateTime.now());
         if (ghiChu != null && !ghiChu.isEmpty()) yeuCau.setGhiChuXuLy(ghiChu);
         thongBao.gui(yeuCau.getDonHang().getKhachHang().getMaKh(),
-                "Yêu cầu đổi trả đơn " + yeuCau.getDonHang().getMaDonHang() + ": " + moi.name());
+                "Yêu cầu đổi trả đơn " + yeuCau.getDonHang().getMaDonHang() + ": " + moi.name(),
+                ThongBaoService.linkYeuCau(yeuCau.getMaYeuCau()));
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
                 LoaiDoiTuongAudit.RETURN, ma, truoc, snapshot(yeuCau));
         return dto(yeuCau);

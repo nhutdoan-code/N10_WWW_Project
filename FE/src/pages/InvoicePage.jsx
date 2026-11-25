@@ -42,6 +42,8 @@ export default function InvoicePage() {
       <p>Tạm tính: {formatPrice(o.tamTinh)}</p>
       <p>Giảm giá: {formatPrice(o.giamGia)}</p>
       <p>Phí vận chuyển: {formatPrice(o.phiVanChuyen)}</p>
+      {Number(o.phiKhaiGia) > 0 && <p className="muted">· Trong đó phí khai giá (bảo hiểm): {formatPrice(o.phiKhaiGia)}</p>}
+      {Number(o.phuPhiCod) > 0 && <p className="muted">· Trong đó phụ phí COD: {formatPrice(o.phuPhiCod)}</p>}
       <p>Giảm phí vận chuyển: {formatPrice(o.giamPhiVanChuyen)}</p>
       <h3>Tổng thanh toán: {formatPrice(o.tongTien)}</h3>
     </div>

@@ -145,8 +145,7 @@ public class DonHangKhoConcurrencyTest {
         when(khachHangRepository.findById("KH001")).thenReturn(Optional.of(khachHang));
         when(diaChiRepository.findById("DC001")).thenReturn(Optional.of(diaChi));
         when(diaChiService.diaChiDayDu(any())).thenReturn("123 Lê Lợi, Q1, TP.HCM");
-        when(phiVanChuyenService.tinhPhi(any(), any())).thenReturn(BigDecimal.ZERO);
-        when(phiVanChuyenService.theoDiaChi(any())).thenReturn(null);
+        when(phiVanChuyenService.tinhChoDiaChi(any(), any(), any(), any())).thenReturn(nhom10.phonenest.support.TestShipping.phi(0));
 
         when(donHangRepository.save(any(DonHang.class))).thenAnswer(inv -> {
             DonHang d = inv.getArgument(0);

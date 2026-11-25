@@ -3,6 +3,7 @@ package nhom10.phonenest.service;
 import nhom10.phonenest.dto.KhuyenMaiDto;
 import nhom10.phonenest.entity.KhuyenMai;
 import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.KieuGiam;
 import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.enums.LoaiKhuyenMai;
 import nhom10.phonenest.exception.AppException;
@@ -139,25 +140,38 @@ public KhuyenMaiDto restore(String ma) {
         if (d.ngayKetThuc().isBefore(d.ngayBatDau())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu");
         }
-        if (d.phanTramGiam() == null || d.phanTramGiam().compareTo(BigDecimal.ZERO) <= 0
-                || d.phanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "Phần trăm giảm phải trong khoảng (0, 100]"
-            );
-        }
         LoaiKhuyenMai loai = d.loai() == null ? LoaiKhuyenMai.DON_HANG : d.loai();
+        KieuGiam kieu = d.kieuGiam() == null ? KieuGiam.PHAN_TRAM : d.kieuGiam();
+        BigDecimal donToiThieu = d.donToiThieu() == null ? BigDecimal.ZERO : d.donToiThieu();
+        if (kieu == KieuGiam.PHAN_TRAM) {
+            if (d.phanTramGiam() == null || d.phanTramGiam().compareTo(BigDecimal.ZERO) <= 0
+                    || d.phanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Phần trăm giảm phải trong khoảng (0, 100]");
+            }
+            // Giảm % thả nổi có thể làm âm lợi nhuận với máy giá cao: bắt buộc có mức trần.
+            if (d.soTienGiamToiDa() == null || d.soTienGiamToiDa().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Voucher giảm theo phần trăm phải có mức giảm tối đa lớn hơn 0");
+            }
+        } else {
+            if (d.soTienGiamCoDinh() == null || d.soTienGiamCoDinh().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền giảm phải lớn hơn 0");
+            }
+            if (loai == LoaiKhuyenMai.DON_HANG && d.soTienGiamCoDinh().compareTo(donToiThieu) > 0) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Đơn tối thiểu phải lớn hơn hoặc bằng số tiền giảm (tránh đơn được giảm gần hết giá trị)");
+            }
+        }
         if (!taoMoi && k.getLoai() != loai) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không được thay đổi loại voucher");
         }
-        if (!taoMoi && k.getPhanTramGiam().compareTo(d.phanTramGiam()) != 0) {
+        if (!taoMoi && kieuGiam(k) != kieu) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không được thay đổi kiểu giảm");
+        }
+        if (!taoMoi && kieu == KieuGiam.PHAN_TRAM && k.getPhanTramGiam().compareTo(d.phanTramGiam()) != 0) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không được thay đổi phần trăm giảm");
         }
-        if (loai == LoaiKhuyenMai.VAN_CHUYEN && d.soTienGiamToiDa() == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Voucher vận chuyển phải có mức giảm tối đa");
-        }
-        if (d.soTienGiamToiDa() != null && d.soTienGiamToiDa().compareTo(BigDecimal.ZERO) < 0) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Mức giảm tối đa không hợp lệ");
+        if (!taoMoi && kieu == KieuGiam.SO_TIEN && k.getSoTienGiamCoDinh().compareTo(d.soTienGiamCoDinh()) != 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không được thay đổi số tiền giảm");
         }
         if (d.donToiThieu() != null && d.donToiThieu().compareTo(BigDecimal.ZERO) < 0
                 || d.soLuong() != null && d.soLuong() < 1
@@ -170,12 +184,14 @@ public KhuyenMaiDto restore(String ma) {
 
         k.setMaKm(ma);
         k.setTenKm(d.tenKm().trim());
-        k.setPhanTramGiam(d.phanTramGiam());
-        k.setSoTienGiamToiDa(d.soTienGiamToiDa());
+        k.setKieuGiam(kieu);
+        k.setPhanTramGiam(kieu == KieuGiam.PHAN_TRAM ? d.phanTramGiam() : null);
+        k.setSoTienGiamToiDa(kieu == KieuGiam.PHAN_TRAM ? d.soTienGiamToiDa() : null);
+        k.setSoTienGiamCoDinh(kieu == KieuGiam.SO_TIEN ? d.soTienGiamCoDinh() : null);
         k.setNgayBatDau(d.ngayBatDau());
         k.setNgayKetThuc(d.ngayKetThuc());
         k.setLoai(loai);
-        k.setDonToiThieu(d.donToiThieu() == null ? BigDecimal.ZERO : d.donToiThieu());
+        k.setDonToiThieu(donToiThieu);
         k.setSoLuong(d.soLuong());
         k.setChiKhachMoi(d.chiKhachMoi());
         k.setGioiHanMoiKhach(d.gioiHanMoiKhach());
@@ -211,7 +227,9 @@ public KhuyenMaiDto restore(String ma) {
         Map<String, Object> duLieu = new LinkedHashMap<>();
         duLieu.put("tenKm", k.getTenKm());
         duLieu.put("loai", k.getLoai() == null ? null : k.getLoai().name());
+        duLieu.put("kieuGiam", kieuGiam(k).name());
         duLieu.put("phanTramGiam", k.getPhanTramGiam());
+        duLieu.put("soTienGiamCoDinh", k.getSoTienGiamCoDinh());
         duLieu.put("soTienGiamToiDa", k.getSoTienGiamToiDa());
         duLieu.put("donToiThieu", k.getDonToiThieu());
         duLieu.put("soLuong", k.getSoLuong());
@@ -240,7 +258,9 @@ public KhuyenMaiDto restore(String ma) {
             k.getNgayBatDau(),
             k.getNgayKetThuc(),
             k.getDieuKienApDung(),
-            k.isTrangThaiHoatDong()
+            k.isTrangThaiHoatDong(),
+            kieuGiam(k),
+            k.getSoTienGiamCoDinh()
     	);
     }
 
@@ -278,13 +298,31 @@ public KhuyenMaiDto restore(String ma) {
         }
     }
 
+    /**
+     * Tiền giảm thực tế trên {@code coSo} (tạm tính với voucher đơn hàng, phí giao hàng theo vùng với voucher vận chuyển).
+     * Điều kiện đơn tối thiểu kiểm tra ở {@link #lyDoKhongDung} (chưa đạt -> không được dùng = giảm 0).
+     * <pre>
+     * SO_TIEN  : min(soTienGiamCoDinh, coSo)
+     * PHAN_TRAM: min(coSo × phanTramGiam / 100, soTienGiamToiDa, coSo)
+     * </pre>
+     */
     public BigDecimal tinhGiam(KhuyenMai k, BigDecimal coSo) {
-        BigDecimal giam = coSo.multiply(k.getPhanTramGiam())
-                .divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR);
-        if (k.getSoTienGiamToiDa() != null && giam.compareTo(k.getSoTienGiamToiDa()) > 0) {
-            giam = k.getSoTienGiamToiDa();
+        BigDecimal base = coSo == null ? BigDecimal.ZERO : coSo.max(BigDecimal.ZERO);
+        BigDecimal giam;
+        if (kieuGiam(k) == KieuGiam.SO_TIEN) {
+            giam = k.getSoTienGiamCoDinh() == null ? BigDecimal.ZERO : k.getSoTienGiamCoDinh();
+        } else {
+            BigDecimal phanTram = k.getPhanTramGiam() == null ? BigDecimal.ZERO : k.getPhanTramGiam();
+            giam = base.multiply(phanTram).divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR);
+            if (k.getSoTienGiamToiDa() != null && giam.compareTo(k.getSoTienGiamToiDa()) > 0) {
+                giam = k.getSoTienGiamToiDa();
+            }
         }
-        return giam.max(BigDecimal.ZERO).min(coSo.max(BigDecimal.ZERO));
+        return giam.max(BigDecimal.ZERO).min(base);
+    }
+
+    static KieuGiam kieuGiam(KhuyenMai k) {
+        return k.getKieuGiam() == null ? KieuGiam.PHAN_TRAM : k.getKieuGiam();
     }
 
     public void ghiNhanSuDung(KhuyenMai k, String maKh, String maDonHang) {

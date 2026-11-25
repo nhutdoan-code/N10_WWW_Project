@@ -20,6 +20,8 @@ public class ThongBao {
     private String maThongBao;
     private String maTk;
     private String noiDung;
+    /** Đường dẫn trang FE liên quan (vd /orders/DH...), null = không có trang chi tiết. */
+    private String duongDan;
     private boolean daDoc;
     private LocalDateTime ngayTao;
 }

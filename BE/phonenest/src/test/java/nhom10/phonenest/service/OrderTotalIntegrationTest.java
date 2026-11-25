@@ -56,33 +56,34 @@ class OrderTotalIntegrationTest extends ItHttpBase {
 
     @Test
     @Order(1)
-    @DisplayName("O1 NEST10 + truong gia gia mao trong request: backend tu tinh, luu nhat quan o 4 bang, khop preview")
+    @DisplayName("O1 GIAM150K + truong gia gia mao trong request: backend tu tinh, luu nhat quan o 4 bang, khop preview")
     void o1_tinhTienVaChongGiaMao() throws Exception {
-        Integer daDung = jdbc.queryForObject("SELECT COUNT(*) FROM sudungkhuyenmai WHERE maKh=? AND maKm='NEST10'", Integer.class, KHACH);
-        assertThat(daDung).as("clone moi: khach chua dung NEST10").isZero();
+        Integer daDung = jdbc.queryForObject("SELECT COUNT(*) FROM sudungkhuyenmai WHERE maKh=? AND maKm='GIAM150K'", Integer.class, KHACH);
+        assertThat(daDung).as("clone moi: khach chua dung GIAM150K").isZero();
         BigDecimal gia = jdbc.queryForObject("SELECT giaBan FROM phienbansanpham WHERE maPhienBan=?", BigDecimal.class, PB);
         int sl = 2;
 
         JsonNode pv = json(goi(get("/api/customer/checkout/preview").param("maDiaChi", DIA_CHI).param("maSanPham", PB)
-                .param("soLuong", String.valueOf(sl)), customer, null));
+                .param("soLuong", String.valueOf(sl)).param("phuongThucTt", "COD"), customer, null));
         BigDecimal tamTinhPv = pv.get("tamTinh").decimalValue();
         BigDecimal phiPv = pv.get("phiVanChuyen").decimalValue();
         BigDecimal giamPv = null;
-        for (JsonNode v : pv.get("vouchers")) if ("NEST10".equals(v.get("maKm").asText())) giamPv = v.get("soTienGiam").decimalValue();
+        for (JsonNode v : pv.get("vouchers")) if ("GIAM150K".equals(v.get("maKm").asText())) giamPv = v.get("soTienGiam").decimalValue();
 
-        MvcResult r = dat(don("soLuong", sl, "maKm", "NEST10",
+        MvcResult r = dat(don("soLuong", sl, "maKm", "GIAM150K",
                 "tongThanhToan", 1, "giamGia", 99999999, "donGia", 1, "giaBan", 1, "phiVanChuyen", 0, "tamTinh", 1));
         assertThat(r.getResponse().getStatus()).as(r.getResponse().getContentAsString()).isIn(200, 201);
         String ma = json(r).get("maDonHang").asText();
 
         Map<String, Object> d = jdbc.queryForMap("SELECT tamTinh, giamGia, phiVanChuyen, giamPhiVanChuyen, tongThanhToan, maKm FROM donhang WHERE maDonHang=?", ma);
         BigDecimal tamTinh = gia.multiply(BigDecimal.valueOf(sl));
-        BigDecimal giam = tamTinh.multiply(BigDecimal.TEN).divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR).min(new BigDecimal("2000000"));
+        // M23: GIAM150K giảm tiền mặt cố định 150.000đ cho đơn từ 3.000.000đ
+        BigDecimal giam = new BigDecimal("150000");
         BigDecimal phi = (BigDecimal) d.get("phiVanChuyen");
         BigDecimal giamPhi = (BigDecimal) d.get("giamPhiVanChuyen");
         assertThat((BigDecimal) d.get("tamTinh")).isEqualByComparingTo(tamTinh);
         assertThat((BigDecimal) d.get("giamGia")).isEqualByComparingTo(giam);
-        assertThat(d.get("maKm")).isEqualTo("NEST10");
+        assertThat(d.get("maKm")).isEqualTo("GIAM150K");
         assertThat((BigDecimal) d.get("tongThanhToan")).isEqualByComparingTo(tamTinh.subtract(giam).add(phi).subtract(giamPhi));
         // Khop voi preview Frontend dang hien thi
         assertThat(tamTinhPv).isEqualByComparingTo(tamTinh);
@@ -95,17 +96,17 @@ class OrderTotalIntegrationTest extends ItHttpBase {
         // Thanh toan = tong don
         assertThat(jdbc.queryForObject("SELECT soTien FROM thanhtoan WHERE maDonHang=?", BigDecimal.class, ma))
                 .isEqualByComparingTo((BigDecimal) d.get("tongThanhToan"));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sudungkhuyenmai WHERE maDonHang=? AND maKm='NEST10'", Integer.class, ma)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sudungkhuyenmai WHERE maDonHang=? AND maKm='GIAM150K'", Integer.class, ma)).isEqualTo(1);
         // Phan hoi API cung khop
         assertThat(json(r).get("tongTien").decimalValue()).isEqualByComparingTo((BigDecimal) d.get("tongThanhToan"));
     }
 
     @Test
     @Order(2)
-    @DisplayName("O2 Dung NEST10 lan 2 (gioi han 1/khach) -> 400, khong tao don")
+    @DisplayName("O2 Dung GIAM150K lan 2 (gioi han 1/khach) -> 400, khong tao don")
     void o2_gioiHanMoiKhach() throws Exception {
         long truoc = jdbc.queryForObject("SELECT COUNT(*) FROM donhang WHERE maKh=?", Long.class, KHACH);
-        MvcResult r = dat(don("maKm", "NEST10"));
+        MvcResult r = dat(don("maKm", "GIAM150K"));
         assertThat(r.getResponse().getStatus()).as(r.getResponse().getContentAsString()).isEqualTo(400);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM donhang WHERE maKh=?", Long.class, KHACH)).isEqualTo(truoc);
     }
@@ -120,7 +121,7 @@ class OrderTotalIntegrationTest extends ItHttpBase {
                 don("maKm", "FREESHIP"),
                 don("maKm", "KHONG_TON_TAI_2B7D"),
                 don("maKm", "SALE10TR"),
-                don("maKmVanChuyen", "NEST10"),
+                don("maKmVanChuyen", "GIAM150K"),
                 don("maKm", "SHIP50", "maKmVanChuyen", "SHIP50")}) {
             MvcResult r = dat(body);
             assertThat(r.getResponse().getStatus()).as(body + " -> " + r.getResponse().getContentAsString()).isEqualTo(400);

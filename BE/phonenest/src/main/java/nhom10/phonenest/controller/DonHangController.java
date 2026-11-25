@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.CheckoutDto;
 import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.dto.GioHangDto;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.service.CheckoutIdempotencyService;
 import nhom10.phonenest.service.DonHangService;
 import nhom10.phonenest.service.ThanhToanService;
@@ -70,7 +71,8 @@ public class DonHangController {
     @GetMapping("/checkout/preview")
     public CheckoutDto xemTruoc(@RequestParam String maDiaChi,
                               @RequestParam(required = false) String maSanPham,
-                              @RequestParam(required = false) Integer soLuong) {
-        return thanhToanService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi, maSanPham, soLuong);
+                              @RequestParam(required = false) Integer soLuong,
+                              @RequestParam(required = false) PhuongThucTt phuongThucTt) {
+        return thanhToanService.xemTruoc(SecurityUtil.currentUserId(), maDiaChi, maSanPham, soLuong, phuongThucTt);
     }
 }

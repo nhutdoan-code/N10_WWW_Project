@@ -9,6 +9,7 @@ import nhom10.phonenest.entity.GioHang;
 import nhom10.phonenest.entity.PhienBanSanPham;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.enums.IdempotencyStatus;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.repository.CheckoutIdempotencyRepository;
 import nhom10.phonenest.repository.GioHangRepository;
 import org.springframework.http.HttpStatus;
@@ -73,8 +74,13 @@ public class ThanhToanDaChonService {
 
     @Transactional
     public CheckoutDto xemTruoc(String maKh, String maDiaChi, List<String> chon) {
+        return xemTruoc(maKh, maDiaChi, chon, null);
+    }
+
+    @Transactional
+    public CheckoutDto xemTruoc(String maKh, String maDiaChi, List<String> chon, PhuongThucTt phuongThuc) {
         tachDongKhongChon(maKh, chon);
-        CheckoutDto dto = thanhToanService.xemTruoc(maKh, maDiaChi, null, null);
+        CheckoutDto dto = thanhToanService.xemTruoc(maKh, maDiaChi, null, null, phuongThuc);
         // Chỉ xem trước: hủy mọi thay đổi tạm thời trên giỏ.
         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
         return dto;

@@ -361,12 +361,7 @@ public class DiscontinuedProductSafetyTest {
         when(phienBanSanPhamRepository.findById("PB1793202488339002")).thenReturn(Optional.of(activePb));
         when(diaChiService.tenTinh("01")).thenReturn("Hà Nội");
 
-        PhiVanChuyen pvc = new PhiVanChuyen();
-        pvc.setPhiCoBan(BigDecimal.valueOf(30000));
-        pvc.setMienPhiTu(BigDecimal.valueOf(5000000));
-        pvc.setThoiGianGiao("2-3 ngày");
-        when(phiVanChuyenService.theoDiaChi("01")).thenReturn(pvc);
-        when(phiVanChuyenService.tinhPhi(any(), any())).thenReturn(BigDecimal.ZERO);
+        when(phiVanChuyenService.tinhChoDiaChi(any(), any(), any(), any())).thenReturn(nhom10.phonenest.support.TestShipping.phi(0));
         when(khuyenMaiRepository.findAll()).thenReturn(List.of());
 
         // Xem trước hợp lệ không bị chặn

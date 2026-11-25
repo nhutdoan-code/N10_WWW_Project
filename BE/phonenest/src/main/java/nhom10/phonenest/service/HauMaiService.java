@@ -124,7 +124,8 @@ public class HauMaiService {
         y.setNgayCapNhat(now);
         themLichSu(y, req.trangThai(), ghiChu, now);
         thongBaoService.gui(y.getDonHang().getKhachHang().getMaKh(),
-                "Yêu cầu " + tenLoai(y.getLoai()) + " " + y.getMaYeuCau() + ": " + req.trangThai().name());
+                "Yêu cầu " + tenLoai(y.getLoai()) + " " + y.getMaYeuCau() + ": " + req.trangThai().name(),
+                ThongBaoService.linkYeuCau(y.getMaYeuCau()));
         return toDto(y);
     }
 

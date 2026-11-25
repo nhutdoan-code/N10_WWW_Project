@@ -10,6 +10,8 @@ import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDungLuong, formatPrice } from '../utils/format';
+import { formatKhoangNgayGiao, LOAI_DIA_BAN } from '../utils/shipping';
+import { mucGiam } from '../utils/voucherAdmin';
 import {
   hasDiscontinuedItems,
   hasUnapprovedItems,
@@ -76,9 +78,9 @@ export default function CheckoutPage() {
     () => !maDiaChi
       ? Promise.resolve(null)
       : chonGio
-        ? orderService.previewSelected(maDiaChi, chonGio)
-        : orderService.preview(maDiaChi, maPhienBanMua || undefined, muaNgay ? slMua : undefined),
-    [maDiaChi, maPhienBanMua, slMua, chonGio?.join(',')]
+        ? orderService.previewSelected(maDiaChi, chonGio, payment)
+        : orderService.preview(maDiaChi, maPhienBanMua || undefined, muaNgay ? slMua : undefined, payment),
+    [maDiaChi, maPhienBanMua, slMua, chonGio?.join(','), payment]
   );
   // 2B.7C: phai khai bao SAU useFetch (truoc day dung loiPv truoc khi khai bao -> trang checkout bi crash).
   const hasBlockedOrder = hasDiscontinued || hasUnapproved || Boolean(loiPv);
@@ -116,13 +118,20 @@ export default function CheckoutPage() {
 
   const tamTinh = pv ? Number(pv.tamTinh) : (chonGio ? items.reduce((sum, i) => sum + Number(i.phienBan?.giaBan ?? 0) * i.soLuong, 0) : total);
   const phi = pv ? Number(pv.phiVanChuyen) : 0;
+  const vc = pv?.vanChuyen;
+  // Voucher vận chuyển chỉ giảm phí giao hàng theo vùng (không giảm phí khai giá / phụ phí COD).
+  const phiDuocGiam = vc ? (vc.mienPhi ? 0 : Number(vc.phiVung)) : phi;
   const giamDh = vDh ? Number(vDh.soTienGiam) : 0;
-  const giamVc = vVc ? Math.min(Number(vVc.soTienGiam), phi) : 0;
+  const giamVc = vVc ? Math.min(Number(vVc.soTienGiam), phiDuocGiam) : 0;
+  const ngayGiao = vc ? formatKhoangNgayGiao(vc.ngayGiaoDuKienTu, vc.ngayGiaoDuKienDen) : null;
   const tong = tamTinh - giamDh + phi - giamVc;
 
   const thieuMienPhi = pv?.mienPhiTu && phi > 0
     ? Number(pv.mienPhiTu) - tamTinh
     : 0;
+  const tienDoMienPhi = pv?.mienPhiTu ? Math.min(100, Math.round((tamTinh / Number(pv.mienPhiTu)) * 100)) : 0;
+  // Tổng tiền khách được bớt: voucher + phí ship được miễn theo ngưỡng freeship.
+  const tietKiem = giamDh + giamVc + (vc?.mienPhi ? Number(vc.phiVung) : 0);
 
   // Theo dõi sự thay đổi của payload: khi người dùng đổi lựa chọn, sinh key mới
   const currentPayloadSig = `${maDiaChi}|${payment}|${vDh?.maKm || ''}|${vVc?.maKm || ''}|${maPhienBanMua || ''}|${muaNgay ? slMua : ''}|${muaNgay ? '' : items.map((i) => `${i.phienBan?.maPhienBan}:${i.soLuong}`).join(',')}|${chonGio ? 'chon' : ''}`;
@@ -373,9 +382,11 @@ export default function CheckoutPage() {
                   }}
                 />
                 <div>
+                  <span className="voucher-tag">{mucGiam(v).ngan}</span>
                   <b>{v.tenKm}</b>
                   {v.chiKhachMoi && <span className="badge badge-KHACH_MOI">Khách hàng mới</span>}
                   <div className="muted">{v.dieuKienApDung}</div>
+                  <small className="muted">Mã {v.maKm}</small>
                   {!v.apDungDuoc && <span className="reason">{v.lyDo}</span>}
                 </div>
                 {v.apDungDuoc && (
@@ -414,9 +425,11 @@ export default function CheckoutPage() {
                   }}
                 />
                 <div>
+                  <span className="voucher-tag">{mucGiam(v).ngan}</span>
                   <b>{v.tenKm}</b>
                   {v.chiKhachMoi && <span className="badge badge-KHACH_MOI">Khách hàng mới</span>}
                   <div className="muted">{v.dieuKienApDung}</div>
+                  <small className="muted">Mã {v.maKm}</small>
                   {!v.apDungDuoc && <span className="reason">{v.lyDo}</span>}
                 </div>
                 {v.apDungDuoc && (
@@ -450,7 +463,21 @@ export default function CheckoutPage() {
 
           <div className="divider" />
           <div className="row between"><span>Tạm tính</span><span>{formatPrice(tamTinh)}</span></div>
-          <div className="row between"><span>Phí vận chuyển</span><span>{formatPrice(phi)}</span></div>
+          <div className="row between">
+            <span>Phí vận chuyển</span>
+            <span>{vc?.mienPhi ? <><s className="muted">{formatPrice(vc.phiVung)}</s> Miễn phí</> : formatPrice(phi)}</span>
+          </div>
+          {vc && !vc.mienPhi && (Number(vc.phiKhaiGia) > 0 || Number(vc.phuPhiCod) > 0) && (
+            <div className="ship-breakdown">
+              <div className="row between"><span>· Phí giao hàng ({vc.tenVung})</span><span>{formatPrice(vc.phiVung)}</span></div>
+              {Number(vc.phiKhaiGia) > 0 && (
+                <div className="row between"><span>· Phí khai giá (bảo hiểm 0,5%)</span><span>{formatPrice(vc.phiKhaiGia)}</span></div>
+              )}
+              {Number(vc.phuPhiCod) > 0 && (
+                <div className="row between"><span>· Phụ phí COD đơn trên 10 triệu</span><span>{formatPrice(vc.phuPhiCod)}</span></div>
+              )}
+            </div>
+          )}
           {vDh && (
             <div className="row between text-success">
               <span>Giảm giá đơn hàng ({vDh.maKm})</span>
@@ -465,26 +492,58 @@ export default function CheckoutPage() {
           )}
           <div className="divider" />
 
-          <div>
-            <div className="row between total">
-              <b>Tổng thanh toán</b>
+          <div className="co-footer">
+            <div className="co-total">
+              <span>Tổng thanh toán</span>
               <b className="price">{formatPrice(tong)}</b>
             </div>
-
-            {muaNgay && (
-              <p className="muted">Mua ngay: giỏ hàng của bạn không bị thay đổi.</p>
+            {tietKiem > 0 && (
+              <div className="co-saving">
+                <Icon name="tag" size={15} /> Bạn tiết kiệm được <b>{formatPrice(tietKiem)}</b>
+              </div>
             )}
 
             {pv && (
-              <p className="muted">
-                Giao đến {pv.khuVuc}, dự kiến {pv.thoiGianGiao}.
-              </p>
+              <section className="co-delivery" aria-label="Thông tin giao hàng">
+                <div className="co-delivery-head">
+                  <span className="co-delivery-icon"><Icon name="truck" size={20} /></span>
+                  <div>
+                    <span className="co-delivery-label">Dự kiến nhận hàng</span>
+                    <b className="co-delivery-date">{ngayGiao || pv.thoiGianGiao}</b>
+                    {ngayGiao && <span className="co-delivery-sub">{pv.thoiGianGiao}</span>}
+                  </div>
+                </div>
+                <dl className="co-delivery-rows">
+                  <div><dt>Giao đến</dt><dd>{pv.khuVuc}</dd></div>
+                  {vc && (
+                    <div>
+                      <dt>Khu vực</dt>
+                      <dd>{vc.tenVung}{vc.loaiDiaBan && vc.loaiDiaBan !== 'PHUONG' ? ` · ${LOAI_DIA_BAN[vc.loaiDiaBan]}` : ''}</dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt>Phí giao hàng</dt>
+                    <dd className={phi === 0 ? 'co-free' : ''}>{phi === 0 ? 'Miễn phí' : formatPrice(phi)}</dd>
+                  </div>
+                </dl>
+                {thieuMienPhi > 0 && (
+                  <div className="co-freeship">
+                    <div className="co-freeship-text">
+                      Mua thêm <b>{formatPrice(thieuMienPhi)}</b> để được miễn phí vận chuyển
+                    </div>
+                    <div className="co-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={tienDoMienPhi}>
+                      <span style={{ width: `${tienDoMienPhi}%` }} />
+                    </div>
+                  </div>
+                )}
+              </section>
             )}
 
-            {thieuMienPhi > 0 && (
-              <p className="muted">
-                Mua thêm {formatPrice(thieuMienPhi)} để được miễn phí vận chuyển.
-              </p>
+            {payment === 'COD' && vc && !vc.mienPhi && tamTinh > 10000000 && (
+              <div className="co-tip">
+                <Icon name="alert-triangle" size={16} />
+                <span>Đơn trên 10 triệu thanh toán COD bị cộng {formatPrice(vc.phuPhiCod)}. Chọn MoMo hoặc chuyển khoản để bỏ phụ phí này.</span>
+              </div>
             )}
 
             <button
