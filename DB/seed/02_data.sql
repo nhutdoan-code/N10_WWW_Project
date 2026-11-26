@@ -88,7 +88,7 @@ INSERT INTO `hinhanhsanpham` (`maHinhAnh`, `maSanPham`, `duongDan`, `gocChup`, `
                                                                                                ('HA0033', 'SP003', '/uploads/sp003-3.jpg', 'Cạnh bên', 0),
                                                                                                ('HA0041', 'SP004', '/uploads/sp004-1.jpg', 'Mặt trước', 1),
                                                                                                ('HA0042', 'SP004', '/uploads/sp004-2.jpg', 'Mặt sau', 0),
-                                                                                               ('HA0043', 'SP004', '/uploads/sp004-3.jpg', 'Cạnh bên', 0),
+                            x``                                                                   ('HA0043', 'SP004', '/uploads/sp004-3.jpg', 'Cạnh bên', 0),
                                                                                                ('HA0051', 'SP005', '/uploads/sp005-1.jpg', 'Mặt trước', 1),
                                                                                                ('HA0052', 'SP005', '/uploads/sp005-2.jpg', 'Mặt sau', 0),
                                                                                                ('HA0053', 'SP005', '/uploads/sp005-3.jpg', 'Cạnh bên', 0),
