@@ -27,10 +27,14 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>, JpaSp
            "t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.COD OR " +
            "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.CHUYEN_KHOAN " +
            "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
-           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN)) OR " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)) OR " +
            "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.VI_DIEN_TU " +
            "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
-           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN)))) " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)))) " +
            "ORDER BY d.ngayMua DESC")
     List<DonHang> findAllVisibleToAdmin();
     // Khóa dòng đơn hàng khi đổi trạng thái để hai request đồng thời không cùng thành công
@@ -130,10 +134,14 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>, JpaSp
            "t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.COD OR " +
            "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.CHUYEN_KHOAN " +
            "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
-           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN)) OR " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)) OR " +
            "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.VI_DIEN_TU " +
            "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
-           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN)))) " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)))) " +
            "ORDER BY d.ngayMua DESC")
     List<DonHang> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
 

@@ -102,6 +102,6 @@ public class AdminTuongTacController {
     @PostMapping("/returns/{ma}/refund")
     public DoiTraDto ghiNhanHoanTien(@PathVariable String ma,
                                     @Valid @RequestBody DoiTraDto.XacNhanHoanTienRequest request) {
-        return doiTraService.ghiNhanHoanTien(ma, request);
+        return doiTraService.ghiNhanHoanTien(ma, request, SecurityUtil.currentUserId());
     }
 }

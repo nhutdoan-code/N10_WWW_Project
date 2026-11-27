@@ -3,6 +3,7 @@ package nhom10.phonenest.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import nhom10.phonenest.enums.LoaiYeuCauDoiTra;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDoiTra;
 
 import java.time.LocalDate;
@@ -29,7 +30,11 @@ public record DoiTraDto(
         String hinhThucHoanTien,
         String maGiaoDichHoanTien,
         LocalDateTime ngayHoanTien,
-        boolean daNhapKho) {
+        boolean daNhapKho,
+        PhuongThucTt phuongThucTt,
+        String trangThaiHoanVnPay,
+        String maYeuCauHoanVnPay,
+        String thongBaoHoanVnPay) {
 
     public record ChiTietDto(String maPhienBan, String tenSanPham, int soLuong,
                              LoaiYeuCauDoiTra loaiYeuCau, boolean daNhapKho,

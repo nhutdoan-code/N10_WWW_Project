@@ -38,7 +38,7 @@ export default function AdminReturnsPage() {
   useEffect(() => {
     setNote('');
     setInternalNote('');
-    setRefundMethod('MOMO');
+    setRefundMethod(detail?.phuongThucTt === 'CHUYEN_KHOAN' ? 'VNPAY' : 'MOMO');
     setRefundReference('');
     if (!selected) return;
     let alive = true;
@@ -48,7 +48,7 @@ export default function AdminReturnsPage() {
       .catch(() => { if (alive) toast('Không tải được ghi chú nội bộ', 'error'); })
       .finally(() => { if (alive) setLoadingInternal(false); });
     return () => { alive = false; };
-  }, [selected]);
+  }, [selected, detail?.phuongThucTt]);
   const saveInternal = async () => {
     if (!detail || savingInternal) return;
     setSavingInternal(true);
@@ -92,19 +92,30 @@ export default function AdminReturnsPage() {
   };
 
   const recordRefund = async () => {
-    if (!detail || busy || (refundMethod !== 'MOMO' && !refundReference.trim())) return;
+    if (!detail || busy || (!['MOMO', 'VNPAY'].includes(refundMethod) && !refundReference.trim())) return;
     const amount = Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN');
+    const retryingVnPay = refundMethod === 'VNPAY' && detail.trangThaiHoanVnPay === 'DANG_HOAN_TIEN';
     const confirmMessage = refundMethod === 'MOMO'
       ? `Yêu cầu MoMo hoàn ${amount} ₫ về giao dịch gốc? Chỉ ghi nhận thành công khi MoMo xác nhận.`
-      : `Sau khi đã chuyển ${amount} ₫ ở ${refundMethod}, xác nhận ghi lại mã đối soát này?`;
+      : refundMethod === 'VNPAY'
+        ? retryingVnPay
+          ? 'VNPay chưa trả kết quả cuối. Gửi lại cùng mã yêu cầu để kiểm tra trạng thái?'
+          : `Gửi VNPay yêu cầu hoàn ${amount} ₫ cho giao dịch gốc?`
+        : `Sau khi đã chuyển ${amount} ₫ ở ${refundMethod}, xác nhận ghi lại mã đối soát này?`;
     if (!window.confirm(confirmMessage)) return;
     setBusy(true);
     try {
-      await adminService.recordReturnRefund(detail.maYeuCau, {
+      const result = await adminService.recordReturnRefund(detail.maYeuCau, {
         hinhThuc: refundMethod,
-        maGiaoDich: refundMethod === 'MOMO' ? null : refundReference.trim(),
+        maGiaoDich: ['MOMO', 'VNPAY'].includes(refundMethod) ? null : refundReference.trim(),
       });
-      toast('Đã ghi nhận thông tin hoàn tiền');
+      if (refundMethod === 'VNPAY' && result?.trangThaiHoanVnPay === 'DANG_HOAN_TIEN') {
+        toast(result.thongBaoHoanVnPay || 'VNPay đang xử lý yêu cầu hoàn tiền', 'warning');
+      } else if (refundMethod === 'VNPAY' && result?.trangThaiHoanVnPay === 'CAN_HOAN_TIEN') {
+        toast(result.thongBaoHoanVnPay || 'VNPay chưa xác nhận hoàn tiền', 'error');
+      } else {
+        toast('Đã ghi nhận thông tin hoàn tiền');
+      }
       setRefundReference('');
       reload();
     } catch (e) { toast(errorMessage(e), 'error'); }
@@ -113,7 +124,7 @@ export default function AdminReturnsPage() {
 
   return <div className="after-sales-admin">
     <h2>Quản lý hậu mãi</h2>
-    <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tiền MoMo được gửi qua API; chuyển khoản/nghiệp vụ khác cần xác nhận đối soát thủ công.</p>
+    <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tiền MoMo và VNPay được gửi qua API; chuyển khoản/nghiệp vụ khác cần xác nhận đối soát thủ công.</p>
     {loading && <p className="muted">Đang tải dữ liệu...</p>}
     {error && <p className="error">{error} <button className="btn" onClick={reload}>Tải lại</button></p>}
     {!loading && !error && data && <>
@@ -169,7 +180,7 @@ export default function AdminReturnsPage() {
         </label><button className="btn" disabled={savingInternal || loadingInternal} onClick={saveInternal}>{savingInternal ? 'Đang lưu...' : 'Lưu ghi chú nội bộ'}</button></div>
         {detail.lichSu?.length > 0 && <div><b>Lịch sử xử lý</b><ol className="as-history">{detail.lichSu.map((h,i)=><li key={i}>{formatAdminDate(h.thoiGian)} · {STATUS_LABELS[h.trangThai] || h.trangThai} {h.ghiChu ? `· ${h.ghiChu}` : ''}</li>)}</ol></div>}
         {detail.source === 'return' && ['DA_DUYET', 'DANG_XU_LY'].includes(detail.trangThai) && !detail.daNhapKho && <div className="as-review"><b>Nhận hàng và nhập kho</b><p className="muted">Chỉ xác nhận sau khi cửa hàng đã nhận và kiểm tra đủ sản phẩm. Số lượng tồn và lịch sử kho được cập nhật cùng giao dịch.</p><button className="btn btn-primary" disabled={busy} onClick={restock}>{busy ? 'Đang lưu...' : 'Xác nhận đã nhận hàng và nhập kho'}</button></div>}
-        {detail.source === 'return' && detail.loai === 'TRA_HANG_HOAN_TIEN' && detail.trangThai === 'DANG_XU_LY' && <div className="as-review"><b>Đối soát hoàn tiền</b>{detail.ngayHoanTien ? <p>Đã ghi nhận {Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN')} ₫ qua {detail.hinhThucHoanTien} · Mã: <code>{detail.maGiaoDichHoanTien}</code> · {formatAdminDate(detail.ngayHoanTien)}</p> : <><p className="muted">{refundMethod === 'MOMO' ? 'Hệ thống sẽ gọi API MoMo để hoàn tiền về giao dịch đã thanh toán.' : 'Thực hiện chuyển tiền bên ngoài trước, sau đó nhập mã giao dịch để lưu đối soát.'}</p><label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo (tự động)</option><option value="CHUYEN_KHOAN">Chuyển khoản (thủ công)</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>{refundMethod !== 'MOMO' && <label>Mã giao dịch / đối soát<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)} placeholder="Mã giao dịch/đối soát" /></label>}<button className="btn btn-primary" disabled={busy || !detail.daNhapKho || (refundMethod !== 'MOMO' && !refundReference.trim())} onClick={recordRefund}>{busy ? 'Đang xử lý...' : refundMethod === 'MOMO' ? 'Hoàn tiền qua MoMo' : 'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho && <p className="muted">Cần xác nhận nhận hàng và nhập kho trước.</p>}</>}</div>}
+        {detail.source === 'return' && detail.loai === 'TRA_HANG_HOAN_TIEN' && detail.trangThai === 'DANG_XU_LY' && <div className="as-review"><b>Đối soát hoàn tiền</b>{detail.ngayHoanTien ? <p>Đã ghi nhận {Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN')} ₫ qua {detail.hinhThucHoanTien} · Mã: <code>{detail.maGiaoDichHoanTien}</code> · {formatAdminDate(detail.ngayHoanTien)}</p> : <><p className="muted">{refundMethod === 'MOMO' ? 'Hệ thống sẽ gọi API MoMo để hoàn tiền về giao dịch đã thanh toán.' : refundMethod === 'VNPAY' ? 'Hệ thống gửi yêu cầu hoàn (toàn phần hoặc một phần) tới VNPay. Chỉ ghi nhận hoàn tất khi VNPay xác nhận.' : 'Thực hiện chuyển tiền bên ngoài trước, sau đó nhập mã giao dịch để lưu đối soát.'}</p>{detail.trangThaiHoanVnPay && <p>VNPay: <strong>{detail.trangThaiHoanVnPay === 'DANG_HOAN_TIEN' ? 'Đang xử lý' : 'Cần thử lại / đối soát'}</strong>{detail.maYeuCauHoanVnPay && <> · Mã yêu cầu: <code>{detail.maYeuCauHoanVnPay}</code></>}{detail.thongBaoHoanVnPay ? ` · ${detail.thongBaoHoanVnPay}` : ''}</p>}<label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo (tự động)</option>{detail.phuongThucTt === 'CHUYEN_KHOAN' && <option value="VNPAY">VNPay (tự động)</option>}<option value="CHUYEN_KHOAN">Chuyển khoản (thủ công)</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>{!['MOMO', 'VNPAY'].includes(refundMethod) && <label>Mã giao dịch / đối soát<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)} placeholder="Mã giao dịch/đối soát" /></label>}<button className="btn btn-primary" disabled={busy || !detail.daNhapKho || (!['MOMO', 'VNPAY'].includes(refundMethod) && !refundReference.trim())} onClick={recordRefund}>{busy ? 'Đang xử lý...' : refundMethod === 'MOMO' ? 'Hoàn tiền qua MoMo' : refundMethod === 'VNPAY' ? detail.trangThaiHoanVnPay === 'DANG_HOAN_TIEN' ? 'Kiểm tra lại cùng yêu cầu VNPay' : `Hoàn tiền qua VNPay · ${Number(detail.soTienHoanDuKien || 0).toLocaleString('vi-VN')} ₫` : 'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho && <p className="muted">Cần xác nhận nhận hàng và nhập kho trước.</p>}</>}</div>}
         {(ACTIONS[detail.source][detail.trangThai] || []).length > 0 && <div className="as-review">
           <label>Ghi chú xử lý / lý do từ chối (khách hàng có thể nhìn thấy)<textarea rows="3" maxLength={500} placeholder="Nhập ghi chú hoặc lý do từ chối..." value={note} onChange={e=>setNote(e.target.value)}/></label>
           <div className="after-sales-actions">{ACTIONS[detail.source][detail.trangThai].map(([next,label]) =>

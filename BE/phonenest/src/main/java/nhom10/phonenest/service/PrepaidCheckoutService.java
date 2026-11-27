@@ -11,6 +11,7 @@ import nhom10.phonenest.exception.AppException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -39,10 +40,16 @@ public class PrepaidCheckoutService {
         }
 
         try {
-            String payUrl = checkout.phuongThucTt() == PhuongThucTt.VI_DIEN_TU
-                    ? momoPaymentService.createCheckoutPayment(session.getMaPhienThanhToan(), session.getSoTien()).payUrl()
-                    : vnPayPaymentService.createCheckoutPayment(
-                            session.getMaPhienThanhToan(), session.getSoTien(), clientIp).payUrl();
+            String payUrl;
+            if (checkout.phuongThucTt() == PhuongThucTt.VI_DIEN_TU) {
+                payUrl = momoPaymentService.createCheckoutPayment(
+                        session.getMaPhienThanhToan(), session.getSoTien()).payUrl();
+            } else {
+                LocalDateTime createDate = sessionService.getOrCreateVnPayCreateDate(
+                        session.getMaPhienThanhToan());
+                payUrl = vnPayPaymentService.createCheckoutPayment(
+                        session.getMaPhienThanhToan(), session.getSoTien(), clientIp, createDate).payUrl();
+            }
             if (payUrl == null || payUrl.isBlank()) {
                 throw new AppException(HttpStatus.BAD_GATEWAY,
                         "Cổng thanh toán không trả về đường dẫn thanh toán");

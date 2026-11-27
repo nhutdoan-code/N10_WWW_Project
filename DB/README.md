@@ -31,7 +31,9 @@ DB/
 │   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
 │   ├── 24_vnpay_payment_transaction.sql    # Lưu mã giao dịch ngân hàng do VNPay trả về (+ _rollback)
 │   ├── 25_order_payment_first_state.sql   # Trạng thái đơn chờ thanh toán online (+ _rollback)
-│   └── 26_prepaid_checkout_sessions.sql   # Tạo đơn online sau khi IPN xác nhận thanh toán (+ _rollback)
+│   ├── 26_prepaid_checkout_sessions.sql   # Tạo đơn online sau khi IPN xác nhận thanh toán (+ _rollback)
+│   ├── 27_vnpay_refund_api.sql             # Hoàn giao dịch VNPay cần đối soát (+ _rollback)
+│   └── 28_vnpay_return_refund.sql          # Hoàn một phần VNPay cho yêu cầu đổi trả (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -42,7 +44,7 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 43 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20, 24–26; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 58 khóa ngoại, và dữ liệu demo:
+File `DB/phonenest_full.sql` (cập nhật 27/11/2026) là **file duy nhất cần import** cho máy mới: 43 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20, 24–27; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 58 khóa ngoại, và dữ liệu demo:
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -109,6 +111,8 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_vnpay_payment_transaction.sql` — thêm `ThanhToan.maGiaoDichNganHang` và unique index để lưu mã giao dịch VNPay. Bắt buộc với bản backend có tích hợp ngân hàng. Rollback: `24_vnpay_payment_transaction_rollback.sql`.
 18. *(sau 24)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/25_order_payment_first_state.sql` — thêm trạng thái `CHO_THANH_TOAN` cho đơn hàng và lịch sử trạng thái. Bắt buộc với bản backend chỉ tiếp nhận đơn MoMo/VNPay sau khi thanh toán thành công. Rollback: `25_order_payment_first_state_rollback.sql`.
 19. *(sau 25)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/26_prepaid_checkout_sessions.sql` — tạo bảng phiên thanh toán tạm, lưu snapshot giỏ hàng và chỉ tạo `DonHang` sau IPN thành công. Bắt buộc với checkout trả trước hiện tại. Chỉ rollback sau khi đã đối soát hết các phiên đang chờ thanh toán/hoàn tiền: `26_prepaid_checkout_sessions_rollback.sql`.
+20. *(sau 26)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/27_vnpay_refund_api.sql` — lưu mã yêu cầu/mã giao dịch hoàn VNPay và trạng thái `DANG_HOAN_TIEN` cho giao dịch cần đối soát. Bắt buộc với tính năng hoàn VNPay.
+21. *(sau 27)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/28_vnpay_return_refund.sql` — lưu trạng thái và mã yêu cầu để hoàn VNPay toàn phần/một phần trong luồng đổi trả hậu mãi. Bắt buộc với backend có hoàn tiền VNPay cho đổi trả.
 
 ---
 

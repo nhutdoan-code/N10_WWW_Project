@@ -135,13 +135,17 @@ public class LocDonHangAdminController {
                                     cb.equal(payment.get("phuongThuc"), PhuongThucTt.CHUYEN_KHOAN),
                                     payment.get("trangThai").in(
                                             TrangThaiThanhToan.DA_THANH_TOAN,
-                                            TrangThaiThanhToan.CAN_HOAN_TIEN)
+                                            TrangThaiThanhToan.CAN_HOAN_TIEN,
+                                            TrangThaiThanhToan.DANG_HOAN_TIEN,
+                                            TrangThaiThanhToan.DA_HOAN_TIEN)
                             ),
                             cb.and(
                                     cb.equal(payment.get("phuongThuc"), PhuongThucTt.VI_DIEN_TU),
                                             payment.get("trangThai").in(
                                                     TrangThaiThanhToan.DA_THANH_TOAN,
-                                                    TrangThaiThanhToan.CAN_HOAN_TIEN)
+                                                    TrangThaiThanhToan.CAN_HOAN_TIEN,
+                                                    TrangThaiThanhToan.DANG_HOAN_TIEN,
+                                                    TrangThaiThanhToan.DA_HOAN_TIEN)
                             )
                     )
             );

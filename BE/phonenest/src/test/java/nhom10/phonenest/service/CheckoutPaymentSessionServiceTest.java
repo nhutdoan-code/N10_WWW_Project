@@ -90,7 +90,7 @@ class CheckoutPaymentSessionServiceTest {
         assertThat(session.getSoTien()).isEqualByComparingTo(AMOUNT);
         assertThat(session.getDuLieuCheckout()).contains("PB001").contains("\"soLuong\":1");
         verify(orderFinalizer, never()).finalizePaidCheckout(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -111,26 +111,47 @@ class CheckoutPaymentSessionServiceTest {
 
     @Test
     void successfulCallbackCreatesOrderOnce() {
+        checkout = new DonHangDto.Checkout(PhuongThucTt.CHUYEN_KHOAN, "DC001", null, null, null, null);
         PhienThanhToan session = pendingSession();
+        LocalDateTime createDate = LocalDateTime.of(2026, 11, 27, 18, 30);
+        session.setNgayTaoGiaoDichVnPay(createDate);
         DonHangDto order = orderDto();
         when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session));
         when(sessionRepository.findByMaPhienThanhToanForUpdate(SESSION_ID)).thenReturn(Optional.of(session));
         when(orderFinalizer.finalizePaidCheckout(
                 eq(CUSTOMER_ID), eq(SESSION_ID), eq(session.getDuLieuCheckout()), eq(AMOUNT),
-                eq("MOMO-TXN-1"), eq(PhuongThucTt.VI_DIEN_TU)))
+                eq("VNPAY-TXN-1"), eq(PhuongThucTt.CHUYEN_KHOAN), eq(createDate)))
                 .thenReturn(order);
 
         var result = service.processCallback(
-                SESSION_ID, PhuongThucTt.VI_DIEN_TU, AMOUNT, true, "MOMO-TXN-1");
+                SESSION_ID, PhuongThucTt.CHUYEN_KHOAN, AMOUNT, true, "VNPAY-TXN-1");
 
         assertThat(result).hasValueSatisfying(callback ->
                 assertThat(callback.status()).isEqualTo(CheckoutPaymentCallbackResult.Status.ORDER_CREATED));
         assertThat(session.getTrangThai()).isEqualTo(TrangThaiPhienThanhToan.DA_TAO_DON);
         assertThat(session.getMaDonHang()).isEqualTo("DH001");
 
-        service.processCallback(SESSION_ID, PhuongThucTt.VI_DIEN_TU, AMOUNT, true, "MOMO-TXN-1");
+        service.processCallback(SESSION_ID, PhuongThucTt.CHUYEN_KHOAN, AMOUNT, true, "VNPAY-TXN-1");
         verify(orderFinalizer, times(1)).finalizePaidCheckout(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
+        verify(orderFinalizer).finalizePaidCheckout(
+                eq(CUSTOMER_ID), eq(SESSION_ID), eq(session.getDuLieuCheckout()), eq(AMOUNT),
+                eq("VNPAY-TXN-1"), eq(PhuongThucTt.CHUYEN_KHOAN), eq(createDate));
+    }
+
+    @Test
+    void vnpayCreateDateIsSavedAndReusedForThePaymentUrl() {
+        PhienThanhToan session = pendingSession();
+        when(sessionRepository.findByMaPhienThanhToanForUpdate(SESSION_ID)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(session)).thenReturn(session);
+
+        LocalDateTime first = service.getOrCreateVnPayCreateDate(SESSION_ID);
+        LocalDateTime second = service.getOrCreateVnPayCreateDate(SESSION_ID);
+
+        assertThat(first).isNotNull();
+        assertThat(second).isEqualTo(first);
+        assertThat(session.getNgayTaoGiaoDichVnPay()).isEqualTo(first);
+        verify(sessionRepository, times(1)).save(session);
     }
 
     @Test
@@ -168,7 +189,7 @@ class CheckoutPaymentSessionServiceTest {
         PhienThanhToan session = new PhienThanhToan();
         session.setMaPhienThanhToan(SESSION_ID);
         session.setKhachHang(customer);
-        session.setPhuongThuc(PhuongThucTt.VI_DIEN_TU);
+        session.setPhuongThuc(checkout.phuongThucTt());
         session.setSoTien(AMOUNT);
         session.setTrangThai(TrangThaiPhienThanhToan.CHO_THANH_TOAN);
         session.setDuLieuCheckout(new ObjectMapper().valueToTree(

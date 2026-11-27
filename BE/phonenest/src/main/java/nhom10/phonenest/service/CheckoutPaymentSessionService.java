@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
@@ -190,6 +191,22 @@ public class CheckoutPaymentSessionService {
     }
 
     @Transactional
+    public LocalDateTime getOrCreateVnPayCreateDate(String sessionId) {
+        PhienThanhToan session = sessionRepository.findByMaPhienThanhToanForUpdate(sessionId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên thanh toán"));
+        if (session.getTrangThai() != TrangThaiPhienThanhToan.CHO_THANH_TOAN) {
+            throw new AppException(HttpStatus.CONFLICT, "Phiên thanh toán đã kết thúc");
+        }
+        if (session.getNgayTaoGiaoDichVnPay() == null) {
+            LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+            session.setNgayTaoGiaoDichVnPay(now);
+            session.setNgayCapNhat(now);
+            sessionRepository.save(session);
+        }
+        return session.getNgayTaoGiaoDichVnPay();
+    }
+
+    @Transactional
     public void markProviderCreationFailed(String sessionId) {
         sessionRepository.findByMaPhienThanhToanForUpdate(sessionId).ifPresent(session -> {
             if (session.getTrangThai() == TrangThaiPhienThanhToan.CHO_THANH_TOAN) {
@@ -266,7 +283,8 @@ public class CheckoutPaymentSessionService {
                     session.getDuLieuCheckout(),
                     session.getSoTien(),
                     providerTransactionId,
-                    paymentMethod);
+                    paymentMethod,
+                    session.getNgayTaoGiaoDichVnPay());
             session.setMaDonHang(order.maDonHang());
             session.setTrangThai(TrangThaiPhienThanhToan.DA_TAO_DON);
             session.setNgayCapNhat(LocalDateTime.now());

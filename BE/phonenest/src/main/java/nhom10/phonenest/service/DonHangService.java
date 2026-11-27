@@ -32,7 +32,10 @@ public class DonHangService {
     private static final int DIEM_MOI_VND = 10000;
     private static final String LY_DO_KHAC = "Lý do khác";
     private record PaymentConfirmation(
-            BigDecimal amount, String paymentReference, String providerTransactionId) {
+            BigDecimal amount,
+            String paymentReference,
+            String providerTransactionId,
+            LocalDateTime vnPayCreateDate) {
     }
 
     private static final List<String> LY_DO_HUY = List.of(
@@ -95,6 +98,19 @@ public class DonHangService {
             String paymentReference,
             String providerTransactionId,
             PhuongThucTt paymentMethod) {
+        return datHangDaThanhToan(
+                maKh, req, items, paidAmount, paymentReference, providerTransactionId, paymentMethod, null);
+    }
+
+    public DonHangDto datHangDaThanhToan(
+            String maKh,
+            DonHangDto.Checkout req,
+            Map<String, Integer> items,
+            BigDecimal paidAmount,
+            String paymentReference,
+            String providerTransactionId,
+            PhuongThucTt paymentMethod,
+            LocalDateTime vnPayCreateDate) {
         if (req.phuongThucTt() != paymentMethod
                 || (paymentMethod != PhuongThucTt.VI_DIEN_TU
                 && paymentMethod != PhuongThucTt.CHUYEN_KHOAN)) {
@@ -105,7 +121,7 @@ public class DonHangService {
                 req,
                 null,
                 items,
-                new PaymentConfirmation(paidAmount, paymentReference, providerTransactionId));
+                new PaymentConfirmation(paidAmount, paymentReference, providerTransactionId, vnPayCreateDate));
     }
 
     private DonHangDto datHangInternal(
@@ -721,6 +737,7 @@ public class DonHangService {
                 t.setMaGiaoDichMoMo(paymentConfirmation.providerTransactionId());
             } else {
                 t.setMaGiaoDichNganHang(paymentConfirmation.providerTransactionId());
+                t.setNgayTaoGiaoDichVnPay(paymentConfirmation.vnPayCreateDate());
             }
         }
         thanhToanRepository.save(t);

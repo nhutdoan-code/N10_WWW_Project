@@ -1,8 +1,8 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..26 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..27 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24-28 (pn_migration_log có M12/M15/M16).
 --   * 43 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
@@ -5690,10 +5690,15 @@ CREATE TABLE `ThanhToan` (
   `maDonHang` varchar(50) NOT NULL,
   `phuongThuc` enum('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
   `soTien` decimal(15,2) NOT NULL,
-  `trangThai` enum('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
+  `trangThai` enum('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DANG_HOAN_TIEN','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
   `maGiaoDich` varchar(150) DEFAULT NULL,
   `maGiaoDichMoMo` varchar(100) DEFAULT NULL,
   `maGiaoDichNganHang` varchar(100) DEFAULT NULL,
+  `ngayTaoGiaoDichVnPay` datetime DEFAULT NULL,
+  `maYeuCauHoanVnPay` varchar(32) DEFAULT NULL,
+  `maGiaoDichHoanVnPay` varchar(100) DEFAULT NULL,
+  `ngayYeuCauHoanVnPay` datetime DEFAULT NULL,
+  `nguoiYeuCauHoanVnPay` varchar(245) DEFAULT NULL,
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayThanhToan` datetime DEFAULT NULL,
   PRIMARY KEY (`maThanhToan`),
@@ -5723,6 +5728,7 @@ CREATE TABLE `PhienThanhToan` (
   `payUrl` varchar(3000) DEFAULT NULL,
   `maDonHang` varchar(50) DEFAULT NULL,
   `maGiaoDichNhaCungCap` varchar(100) DEFAULT NULL,
+  `ngayTaoGiaoDichVnPay` datetime DEFAULT NULL,
   `maGiaoDichHoanTien` varchar(100) DEFAULT NULL,
   `lyDoHoanTien` varchar(500) DEFAULT NULL,
   `ngayTao` datetime NOT NULL,
@@ -5906,6 +5912,11 @@ CREATE TABLE `YeuCauDoiTra` (
   `hinhThucHoanTien` varchar(60) DEFAULT NULL,
   `maGiaoDichHoanTien` varchar(150) DEFAULT NULL,
   `ngayHoanTien` datetime DEFAULT NULL,
+  `trangThaiHoanVnPay` varchar(20) DEFAULT NULL,
+  `maYeuCauHoanVnPay` varchar(32) DEFAULT NULL,
+  `ngayYeuCauHoanVnPay` datetime DEFAULT NULL,
+  `nguoiYeuCauHoanVnPay` varchar(245) DEFAULT NULL,
+  `thongBaoHoanVnPay` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`maYeuCau`),
   KEY `FK_YeuCauDoiTra_DonHang` (`maDonHang`),
   CONSTRAINT `FK_YeuCauDoiTra_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`) ON UPDATE CASCADE

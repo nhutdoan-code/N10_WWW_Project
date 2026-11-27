@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -33,7 +34,8 @@ public class CheckoutPaymentOrderFinalizer {
             String checkoutPayload,
             BigDecimal paidAmount,
             String providerTransactionId,
-            PhuongThucTt paymentMethod) {
+            PhuongThucTt paymentMethod,
+            LocalDateTime vnPayCreateDate) {
         ThanhToan existingPayment = thanhToanRepository.findByMaGiaoDich(sessionId).orElse(null);
         if (existingPayment != null) {
             return donHangService.chiTiet(customerId, existingPayment.getDonHang().getMaDonHang());
@@ -61,6 +63,7 @@ public class CheckoutPaymentOrderFinalizer {
                 paidAmount,
                 sessionId,
                 providerTransactionId,
-                paymentMethod);
+                paymentMethod,
+                vnPayCreateDate);
     }
 }

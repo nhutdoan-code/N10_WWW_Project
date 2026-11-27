@@ -67,6 +67,8 @@ public class PhienThanhToan {
     @Column(length = 100)
     private String maGiaoDichNhaCungCap;
 
+    private LocalDateTime ngayTaoGiaoDichVnPay;
+
     @Column(length = 100)
     private String maGiaoDichHoanTien;
 

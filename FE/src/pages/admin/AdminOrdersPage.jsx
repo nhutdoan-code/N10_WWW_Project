@@ -48,6 +48,8 @@ export default function AdminOrdersPage() {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [momoRefundStatus, setMomoRefundStatus] = useState(null);
   const [refundingMomo, setRefundingMomo] = useState(false);
+  const [vnPayRefundStatus, setVnPayRefundStatus] = useState(null);
+  const [refundingVnPay, setRefundingVnPay] = useState(false);
 
   const toast = useToast();
 
@@ -57,6 +59,16 @@ export default function AdminOrdersPage() {
     let active = true;
     adminService.momoRefundStatus(selected.maDonHang)
       .then((status) => { if (active) setMomoRefundStatus(status); })
+      .catch((error) => { if (active) toast(errorMessage(error), 'error'); });
+    return () => { active = false; };
+  }, [selected?.maDonHang, selected?.phuongThucTt]);
+
+  useEffect(() => {
+    setVnPayRefundStatus(null);
+    if (!selected || selected.phuongThucTt !== 'CHUYEN_KHOAN') return undefined;
+    let active = true;
+    adminService.vnPayRefundStatus(selected.maDonHang)
+      .then((status) => { if (active) setVnPayRefundStatus(status); })
       .catch((error) => { if (active) toast(errorMessage(error), 'error'); });
     return () => { active = false; };
   }, [selected?.maDonHang, selected?.phuongThucTt]);
@@ -75,6 +87,32 @@ export default function AdminOrdersPage() {
       toast(errorMessage(error), 'error');
     } finally {
       setRefundingMomo(false);
+    }
+  };
+
+  const refundPendingVnPay = async () => {
+    if (!selected || refundingVnPay) return;
+    const retrying = vnPayRefundStatus?.status === 'DANG_HOAN_TIEN';
+    const confirmation = retrying
+      ? 'Yêu cầu trước đó chưa có kết quả cuối. Gửi lại cùng mã yêu cầu để VNPay đối soát, không tạo mã hoàn mới?'
+      : `Xác nhận gửi VNPay yêu cầu hoàn ${formatPrice(selected.tongTien)} cho giao dịch này?`;
+    if (!window.confirm(confirmation)) return;
+    setRefundingVnPay(true);
+    try {
+      const status = await adminService.refundVnPayPayment(selected.maDonHang);
+      setVnPayRefundStatus(status);
+      if (status.status === 'DA_HOAN_TIEN') {
+        toast('VNPay xác nhận đã hoàn tiền');
+      } else if (status.status === 'DANG_HOAN_TIEN') {
+        toast(status.message || 'VNPay đang xử lý yêu cầu hoàn tiền', 'warning');
+      } else {
+        toast(status.message || 'VNPay chưa xác nhận hoàn tiền', 'error');
+      }
+      reload();
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    } finally {
+      setRefundingVnPay(false);
     }
   };
 
@@ -682,6 +720,37 @@ export default function AdminOrdersPage() {
               </button>
             </section>
           )}
+
+          {selected.phuongThucTt === 'CHUYEN_KHOAN'
+            && ['CAN_HOAN_TIEN', 'DANG_HOAN_TIEN', 'DA_HOAN_TIEN'].includes(vnPayRefundStatus?.status) && (
+              <section className="section">
+                <h3>Hoàn tiền VNPay</h3>
+                <p>
+                  Trạng thái: <strong>
+                    {vnPayRefundStatus.status === 'CAN_HOAN_TIEN' ? 'Cần hoàn tiền' :
+                      vnPayRefundStatus.status === 'DANG_HOAN_TIEN' ? 'VNPay đang xử lý' : 'Đã hoàn tiền'}
+                  </strong>
+                </p>
+                {vnPayRefundStatus.message && <p>{vnPayRefundStatus.message}</p>}
+                {vnPayRefundStatus.transactionId && (
+                  <p>Mã giao dịch gốc: <code>{vnPayRefundStatus.transactionId}</code></p>
+                )}
+                {vnPayRefundStatus.refundRequestId && (
+                  <p>Mã yêu cầu hoàn: <code>{vnPayRefundStatus.refundRequestId}</code></p>
+                )}
+                {vnPayRefundStatus.refundTransactionId && (
+                  <p>Mã giao dịch hoàn: <code>{vnPayRefundStatus.refundTransactionId}</code></p>
+                )}
+                {['CAN_HOAN_TIEN', 'DANG_HOAN_TIEN'].includes(vnPayRefundStatus.status) && (
+                  <button className="btn btn-primary" disabled={refundingVnPay} onClick={refundPendingVnPay}>
+                    {refundingVnPay ? 'Đang gửi yêu cầu VNPay...' :
+                      vnPayRefundStatus.status === 'DANG_HOAN_TIEN'
+                        ? 'Kiểm tra lại cùng yêu cầu hoàn VNPay'
+                        : `Gửi yêu cầu hoàn ${formatPrice(selected.tongTien)} qua VNPay`}
+                  </button>
+                )}
+              </section>
+            )}
 
           {selected.ngayGiao && (
             <p>
