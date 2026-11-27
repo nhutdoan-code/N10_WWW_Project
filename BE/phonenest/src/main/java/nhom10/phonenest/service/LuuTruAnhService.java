@@ -27,39 +27,53 @@ public class LuuTruAnhService {
         this.uploadPathResolver = uploadPathResolver;
     }
 
-    public String luu(MultipartFile file) {
+    public String luu(MultipartFile file) { return luu(file, ""); }
+
+    private String prefix(String user) {
+        return UUID.nameUUIDFromBytes(user.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "_";
+    }
+    public String luuHauMai(MultipartFile file, String user) { return luu(file, prefix(user)); }
+    public boolean anhHauMaiHopLe(String url, String user) {
+        if (url == null || !url.startsWith("/uploads/" + prefix(user))) return false;
+        String name = url.substring("/uploads/".length());
+        if (!name.substring(prefix(user).length()).matches("[0-9a-f-]{36}\\.(jpg|jpeg|png|webp)")) return false;
+        Path path = uploadPathResolver.resolve(name);
+        try { return Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS) && Files.size(path) > 0 && Files.size(path) <= MAX_BYTES; }
+        catch (IOException e) { return false; }
+    }
+    private String luu(MultipartFile file, String prefix) {
         if (file == null || file.isEmpty()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Vui long chon mot file anh");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn một file ảnh");
         }
         if (file.getSize() > MAX_BYTES) {
-            throw new AppException(HttpStatus.PAYLOAD_TOO_LARGE, "Anh khong duoc vuot qua 5MB");
+            throw new AppException(HttpStatus.PAYLOAD_TOO_LARGE, "Ảnh không được vượt quá 5 MB");
         }
 
         String duoi = layDuoi(file.getOriginalFilename());
         if (!DUOI_ANH.contains(duoi)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi chap nhan anh JPG, PNG hoac WEBP");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP");
         }
 
         String loai = file.getContentType() == null
                 ? ""
                 : file.getContentType().toLowerCase(Locale.ROOT);
         if (!loai.startsWith("image/")) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi chap nhan file anh");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận file ảnh");
         }
 
         if (!hopLeVoiDuoi(duoi, loai, file)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Noi dung file khong phai anh hop le");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Nội dung file không phải ảnh hợp lệ");
         }
 
         // Khong dung original filename lam duong dan file tren he thong.
-        String tenMoi = UUID.randomUUID() + "." + duoi;
+        String tenMoi = prefix + UUID.randomUUID() + "." + duoi;
         Path dich = uploadPathResolver.resolve(tenMoi);
 
         try (InputStream in = file.getInputStream()) {
             Files.createDirectories(uploadPathResolver.getRoot());
             Files.copy(in, dich, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Khong the luu anh, vui long thu lai");
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu ảnh, vui lòng thử lại");
         }
 
         return "/uploads/" + tenMoi;

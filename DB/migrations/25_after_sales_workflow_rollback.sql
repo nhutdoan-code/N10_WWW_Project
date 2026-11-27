@@ -1,4 +1,4 @@
--- Rollback migration 24.
+-- Rollback migration 25.
 -- Chuyen cac buoc moi ve DANG_XU_LY de khong mat lich su khi thu hep ENUM.
 UPDATE LichSuHauMai
 SET trangThai = 'DANG_XU_LY'
@@ -14,4 +14,4 @@ ALTER TABLE LichSuHauMai
 ALTER TABLE YeuCauHauMai
     MODIFY COLUMN trangThai ENUM('CHO_TIEP_NHAN', 'DANG_XU_LY', 'HOAN_TAT', 'TU_CHOI')
         NOT NULL DEFAULT 'CHO_TIEP_NHAN',
-    DROP COLUMN ketQuaXuLy;
+    DROP COLUMN IF EXISTS ketQuaXuLy;

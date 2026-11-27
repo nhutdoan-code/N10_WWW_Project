@@ -31,6 +31,8 @@ class HauMaiServiceTest {
     @Mock private YeuCauHauMaiRepository yeuCauRepo;
     @Mock private DonHangRepository donHangRepo;
     @Mock private ThongBaoService thongBaoService;
+    @Mock private nhom10.phonenest.repository.KhachHangRepository khachHangRepo;
+    @Mock private nhom10.phonenest.repository.TaiKhoanRepository taiKhoanRepo;
     @InjectMocks private HauMaiService service;
 
     private DonHang donHang(String maKh) {
@@ -56,15 +58,26 @@ class HauMaiServiceTest {
     }
 
     @Test
-    void khongChoKhieuNaiKhiDonMoiChoXacNhan() {
+    void choKhieuNaiKhiDonMoiChoXacNhan() {
         DonHang don = donHang("KH1");
         don.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
         when(donHangRepo.findByIdForUpdate("DH1")).thenReturn(Optional.of(don));
-        AppException error = assertThrows(AppException.class, () -> service.tao("KH1",
-                new HauMaiDto.Request("DH1", LoaiHauMai.KHIEU_NAI,
-                        null, "Yeu cau xu ly", null)));
-        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
-        verifyNoInteractions(yeuCauRepo, thongBaoService);
+        assertEquals("DH1", service.tao("KH1", new HauMaiDto.Request("DH1", LoaiHauMai.KHIEU_NAI,
+                        null, "Yeu cau xu ly", null)).maDonHang());
+    }
+
+    @Test
+    void khieuNaiKhongCanDonHangVaCoChuSoHuu() {
+        KhachHang kh = donHang("KH1").getKhachHang();
+        when(khachHangRepo.findById("KH1")).thenReturn(Optional.of(kh));
+        HauMaiDto dto = service.tao("KH1", new HauMaiDto.Request(null, LoaiHauMai.KHIEU_NAI, null, "Phản ánh chất lượng dịch vụ chung", null));
+        assertNull(dto.maDonHang());
+        var cap = org.mockito.ArgumentCaptor.forClass(nhom10.phonenest.entity.YeuCauHauMai.class);
+        verify(yeuCauRepo).save(cap.capture());
+        assertEquals("KH1", cap.getValue().getKhachHang().getMaKh());
+        when(yeuCauRepo.findById(dto.maYeuCau())).thenReturn(Optional.of(cap.getValue()));
+        assertThrows(AppException.class, () -> service.chiTietCuaToi("KH2", dto.maYeuCau()));
+        assertEquals(dto.maYeuCau(), service.chiTietCuaToi("KH1", dto.maYeuCau()).maYeuCau());
     }
 
     @Test
@@ -84,6 +97,23 @@ class HauMaiServiceTest {
                 new HauMaiDto.Request("DH1", LoaiHauMai.BAO_HANH, "PB1", "May khong bat", null)));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
         verifyNoInteractions(yeuCauRepo, thongBaoService);
+    }
+
+    @Test
+    void baoHanhTinhTuNgayNhanVaKhongPhuThuocThoiHanSanPham() {
+        DonHang don = donHang("KH1");
+        don.setNgayGiao(LocalDateTime.now().minusMonths(13));
+        don.setNgayKhachXacNhan(LocalDateTime.now().minusMonths(11));
+        PhienBanSanPham pb = new PhienBanSanPham();
+        pb.setMaPhienBan("PB1");
+        ChiTietDonHang dong = new ChiTietDonHang();
+        dong.setMaChiTiet("CT1");
+        dong.setPhienBan(pb);
+        dong.setBaoHanhThang(1);
+        don.setChiTiet(List.of(dong));
+        when(donHangRepo.findByIdForUpdate("DH1")).thenReturn(Optional.of(don));
+        HauMaiDto dto = service.tao("KH1", new HauMaiDto.Request("DH1", LoaiHauMai.BAO_HANH, "PB1", "May hong", null));
+        assertEquals(TrangThaiHauMai.CHO_TIEP_NHAN, dto.trangThai());
     }
 
     @Test

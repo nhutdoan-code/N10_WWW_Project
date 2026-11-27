@@ -52,8 +52,16 @@ class ChatServicePersonalizationTest {
     @Mock
     private SemanticSearchService semanticSearchService;
 
+    @Mock
+    private ChatScopeGuard chatScopeGuard;
+
     @InjectMocks
     private ChatService chatService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void cauHinhPhamViChat() {
+        lenient().when(chatScopeGuard.kiemTraPhamVi(any(), any())).thenReturn(ChatScopeGuard.KetQua.IN_SCOPE);
+    }
 
     @Test
     void fallbackRecommendationsUseRecentSearchInterests() {

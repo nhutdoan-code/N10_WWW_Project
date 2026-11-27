@@ -61,7 +61,7 @@ export const PRODUCT_STATUS = {
 };
 
 export const RETURN_STATUS = {
-  CHO_DUYET: 'Chờ duyệt',
+  CHO_DUYET: 'Chờ tiếp nhận',
   DA_DUYET: 'Đã duyệt',
   TU_CHOI: 'Từ chối',
   DANG_XU_LY: 'Đang xử lý',

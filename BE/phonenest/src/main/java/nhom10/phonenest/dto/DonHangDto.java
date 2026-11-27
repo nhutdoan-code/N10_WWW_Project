@@ -10,6 +10,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// hanDoiTra/hanBaoHanh la truong tinh toan (chi xuat ra JSON): bo qua khi doc lai, vi du
+// CheckoutIdempotencyService doc lai response da luu de tra cho request lap lai.
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(value = {"hanDoiTra", "hanBaoHanh"}, allowGetters = true)
 public record DonHangDto(
         String maDonHang,
         String maKh,
@@ -39,6 +42,11 @@ public record DonHangDto(
         BigDecimal phuPhiCod,
         LocalDate ngayGiaoDuKienTu,
         LocalDate ngayGiaoDuKienDen) {
+
+    @com.fasterxml.jackson.annotation.JsonProperty("hanDoiTra")
+    public LocalDateTime hanDoiTra() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, false); }
+    @com.fasterxml.jackson.annotation.JsonProperty("hanBaoHanh")
+    public LocalDateTime hanBaoHanh() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, true); }
 
     /** Constructor trước M22 (không có chi tiết phí / ngày giao dự kiến), giữ cho test và caller cũ. */
     public DonHangDto(

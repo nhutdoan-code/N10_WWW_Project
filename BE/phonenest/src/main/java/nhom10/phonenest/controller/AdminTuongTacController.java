@@ -24,6 +24,7 @@ public class AdminTuongTacController {
     private final DanhGiaService danhGiaService;
     private final HoiDapService hoiDapService;
     private final DoiTraService doiTraService;
+    private final nhom10.phonenest.service.AfterSalesAdminWorkflow workflow;
 
     @GetMapping("/reviews")
     public List<DanhGiaDto> reviews() {
@@ -87,16 +88,18 @@ public class AdminTuongTacController {
         return java.util.Map.of("message", "Đã lưu ghi chú nội bộ");
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PutMapping("/returns/{ma}/status")
     public DoiTraDto capNhatReturn(@PathVariable String ma,
                                    @RequestParam TrangThaiDoiTra trangThai,
                                    @RequestParam(required = false) String ghiChuXuLy) {
+        if (trangThai == TrangThaiDoiTra.HOAN_TAT) workflow.checkCompletion("return", ma);
         return doiTraService.capNhat(ma, trangThai, ghiChuXuLy);
     }
 
     @PostMapping("/returns/{ma}/restock")
     public DoiTraDto xacNhanNhapKho(@PathVariable String ma) {
-        return doiTraService.xacNhanNhapKho(ma, SecurityUtil.currentUserId());
+        return workflow.restock(ma, SecurityUtil.currentUserId());
     }
 
     @PostMapping("/returns/{ma}/refund")

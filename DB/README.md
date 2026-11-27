@@ -29,7 +29,8 @@ DB/
 │   ├── 21_chat_history_vector_store.sql    # Lịch sử ChatBox + vector store MariaDB (+ _rollback)
 │   ├── 22_shipping_zone_eta_notification_link.sql # Phí ship theo vùng, ngày giao dự kiến, link thông báo (+ _rollback)
 │   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
-│   └── 24_after_sales_workflow.sql        # Quy trình bảo hành/khiếu nại và kết quả xử lý (+ _rollback)
+│   ├── 24_after_sales_optional_order.sql   # Hậu mãi V2: maKh, khiếu nại không gắn đơn (+ _rollback)
+│   └── 25_after_sales_workflow.sql         # Bước kiểm tra/xác minh và kết quả xử lý (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -38,9 +39,13 @@ DB/
 
 ## 2. Cách khởi tạo Database
 
+### Migration 24–25 — Hậu mãi V2
+
+Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_optional_order.sql` và `25_after_sales_workflow.sql` trên database đang sử dụng trước khi chạy backend V2. Không xóa hoặc import đè database. M24 thêm `YeuCauHauMai.maKh`, điền chủ sở hữu từ đơn cũ và cho phép khiếu nại không gắn đơn. M25 thêm các trạng thái kiểm tra/xác minh và kết quả xử lý. Nếu trước đó đã áp dụng migration workflow số 24 trên nhánh cũ, M25 dùng `ADD COLUMN IF NOT EXISTS` nên vẫn áp dụng được. Không rollback M24 nếu đã có khiếu nại độc lập. Nếu cài mới, chỉ cần import `phonenest_full.sql`, không chạy lại migration.
+
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 27/11/2026, đã gồm cấu trúc workflow hậu mãi ở migration 24) là **file duy nhất cần import** cho máy mới. Bản kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema mới cần được áp dụng bằng migration 24 cho database hiện có.
+File `DB/phonenest_full.sql` (schema đã gồm M24 và M25; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 đã được bổ sung vào dump này.
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -104,7 +109,8 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 14. *(sau 20)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/21_chat_history_vector_store.sql` — bảng lịch sử ChatBox (`CuocHoiThoaiChat`, `TinNhanChat`) và vector store sản phẩm trong MariaDB (`phonenest_vector_store`, `product_embedding_sync`). Cần MariaDB ≥ 11.7 (kiểu `VECTOR`). Bắt buộc để dùng ChatBox khi đã đăng nhập; vector store tự quay về bộ nhớ nếu thiếu bảng. Rollback: `21_chat_history_vector_store_rollback.sql`.
 15. *(sau 21)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/22_shipping_zone_eta_notification_link.sql` — phí vận chuyển theo 4 vùng từ kho TP.HCM cho đủ 34 tỉnh/thành (phụ phí xã ngoại thành / đặc khu, phí khai giá 0,5% tối đa 50.000đ cho đơn từ 3 triệu, phụ phí COD 15.000đ cho đơn trên 10 triệu, freeship 3–5 triệu), số ngày giao + ngày giao dự kiến lưu trên đơn, voucher `FREESHIP`/`SHIP50` chỉ giảm phí vùng, cột `ThongBao.duongDan` để bấm thông báo mở đúng trang. **Bắt buộc** với backend hiện tại. Rollback: `22_shipping_zone_eta_notification_link_rollback.sql`.
 16. *(sau 22)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/23_voucher_discount_type.sql` — thêm `KhuyenMai.kieuGiam` (`PHAN_TRAM` bắt buộc có `soTienGiamToiDa` / `SO_TIEN` dùng `soTienGiamCoDinh`), tắt mã cũ NEST10/SALE10TR/KHACHMOI10/WELCOME5 (giữ lịch sử) và thêm bộ voucher mới. **Bắt buộc** với backend hiện tại. Rollback: `23_voucher_discount_type_rollback.sql`.
-17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_after_sales_workflow.sql` — thêm bước kiểm tra/xác minh riêng cho bảo hành và khiếu nại, cùng cột kết quả xử lý. **Bắt buộc** với backend hiện tại. Rollback: `24_after_sales_workflow_rollback.sql`.
+17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_after_sales_optional_order.sql` — thêm `YeuCauHauMai.maKh` (điền từ đơn cũ), cho phép `maDonHang` NULL để khiếu nại không gắn đơn. Rollback: `24_after_sales_optional_order_rollback.sql` (dừng nếu đã có yêu cầu không gắn đơn).
+18. *(sau 24)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/25_after_sales_workflow.sql` — thêm bước kiểm tra/xác minh riêng cho bảo hành và khiếu nại, cùng cột kết quả xử lý. **Bắt buộc** với backend hiện tại. Rollback: `25_after_sales_workflow_rollback.sql`.
 
 ---
 

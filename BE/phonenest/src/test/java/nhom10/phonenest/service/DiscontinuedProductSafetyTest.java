@@ -431,7 +431,9 @@ public class DiscontinuedProductSafetyTest {
     @Test
     @DisplayName("Test 12: AI Semantic Search không gợi ý hoặc lập chỉ mục sản phẩm NGUNG_KINH_DOANH")
     void test12_AiSearchDoesNotRecommendDiscontinuedProducts() {
-        when(sanPhamRepository.findAll()).thenReturn(List.of(activeSp, discontinuedSp));
+        // Fallback search dung truy van loc san pham dang ban + con hang; tra ve ca san pham ngung ban
+        // de kiem tra lop loc trong service van chan san pham NGUNG_KINH_DOANH.
+        when(sanPhamRepository.findAllWithPhienBansCoHang(any())).thenReturn(List.of(activeSp, discontinuedSp));
         when(embeddingModel.isAvailable()).thenReturn(false); // test keyword fallback
 
         var results = testSemanticSearchService.search("điện thoại giá rẻ", 10);

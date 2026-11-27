@@ -296,6 +296,7 @@ function ChatSession({ sessionKey, open, setOpen, onCartChanged }) {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
+  useEffect(() => { const show = () => setOpen(true); window.addEventListener('phonenest:open-chat', show); return () => window.removeEventListener('phonenest:open-chat', show); }, []);
   const auth = useAuth();
   const cart = useCart();
   const user = auth?.user;

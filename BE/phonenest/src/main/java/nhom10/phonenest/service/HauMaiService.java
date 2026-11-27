@@ -33,10 +33,12 @@ public class HauMaiService {
     private final YeuCauHauMaiRepository yeuCauRepo;
     private final DonHangRepository donHangRepo;
     private final ThongBaoService thongBaoService;
+    private final nhom10.phonenest.repository.KhachHangRepository khachHangRepo;
+    private final nhom10.phonenest.repository.TaiKhoanRepository taiKhoanRepo;
 
     public HauMaiDto tao(String maKh, HauMaiDto.Request req) {
         // Khoá đơn hàng để hai yêu cầu cùng lúc không tạo trùng trong cùng giao dịch.
-        DonHang don = donHangRepo.findByIdForUpdate(req.maDonHang())
+        DonHang don = req.maDonHang() == null || req.maDonHang().isBlank() ? null : donHangRepo.findByIdForUpdate(req.maDonHang())
                 .filter(d -> d.getKhachHang().getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng của bạn"));
         String lyDo = req.lyDo().trim();
@@ -44,32 +46,17 @@ public class HauMaiService {
 
         ChiTietDonHang dong = null;
         if (req.loai() == LoaiHauMai.BAO_HANH) {
-            if (don.getTrangThai() != TrangThaiDonHang.DA_GIAO || don.getNgayGiao() == null) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ nhận bảo hành cho đơn đã giao có ngày giao xác định");
-            }
+            if (don == null) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn đơn hàng bảo hành");
+            nhom10.phonenest.util.AfterSalesPolicy.require(don, true);
             dong = don.getChiTiet().stream()
                     .filter(c -> c.getPhienBan().getMaPhienBan().equals(req.maPhienBan()))
                     .findFirst()
                     .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm không thuộc đơn hàng"));
-            if (dong.getBaoHanhThang() <= 0 ||
-                    LocalDateTime.now().isAfter(don.getNgayGiao().plusMonths(dong.getBaoHanhThang()))) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm đã hết thời hạn bảo hành");
-            }
             if (yeuCauRepo.existsByDonHangMaDonHangAndChiTietDonHangMaChiTietAndLoaiAndTrangThaiIn(
                     don.getMaDonHang(), dong.getMaChiTiet(), LoaiHauMai.BAO_HANH, DANG_MO)) {
                 throw new AppException(HttpStatus.CONFLICT, "Sản phẩm đã có yêu cầu bảo hành đang xử lý");
             }
-        } else {
-            // Không nhận khiếu nại khi đơn mới đặt, chưa qua giai đoạn giao hàng.
-            // Khiếu nại trong vận chuyển, đã giao hoặc sau hủy vẫn được tiếp nhận.
-            TrangThaiDonHang trangThai = don.getTrangThai();
-            if (trangThai != TrangThaiDonHang.DANG_GIAO
-                    && trangThai != TrangThaiDonHang.CHO_KHACH_XAC_NHAN
-                    && trangThai != TrangThaiDonHang.DA_GIAO
-                    && trangThai != TrangThaiDonHang.DA_HUY) {
-                throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Đơn hàng chưa đến giai đoạn được gửi khiếu nại. Bạn có thể hủy đơn nếu không muốn tiếp tục mua.");
-            }
+        } else if (don != null) {
             if (yeuCauRepo.existsByDonHangMaDonHangAndLoaiAndTrangThaiIn(
                     don.getMaDonHang(), LoaiHauMai.KHIEU_NAI, DANG_MO)) {
                 throw new AppException(HttpStatus.CONFLICT, "Đơn hàng đã có khiếu nại đang xử lý");
@@ -80,6 +67,8 @@ public class HauMaiService {
         YeuCauHauMai yeuCau = new YeuCauHauMai();
         yeuCau.setMaYeuCau(IdGenerator.next("HM"));
         yeuCau.setDonHang(don);
+        yeuCau.setKhachHang(don != null ? don.getKhachHang() : khachHangRepo.findById(maKh)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy khách hàng")));
         yeuCau.setChiTietDonHang(dong);
         yeuCau.setLoai(req.loai());
         yeuCau.setLyDo(lyDo);
@@ -88,7 +77,7 @@ public class HauMaiService {
         yeuCau.setNgayCapNhat(now);
         themLichSu(yeuCau, TrangThaiHauMai.CHO_TIEP_NHAN, "Khách hàng đã gửi yêu cầu", now);
         yeuCauRepo.save(yeuCau);
-        thongBaoService.guiQuanTri("Có yêu cầu " + tenLoai(req.loai()) + " mới cho đơn " + don.getMaDonHang());
+        thongBaoService.guiQuanTri("Có yêu cầu " + tenLoai(req.loai()) + " mới" + (don == null ? " (không gắn đơn hàng)" : " cho đơn " + don.getMaDonHang()));
         return toDto(yeuCau);
     }
 
@@ -101,14 +90,14 @@ public class HauMaiService {
     @Transactional(readOnly = true)
     public HauMaiDto chiTietCuaToi(String maKh, String ma) {
         YeuCauHauMai y = yeuCauRepo.findById(ma)
-                .filter(x -> x.getDonHang().getKhachHang().getMaKh().equals(maKh))
+                .filter(x -> owner(x).getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
         return toDto(y);
     }
 
     @Transactional(readOnly = true)
     public List<HauMaiDto> tatCa() {
-        return yeuCauRepo.findAllByOrderByNgayTaoDesc().stream().map(this::toDto).toList();
+        return yeuCauRepo.findAllByOrderByNgayTaoDesc().stream().map(y -> toDto(y, true)).toList();
     }
 
     public HauMaiDto xuLy(String ma, HauMaiDto.XuLyRequest req) {
@@ -125,6 +114,10 @@ public class HauMaiService {
         if (req.trangThai() == TrangThaiHauMai.HOAN_TAT && (ketQua == null || ketQua.isEmpty())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi rõ kết quả xử lý trước khi hoàn tất");
         }
+        if (y.getLoai() == LoaiHauMai.BAO_HANH && req.trangThai() == TrangThaiHauMai.HOAN_TAT
+                && !nhom10.phonenest.util.WarrantyDevicePolicy.validResolution(ghiChu)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chọn kết quả sửa chữa, thay linh kiện hoặc đổi máy tương đương và ghi rõ xử lý thực tế trước khi hoàn tất");
+        }
         LocalDateTime now = LocalDateTime.now();
         y.setTrangThai(req.trangThai());
         y.setGhiChuXuLy(ghiChu);
@@ -133,7 +126,7 @@ public class HauMaiService {
         }
         y.setNgayCapNhat(now);
         themLichSu(y, req.trangThai(), ghiChu, now);
-        thongBaoService.gui(y.getDonHang().getKhachHang().getMaKh(),
+        thongBaoService.gui(owner(y).getMaKh(),
                 "Yêu cầu " + tenLoai(y.getLoai()) + " " + y.getMaYeuCau() + ": "
                         + tenTrangThai(y.getLoai(), req.trangThai()),
                 ThongBaoService.linkYeuCau(y.getMaYeuCau()));
@@ -181,12 +174,19 @@ public class HauMaiService {
         };
     }
 
-    private HauMaiDto toDto(YeuCauHauMai y) {
+    private nhom10.phonenest.entity.KhachHang owner(YeuCauHauMai y) {
+        return y.getKhachHang() != null ? y.getKhachHang() : y.getDonHang().getKhachHang();
+    }
+
+    private HauMaiDto toDto(YeuCauHauMai y) { return toDto(y, false); }
+    private HauMaiDto toDto(YeuCauHauMai y, boolean admin) {
         ChiTietDonHang dong = y.getChiTietDonHang();
-        return new HauMaiDto(y.getMaYeuCau(), y.getDonHang().getMaDonHang(),
+        String phone = y.getDonHang() == null ? null : y.getDonHang().getSoDienThoaiNhan();
+        if (admin && (phone == null || phone.isBlank())) phone = taiKhoanRepo.findById(owner(y).getMaKh()).map(nhom10.phonenest.entity.TaiKhoan::getSoDienThoai).orElse(null);
+        return new HauMaiDto(y.getMaYeuCau(), y.getDonHang() == null ? null : y.getDonHang().getMaDonHang(),
                 dong == null ? null : dong.getPhienBan().getMaPhienBan(),
                 dong == null ? null : dong.getTenSanPham() + " - " + dong.getTenPhienBan(),
-                y.getDonHang().getKhachHang().getHoTen(), y.getDonHang().getSoDienThoaiNhan(), y.getLoai(), y.getLyDo(),
+                owner(y).getHoTen(), phone, y.getLoai(), y.getLyDo(),
                 y.getHinhAnhMinhChung(), y.getTrangThai(), y.getGhiChuXuLy(), y.getKetQuaXuLy(),
                 y.getNgayTao(), y.getNgayCapNhat(),
                 y.getLichSu().stream().map(l -> new HauMaiDto.LichSu(

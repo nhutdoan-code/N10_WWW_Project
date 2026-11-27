@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface YeuCauHauMaiRepository extends JpaRepository<YeuCauHauMai, String> {
-    List<YeuCauHauMai> findByDonHangKhachHangMaKhOrderByNgayTaoDesc(String maKh);
+    @Query("select y from YeuCauHauMai y left join y.donHang d left join d.khachHang k left join y.khachHang own where own.maKh = :maKh or (own.maKh is null and k.maKh = :maKh) order by y.ngayTao desc")
+    List<YeuCauHauMai> findByDonHangKhachHangMaKhOrderByNgayTaoDesc(@Param("maKh") String maKh);
 
     List<YeuCauHauMai> findAllByOrderByNgayTaoDesc();
 

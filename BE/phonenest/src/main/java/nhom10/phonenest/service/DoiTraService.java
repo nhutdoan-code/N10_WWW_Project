@@ -20,13 +20,51 @@ import java.util.*;
 @RequiredArgsConstructor
 @Transactional
 public class DoiTraService {
-    private static final int HAN_DOI_TRA_NGAY = 7;
+
 
     private final YeuCauDoiTraRepository repo;
     private final DonHangRepository donRepo;
     private final ThongBaoService thongBao;
     private final NhatKyHoatDongService nhatKyHoatDongService;
     private final KhoService khoService;
+    private final PhienBanSanPhamRepository phienBanRepo;
+    private final ThanhToanRepository thanhToanRepo;
+
+    public record ExchangeOption(String id, String label, BigDecimal price, int stock) {}
+    private boolean exchangeAvailable(PhienBanSanPham p, int quantity) {
+        return PheDuyetBanHangPolicy.duocPhepBan(p) && p.getGiaBan() != null && p.getGiaBan().signum() > 0 && p.getSoLuongTon() >= quantity;
+    }
+    private ExchangeOption exchangeOption(PhienBanSanPham p) {
+        return new ExchangeOption(p.getMaPhienBan(), p.getSanPham().getTenMay() + " · " + p.getRam() + "GB RAM / " + p.getBoNho() + "GB · " + p.getMauSac(), p.getGiaBan(), p.getSoLuongTon());
+    }
+    @Transactional(readOnly = true)
+    public List<ExchangeOption> exchangeOptions() {
+        return phienBanRepo.findAll().stream().filter(p -> exchangeAvailable(p, 1)).map(this::exchangeOption)
+                .sorted(Comparator.comparing(ExchangeOption::label)).toList();
+    }
+    public DoiTraDto taoTuForm(String maKh, nhom10.phonenest.dto.AfterSalesInput input, LoaiYeuCauDoiTra type, LuuTruAnhService storage) {
+        DonHang order = donRepo.findByIdForUpdate(input.maDonHang()).filter(d -> d.getKhachHang().getMaKh().equals(maKh))
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"));
+        nhom10.phonenest.util.AfterSalesPolicy.require(order, false);
+        if (input.chiTiet() == null) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng cập nhật biểu mẫu đổi trả mới");
+        if (input.maPhienBan() == null || input.maPhienBan().isBlank() || input.soLuong() == null || input.soLuong() < 1)
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn sản phẩm và số lượng hợp lệ");
+        var details = new HashMap<>(input.chiTiet());
+        var payment = thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null);
+        if (type == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN && payment == PhuongThucTt.COD && !"Chuyển khoản".equals(details.get("refund")))
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn COD chỉ hỗ trợ hoàn tiền qua chuyển khoản");
+        if (type == LoaiYeuCauDoiTra.DOI_HANG) {
+            int quantity = input.soLuong() == null ? 1 : input.soLuong();
+            String targetId = details.get("targetId");
+            if (targetId == null || targetId.isBlank() || quantity < 1) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn phiên bản muốn đổi và số lượng hợp lệ");
+            var target = phienBanRepo.findById(targetId).filter(p -> exchangeAvailable(p, quantity))
+                    .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Phiên bản muốn đổi không còn đủ hàng hoặc không được bán"));
+            var option = exchangeOption(target);
+            details.put("target", option.label() + " [" + option.id() + "]");
+        }
+        var normalized = new nhom10.phonenest.dto.AfterSalesInput(input.maDonHang(), input.maPhienBan(), input.soLuong(), input.loai(), type, input.lyDo(), input.hinhAnhMinhChung(), input.anhMinhChung(), details);
+        return tao(maKh, new DoiTraDto.Request(input.maDonHang(), normalized.description(type.name()), normalized.images(type.name(), maKh, storage), type, input.maPhienBan(), input.soLuong()));
+    }
 
     public DoiTraDto tao(String maKh, DoiTraDto.Request r) {
         // 2B.7E: khoa dong don hang (serialize cac yeu cau dong thoi); kiem tra trung tung san pham
@@ -34,13 +72,7 @@ public class DoiTraService {
         DonHang don = donRepo.findByIdForUpdate(r.maDonHang())
                 .filter(d -> d.getKhachHang().getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"));
-        if (don.getTrangThai() != TrangThaiDonHang.DA_GIAO) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ đơn đã giao mới được đổi trả");
-        }
-        LocalDateTime ngayGiao = don.getNgayGiao() != null ? don.getNgayGiao() : don.getNgayCapNhat();
-        if (ngayGiao == null || LocalDateTime.now().isAfter(ngayGiao.plusDays(HAN_DOI_TRA_NGAY))) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Đã quá " + HAN_DOI_TRA_NGAY + " ngày đổi trả");
-        }
+        nhom10.phonenest.util.AfterSalesPolicy.require(don, false);
         String lyDo = r.lyDo().trim();
         if (lyDo.isEmpty()) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do đổi trả");
 
@@ -154,7 +186,7 @@ public class DoiTraService {
         yeuCau.setNgayCapNhat(java.time.LocalDateTime.now());
         if (ghiChu != null && !ghiChu.isEmpty()) yeuCau.setGhiChuXuLy(ghiChu);
         thongBao.gui(yeuCau.getDonHang().getKhachHang().getMaKh(),
-                "Yêu cầu đổi trả đơn " + yeuCau.getDonHang().getMaDonHang() + ": " + moi.name(),
+                "Yêu cầu đổi trả đơn " + yeuCau.getDonHang().getMaDonHang() + ": " + nhom10.phonenest.util.AfterSalesStatusLabel.label(moi.name()),
                 ThongBaoService.linkYeuCau(yeuCau.getMaYeuCau()));
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
                 LoaiDoiTuongAudit.RETURN, ma, truoc, snapshot(yeuCau));
@@ -173,7 +205,12 @@ public class DoiTraService {
         }
         YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
                 new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
-        y.setGhiChuNoiBo(ghiChu == null ? "" : ghiChu.trim());
+        String next = ghiChu == null ? "" : ghiChu.trim();
+        if (!Objects.equals(y.getGhiChuNoiBo(), next)) {
+            y.setGhiChuNoiBo(next);
+            nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, ma,
+                    Map.of(), Map.of("suKien", "INTERNAL_NOTE"));
+        }
     }
 
     public DoiTraDto xacNhanNhapKho(String ma, String adminId) {
@@ -193,6 +230,9 @@ public class DoiTraService {
             ct.setDaNhapKho(true);
             ct.setNgayNhapKho(now);
         }
+        y.setNgayCapNhat(now);
+        nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, ma,
+                Map.of(), Map.of("suKien", "RESTOCK"));
         return dto(y);
     }
 
@@ -216,16 +256,57 @@ public class DoiTraService {
         if (!Set.of("MOMO", "CHUYEN_KHOAN", "TIEN_MAT", "KHAC").contains(method)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Hình thức hoàn tiền không hợp lệ");
         }
+        int phanTram = request.phanTram() == null ? 100 : request.phanTram();
+        if (phanTram < 1 || phanTram > 100) throw new AppException(HttpStatus.BAD_REQUEST, "Tỷ lệ hoàn tiền phải từ 1 đến 100");
         tinhSoTienHoanDuKien(y);
-        if (tongTienHoan(y).signum() <= 0) {
-            throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn dự kiến phải lớn hơn 0");
+        BigDecimal ceiling = tongTienHoan(y);
+        BigDecimal requested = request.soTien();
+        String adjustment = Objects.toString(request.lyDoDieuChinh(), "").trim();
+        if (thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null) == PhuongThucTt.COD && !"CHUYEN_KHOAN".equals(method))
+                throw new AppException(HttpStatus.BAD_REQUEST, "Đơn COD phải hoàn qua chuyển khoản");
+        if (y.getLyDoChung() != null && y.getLyDoChung().lines().anyMatch(line -> line.equals("Hoàn tiền đề nghị: Chuyển khoản")) && !"CHUYEN_KHOAN".equals(method))
+                throw new AppException(HttpStatus.BAD_REQUEST, "Khách hàng chọn hoàn qua chuyển khoản");
+        if (requested == null && phanTram < 100 && adjustment.isBlank()) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
+        if (requested != null) {
+            if (requested.stripTrailingZeros().scale() > 0 || requested.signum() <= 0 || requested.compareTo(ceiling) > 0)
+                throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền hoàn phải là số nguyên dương, không vượt giá trị đủ điều kiện");
+            if (requested.compareTo(ceiling) < 0 && adjustment.isBlank())
+                throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
+            // Allocate the exact total, never exceeding each line's refundable amount.
+            BigDecimal remaining = requested;
+            BigDecimal remainingCeiling = y.getChiTiet().stream().map(c -> c.getSoTienHoan().setScale(0, RoundingMode.FLOOR)).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (requested.compareTo(remainingCeiling) > 0) throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền vượt mức hoàn nguyên đồng");
+            for (ChiTietDoiTra ct : y.getChiTiet()) {
+                BigDecimal base = ct.getSoTienHoan().setScale(0, RoundingMode.FLOOR);
+                BigDecimal allocated = remainingCeiling.signum() == 0 ? BigDecimal.ZERO :
+                        remaining.multiply(base).divide(remainingCeiling, 0, RoundingMode.FLOOR).min(base);
+                ct.setSoTienHoan(allocated);
+                remaining = remaining.subtract(allocated);
+                remainingCeiling = remainingCeiling.subtract(base);
+            }
+        } else {
+            for (ChiTietDoiTra ct : y.getChiTiet()) {
+                ct.setSoTienHoan(ct.getSoTienHoan().multiply(BigDecimal.valueOf(phanTram)).divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR));
+            }
         }
+        if (tongTienHoan(y).signum() <= 0) throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn phải lớn hơn 0");
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime paid = request.thoiDiemHoan() == null ? now : request.thoiDiemHoan();
+        if (paid.isAfter(now) || y.getChiTiet().stream().anyMatch(ct -> ct.getNgayNhapKho() != null && paid.isBefore(ct.getNgayNhapKho())))
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thời điểm hoàn phải từ lúc nhập kho đến hiện tại");
         Map<String, Object> truoc = snapshot(y);
         y.setHinhThucHoanTien(method);
         y.setMaGiaoDichHoanTien(request.maGiaoDich().trim());
-        y.setNgayHoanTien(LocalDateTime.now());
+        y.setNgayHoanTien(paid);
+        y.setNgayCapNhat(now);
+        Map<String, Object> sau = snapshot(y);
+        sau.put("suKien", "REFUND");
+        sau.put("giaTriDuDieuKien", ceiling);
+        sau.put("soTienHoan", tongTienHoan(y));
+        sau.put("lyDoDieuChinh", adjustment);
+        sau.put("ngayHoanTien", paid.toString());
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
-                LoaiDoiTuongAudit.RETURN, ma, truoc, snapshot(y));
+                LoaiDoiTuongAudit.RETURN, ma, truoc, sau);
         return dto(y);
     }
 
@@ -252,6 +333,7 @@ public class DoiTraService {
     private Map<String, Object> snapshot(YeuCauDoiTra y) {
         Map<String, Object> duLieu = new LinkedHashMap<>();
         duLieu.put("trangThai", y.getTrangThai().name());
+        duLieu.put("phanHoi", y.getGhiChuXuLy());
         duLieu.put("hinhThucHoanTien", y.getHinhThucHoanTien());
         duLieu.put("maGiaoDichHoanTien", y.getMaGiaoDichHoanTien());
         return duLieu;
@@ -275,9 +357,9 @@ public class DoiTraService {
                 ct == null ? null : ct.getLoaiYeuCau(), tenSanPham,
                 soLuong, y.getGhiChuXuLy(), items,
                 y.getChiTiet().stream().anyMatch(item -> item.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN)
-                        ? (tongTienHoan(y).signum() > 0 ? tongTienHoan(y) : tinhTongHoanDuKien(y)) : null,
+                        ? (y.getNgayHoanTien() != null ? tongTienHoan(y) : tinhTongHoanDuKien(y)) : null,
                 y.getHinhThucHoanTien(), y.getMaGiaoDichHoanTien(), y.getNgayHoanTien(),
-                !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho));
+                !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho), y.getNgayTao());
     }
 
     private BigDecimal tinhTongHoanDuKien(YeuCauDoiTra y) {
