@@ -29,7 +29,10 @@ export const PAYMENT_METHODS = [
   { value: 'VI_DIEN_TU', label: 'Ví điện tử' },
 ];
 
+export const CHECKOUT_PAYMENT_METHODS = PAYMENT_METHODS;
+
 export const ORDER_STATUS = {
+  CHO_THANH_TOAN: 'Chờ thanh toán',
   CHO_XAC_NHAN: 'Chờ xác nhận',
   DA_XAC_NHAN: 'Đã xác nhận',
   DANG_CHUAN_BI: 'Đang chuẩn bị',

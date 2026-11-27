@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { getOrderActions } from '../src/utils/orderActions.js';
 
 const cases = [
+  ['CHO_THANH_TOAN', false, false, false, true],
   ['CHO_XAC_NHAN', false, false, false, true],
   ['DA_XAC_NHAN', false, false, false, true],
   ['DANG_CHUAN_BI', false, false, false, true],

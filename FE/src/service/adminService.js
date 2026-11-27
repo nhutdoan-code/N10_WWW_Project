@@ -35,6 +35,8 @@ export const adminService = {
   updateOrderStatus: (ma, trangThai) => api.put(`/admin/orders/${ma}/status`, null, { params: { trangThai } }),
   cancelOrder: (ma, data) => api.put(`/admin/orders/${ma}/cancel`, data),
   markDelivered: (ma) => api.put(`/admin/orders/${ma}/mark-delivered`),
+  momoRefundStatus: (ma) => api.get(`/admin/orders/${ma}/momo/refund-status`),
+  refundMomoPayment: (ma) => api.post(`/admin/orders/${ma}/momo/refund`),
   updateOrderLine: (ma, maSanPham, soLuong) => api.put(`/admin/orders/${ma}/items/${maSanPham}`, { soLuong }),
 
   accounts: () => api.get('/admin/accounts'),

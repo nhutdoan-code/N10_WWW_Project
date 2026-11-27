@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS } from '../../config/constants';
@@ -46,8 +46,37 @@ export default function AdminOrdersPage() {
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
   const [cancelNote, setCancelNote] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [momoRefundStatus, setMomoRefundStatus] = useState(null);
+  const [refundingMomo, setRefundingMomo] = useState(false);
 
   const toast = useToast();
+
+  useEffect(() => {
+    setMomoRefundStatus(null);
+    if (!selected || selected.phuongThucTt !== 'VI_DIEN_TU') return undefined;
+    let active = true;
+    adminService.momoRefundStatus(selected.maDonHang)
+      .then((status) => { if (active) setMomoRefundStatus(status); })
+      .catch((error) => { if (active) toast(errorMessage(error), 'error'); });
+    return () => { active = false; };
+  }, [selected?.maDonHang, selected?.phuongThucTt]);
+
+  const refundPendingMomo = async () => {
+    if (!selected || refundingMomo) return;
+    if (!window.confirm(`Xác nhận yêu cầu MoMo hoàn ${formatPrice(selected.tongTien)} về giao dịch gốc?`)) return;
+    setRefundingMomo(true);
+    try {
+      await adminService.refundMomoPayment(selected.maDonHang);
+      const nextStatus = await adminService.momoRefundStatus(selected.maDonHang);
+      setMomoRefundStatus(nextStatus);
+      toast('MoMo đã xác nhận hoàn tiền');
+      reload();
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    } finally {
+      setRefundingMomo(false);
+    }
+  };
 
   // Gọi API lọc và phân trang tại Backend
   const {
@@ -642,6 +671,16 @@ export default function AdminOrdersPage() {
 
           {selected.trangThai === 'DA_HUY' && selected.lyDoHuy && (
             <p><strong>Lý do hủy:</strong> {selected.lyDoHuy}</p>
+          )}
+
+          {selected.phuongThucTt === 'VI_DIEN_TU' && momoRefundStatus?.status === 'CAN_HOAN_TIEN' && (
+            <section className="section">
+              <h3>Giao dịch MoMo cần hoàn</h3>
+              <p>Tiền đã được MoMo thu nhưng đơn cần được đối soát hoàn. Mã giao dịch: <code>{momoRefundStatus.transactionId}</code></p>
+              <button className="btn btn-primary" disabled={refundingMomo} onClick={refundPendingMomo}>
+                {refundingMomo ? 'Đang gửi yêu cầu MoMo...' : `Hoàn ${formatPrice(selected.tongTien)} qua MoMo`}
+              </button>
+            </section>
           )}
 
           {selected.ngayGiao && (

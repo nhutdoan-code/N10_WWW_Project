@@ -28,7 +28,10 @@ DB/
 │   ├── 20_return_refund_restock_admin.sql  # Đối soát hoàn tiền và nhập lại kho khi đổi trả (+ _rollback)
 │   ├── 21_chat_history_vector_store.sql    # Lịch sử ChatBox + vector store MariaDB (+ _rollback)
 │   ├── 22_shipping_zone_eta_notification_link.sql # Phí ship theo vùng, ngày giao dự kiến, link thông báo (+ _rollback)
-│   └── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
+│   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
+│   ├── 24_vnpay_payment_transaction.sql    # Lưu mã giao dịch ngân hàng do VNPay trả về (+ _rollback)
+│   ├── 25_order_payment_first_state.sql   # Trạng thái đơn chờ thanh toán online (+ _rollback)
+│   └── 26_prepaid_checkout_sessions.sql   # Tạo đơn online sau khi IPN xác nhận thanh toán (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -39,7 +42,7 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
+File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 43 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20, 24–26; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 58 khóa ngoại, và dữ liệu demo:
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -58,7 +61,7 @@ File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất c�
 > 2. **Chỉ dùng cho database mới/trống**: `phonenest_full.sql` hoàn toàn **KHÔNG** chứa lệnh `DROP DATABASE` hay `CREATE DATABASE`, và **KHÔNG** chỉ định cứng `USE <db>`.
 > 3. **Cơ chế bảo vệ 2 lớp ngăn chặn tác động database không trống:**
 >    - **Lớp 1 (Fail-fast Pre-check):** Ngay đầu file `phonenest_full.sql`, một truy vấn kiểm tra tự động `information_schema.TABLES` sẽ kích hoạt lỗi hủy lệnh ngay lập tức (`ERROR 1103`) nếu database đích đang chứa bất kỳ bảng nào, ngăn chặn triệt để tình trạng ghi đè hoặc tạo bảng chắp vá trên database có sẵn dữ liệu.
->    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 42 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
+>    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 43 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
 > 4. Tuyệt đối không dùng `INSERT IGNORE` hay `REPLACE INTO`.
 
 **Quy trình kiểm tra database đích trống và import an toàn:**
@@ -103,6 +106,9 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 14. *(sau 20)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/21_chat_history_vector_store.sql` — bảng lịch sử ChatBox (`CuocHoiThoaiChat`, `TinNhanChat`) và vector store sản phẩm trong MariaDB (`phonenest_vector_store`, `product_embedding_sync`). Cần MariaDB ≥ 11.7 (kiểu `VECTOR`). Bắt buộc để dùng ChatBox khi đã đăng nhập; vector store tự quay về bộ nhớ nếu thiếu bảng. Rollback: `21_chat_history_vector_store_rollback.sql`.
 15. *(sau 21)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/22_shipping_zone_eta_notification_link.sql` — phí vận chuyển theo 4 vùng từ kho TP.HCM cho đủ 34 tỉnh/thành (phụ phí xã ngoại thành / đặc khu, phí khai giá 0,5% tối đa 50.000đ cho đơn từ 3 triệu, phụ phí COD 15.000đ cho đơn trên 10 triệu, freeship 3–5 triệu), số ngày giao + ngày giao dự kiến lưu trên đơn, voucher `FREESHIP`/`SHIP50` chỉ giảm phí vùng, cột `ThongBao.duongDan` để bấm thông báo mở đúng trang. **Bắt buộc** với backend hiện tại. Rollback: `22_shipping_zone_eta_notification_link_rollback.sql`.
 16. *(sau 22)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/23_voucher_discount_type.sql` — thêm `KhuyenMai.kieuGiam` (`PHAN_TRAM` bắt buộc có `soTienGiamToiDa` / `SO_TIEN` dùng `soTienGiamCoDinh`), tắt mã cũ NEST10/SALE10TR/KHACHMOI10/WELCOME5 (giữ lịch sử) và thêm bộ voucher mới. **Bắt buộc** với backend hiện tại. Rollback: `23_voucher_discount_type_rollback.sql`.
+17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_vnpay_payment_transaction.sql` — thêm `ThanhToan.maGiaoDichNganHang` và unique index để lưu mã giao dịch VNPay. Bắt buộc với bản backend có tích hợp ngân hàng. Rollback: `24_vnpay_payment_transaction_rollback.sql`.
+18. *(sau 24)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/25_order_payment_first_state.sql` — thêm trạng thái `CHO_THANH_TOAN` cho đơn hàng và lịch sử trạng thái. Bắt buộc với bản backend chỉ tiếp nhận đơn MoMo/VNPay sau khi thanh toán thành công. Rollback: `25_order_payment_first_state_rollback.sql`.
+19. *(sau 25)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/26_prepaid_checkout_sessions.sql` — tạo bảng phiên thanh toán tạm, lưu snapshot giỏ hàng và chỉ tạo `DonHang` sau IPN thành công. Bắt buộc với checkout trả trước hiện tại. Chỉ rollback sau khi đã đối soát hết các phiên đang chờ thanh toán/hoàn tiền: `26_prepaid_checkout_sessions_rollback.sql`.
 
 ---
 
@@ -127,7 +133,7 @@ Migration `11_user_behavior_tracking.sql` bổ sung bảng lưu vết toàn bộ
 
 ## 4. Kiểm chứng tương đương (Verification)
 
-> Bản `phonenest_full.sql` ngày 15/11/2026 được kiểm chứng: import vào database trống thành công; import lần 2 bị chặn bởi guard; `CHECKSUM TABLE` 38/38 bảng khớp database nguồn; 55/55 khóa ngoại; backend chạy `SCHEMA_CHECK OK`. Phần dưới mô tả lần kiểm chứng của bản cũ (33 bảng).
+> Bản `phonenest_full.sql` ngày 15/11/2026 được kiểm chứng: import vào database trống thành công; import lần 2 bị chặn bởi guard; `CHECKSUM TABLE` 43/43 bảng khớp database nguồn; 58/58 khóa ngoại; backend chạy `SCHEMA_CHECK OK`. Phần dưới mô tả lần kiểm chứng của bản cũ (33 bảng).
 
 Cơ chế tạo `phonenest_full.sql` được kiểm chứng bằng script so sánh tự động giữa cơ sở dữ liệu chạy tuần tự (`test_phonenest_source`) và cơ sở dữ liệu import từ `phonenest_full.sql` (`test_phonenest_full`).
 

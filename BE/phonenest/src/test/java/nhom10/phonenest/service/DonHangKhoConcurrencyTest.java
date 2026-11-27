@@ -214,6 +214,50 @@ public class DonHangKhoConcurrencyTest {
     }
 
     @Test
+    void onlineCheckoutDoesNotCreateOrderUntilPaymentAndCodStillCreatesImmediately() {
+        pb1.setSoLuongTon(3);
+        configurePessimisticRowLocking();
+        when(thanhToanService.mucMua("KH001", "PB001", 1)).thenReturn(Map.of("PB001", 1));
+
+        try {
+            DonHangDto.Checkout onlineRequest = new DonHangDto.Checkout(
+                    PhuongThucTt.CHUYEN_KHOAN, "DC001", null, null, "PB001", 1
+            );
+            assertThatThrownBy(() -> donHangService.datHang("KH001", onlineRequest))
+                    .isInstanceOf(AppException.class)
+                    .hasMessageContaining("phải thành công trước khi tạo đơn");
+
+            assertThat(savedDonHang).isEmpty();
+            assertThat(pb1.getSoLuongTon()).isEqualTo(3);
+            verify(lichSuRepository, never()).save(any());
+
+            DonHangDto.Checkout codRequest = new DonHangDto.Checkout(
+                    PhuongThucTt.COD, "DC001", null, null, "PB001", 1
+            );
+            donHangService.datHang("KH001", codRequest);
+
+            assertThat(savedDonHang).hasSize(1);
+            assertThat(savedDonHang.get(0).getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
+        } finally {
+            releaseAllRowLocks();
+        }
+    }
+
+    @Test
+    void paymentConfirmationMovesOnlyPendingPaymentOrderToAwaitingConfirmation() {
+        DonHang order = new DonHang();
+        order.setMaDonHang("DH_PAYMENT");
+        order.setTrangThai(TrangThaiDonHang.CHO_THANH_TOAN);
+
+        donHangService.xacNhanSauThanhToan(order);
+
+        assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
+        verify(donHangRepository).save(order);
+        verify(lichSuRepository).save(argThat(history ->
+                history.getTrangThai() == TrangThaiDonHang.CHO_XAC_NHAN));
+    }
+
+    @Test
     @DisplayName("Test 1: Kho còn 1 sản phẩm, 10 khách đặt đồng thời: chỉ đúng 1 đơn thành công")
     void test01_singleStock_10ConcurrentOrders_onlyOneSucceeds() throws Exception {
         pb1.setSoLuongTon(1);

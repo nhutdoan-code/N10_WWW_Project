@@ -37,7 +37,7 @@ public record DoiTraDto(
 
     public record XacNhanHoanTienRequest(
             @NotBlank(message = "Vui lòng chọn hình thức hoàn tiền") @Size(max = 60) String hinhThuc,
-            @NotBlank(message = "Vui lòng nhập mã giao dịch/đối soát") @Size(max = 150) String maGiaoDich) {}
+            @Size(max = 150) String maGiaoDich) {}
 
     public record Request(
             @NotBlank(message = "Vui lòng chọn đơn hàng") String maDonHang,

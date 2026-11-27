@@ -10,16 +10,22 @@ import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 import nhom10.phonenest.enums.TrangThaiThanhToan;
 import nhom10.phonenest.exception.AppException;
+import nhom10.phonenest.enums.HanhDongAudit;
+import nhom10.phonenest.enums.LoaiDoiTuongAudit;
 import nhom10.phonenest.repository.DonHangRepository;
 import nhom10.phonenest.repository.ThanhToanRepository;
 import nhom10.phonenest.util.IdGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -40,10 +46,15 @@ public class MomoPaymentService {
 
     private final DonHangRepository donHangRepository;
     private final ThanhToanRepository thanhToanRepository;
+    private final DonHangService donHangService;
+    private final CheckoutPaymentSessionService checkoutPaymentSessionService;
     private final ThongBaoService thongBaoService;
+    private final NhatKyHoatDongService nhatKyHoatDongService;
 
     @Value("${momo.endpoint:https://test-payment.momo.vn/v2/gateway/api/create}")
     private String endpoint;
+    @Value("${momo.refund-endpoint:https://test-payment.momo.vn/v2/gateway/api/refund}")
+    private String refundEndpoint;
     @Value("${momo.partner-code:}")
     private String partnerCode;
     @Value("${momo.access-key:}")
@@ -54,6 +65,10 @@ public class MomoPaymentService {
     private String redirectUrl;
     @Value("${momo.ipn-url:http://localhost:8080/api/payment/momo/ipn}")
     private String ipnUrl;
+    @Value("${momo.connect-timeout-ms:5000}")
+    private int connectTimeoutMs;
+    @Value("${momo.read-timeout-ms:15000}")
+    private int readTimeoutMs;
 
     public MomoPaymentDto create(String maKh, String maDonHang) {
         requireConfigured();
@@ -134,8 +149,14 @@ public class MomoPaymentService {
 
         Map<?, ?> response;
         try {
-            response = RestClient.create(endpoint).post().body(request).retrieve().body(Map.class);
+            response = postToMomo(endpoint, request);
+        } catch (RestClientResponseException ex) {
+            log.error("MoMo trả HTTP {} khi tạo thanh toán cho đơn {}", ex.getStatusCode(), maDonHang, ex);
+            throw new AppException(HttpStatus.BAD_GATEWAY,
+                    "MoMo trả lỗi HTTP " + ex.getStatusCode().value()
+                            + " khi tạo thanh toán. Kiểm tra cấu hình tài khoản merchant sandbox.");
         } catch (RuntimeException ex) {
+            log.error("Không thể kết nối MoMo khi tạo thanh toán cho đơn {}", maDonHang, ex);
             throw new AppException(HttpStatus.BAD_GATEWAY, "Không thể kết nối cổng thanh toán MoMo");
         }
         if (response == null || !"0".equals(value(response, "resultCode"))) {
@@ -153,12 +174,162 @@ public class MomoPaymentService {
                 value(response, "message"));
     }
 
+    public MomoPaymentDto createCheckoutPayment(String sessionId, BigDecimal amount) {
+        requireConfigured();
+        String amountText;
+        try {
+            amountText = amount.toBigIntegerExact().toString();
+        } catch (ArithmeticException ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền thanh toán MoMo phải là số nguyên VND");
+        }
+
+        Map<String, String> request = new LinkedHashMap<>();
+        request.put("partnerCode", partnerCode);
+        request.put("requestType", REQUEST_TYPE);
+        request.put("ipnUrl", ipnUrl);
+        request.put("redirectUrl", appendQuery(redirectUrl, "checkoutPayment", sessionId));
+        request.put("orderId", sessionId);
+        request.put("amount", amountText);
+        request.put("lang", "vi");
+        request.put("requestId", sessionId);
+        request.put("extraData", "");
+        request.put("orderInfo", "Thanh toan PhoneNest checkout " + sessionId);
+        request.put("signature", signCreate(request));
+
+        Map<?, ?> response;
+        try {
+            response = postToMomo(endpoint, request);
+        } catch (RestClientResponseException ex) {
+            log.error("MoMo trả HTTP {} khi tạo thanh toán cho phiên {}", ex.getStatusCode(), sessionId, ex);
+            throw new AppException(
+                    HttpStatus.BAD_GATEWAY,
+                    "MoMo trả lỗi HTTP " + ex.getStatusCode().value()
+                            + " khi tạo thanh toán. Kiểm tra cấu hình tài khoản merchant sandbox.",
+                    "PAYMENT_PROVIDER_UNCERTAIN");
+        } catch (RuntimeException ex) {
+            log.warn("Không xác định được kết quả tạo thanh toán MoMo cho phiên {}", sessionId, ex);
+            throw new AppException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Chưa xác định được kết quả tạo thanh toán MoMo. Vui lòng thử lại bằng phiên hiện tại.",
+                    "PAYMENT_PROVIDER_UNCERTAIN");
+        }
+        if (response == null || !"0".equals(value(response, "resultCode"))) {
+            throw new AppException(HttpStatus.BAD_GATEWAY,
+                    "MoMo từ chối tạo thanh toán: " + value(response, "message"));
+        }
+        return new MomoPaymentDto(
+                sessionId,
+                value(response, "requestId"),
+                value(response, "payUrl"),
+                value(response, "deeplink"),
+                value(response, "qrCodeUrl"),
+                value(response, "resultCode"),
+                value(response, "message"));
+    }
+
     public PaymentStatusDto status(String maKh, String maDonHang) {
         DonHang order = donHangRepository.findById(maDonHang)
                 .filter(d -> d.getKhachHang().getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"));
         ThanhToan payment = findPayment(order.getMaDonHang());
         return new PaymentStatusDto(payment.getTrangThai().name(), payment.getMaGiaoDich());
+    }
+
+    public String refund(String maDonHang, BigDecimal amount, String returnId) {
+        requireConfigured();
+        ThanhToan payment = thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(maDonHang).stream()
+                .filter(p -> p.getPhuongThuc() == PhuongThucTt.VI_DIEN_TU
+                        && p.getTrangThai() == TrangThaiThanhToan.DA_THANH_TOAN
+                        && p.getMaGiaoDich() != null
+                        && p.getMaGiaoDichMoMo() != null)
+                .findFirst()
+                .orElseThrow(() -> new AppException(HttpStatus.CONFLICT,
+                        "Không tìm thấy giao dịch MoMo đã thanh toán để hoàn tiền"));
+        return submitRefund(payment, amount, "RF" + returnId, "Hoan tien yeu cau " + returnId);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentStatusDto refundStatus(String maDonHang) {
+        return thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(maDonHang).stream()
+                .filter(p -> p.getPhuongThuc() == PhuongThucTt.VI_DIEN_TU
+                        && p.getTrangThai() == TrangThaiThanhToan.CAN_HOAN_TIEN)
+                .findFirst()
+                .map(p -> new PaymentStatusDto(p.getTrangThai().name(), p.getMaGiaoDich()))
+                .orElse(new PaymentStatusDto("KHONG_CAN_HOAN", null));
+    }
+
+    public PaymentStatusDto refundPendingPayment(String maDonHang) {
+        DonHang order = donHangRepository.findByIdForUpdate(maDonHang)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng"));
+        ThanhToan pending = thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(maDonHang).stream()
+                .filter(p -> p.getPhuongThuc() == PhuongThucTt.VI_DIEN_TU
+                        && p.getTrangThai() == TrangThaiThanhToan.CAN_HOAN_TIEN
+                        && p.getMaGiaoDich() != null)
+                .findFirst()
+                .orElseThrow(() -> new AppException(HttpStatus.CONFLICT,
+                        "Không có giao dịch MoMo nào đang cần hoàn tiền"));
+        ThanhToan payment = thanhToanRepository.findByMaGiaoDichForUpdate(pending.getMaGiaoDich())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy giao dịch MoMo cần hoàn"));
+        if (payment.getTrangThai() != TrangThaiThanhToan.CAN_HOAN_TIEN
+                || payment.getMaGiaoDichMoMo() == null) {
+            throw new AppException(HttpStatus.CONFLICT, "Giao dịch MoMo không còn ở trạng thái cần hoàn");
+        }
+        String refundId = "RF" + payment.getMaThanhToan();
+        String transactionId = submitRefund(payment, payment.getSoTien(), refundId,
+                "Hoan tien don hang " + order.getMaDonHang());
+        Map<String, Object> before = Map.of(
+                "trangThai", payment.getTrangThai().name(),
+                "maGiaoDich", payment.getMaGiaoDich());
+        payment.setTrangThai(TrangThaiThanhToan.DA_HOAN_TIEN);
+        thanhToanRepository.save(payment);
+        nhatKyHoatDongService.ghi(HanhDongAudit.REFUND_PAYMENT, LoaiDoiTuongAudit.PAYMENT,
+                payment.getMaThanhToan(), before, Map.of(
+                        "trangThai", payment.getTrangThai().name(),
+                        "maGiaoDich", payment.getMaGiaoDich(),
+                        "maGiaoDichHoanTien", transactionId,
+                        "soTienHoan", payment.getSoTien()));
+        return new PaymentStatusDto(payment.getTrangThai().name(), transactionId);
+    }
+
+    private String submitRefund(ThanhToan payment, BigDecimal amount, String requestId, String description) {
+        requireConfigured();
+        if (amount == null || amount.signum() <= 0 || amount.compareTo(payment.getSoTien()) > 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền hoàn MoMo không hợp lệ");
+        }
+
+        String amountText;
+        try {
+            amountText = amount.toBigIntegerExact().toString();
+        } catch (ArithmeticException ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền hoàn MoMo phải là số nguyên VND");
+        }
+        Map<String, String> request = new LinkedHashMap<>();
+        request.put("partnerCode", partnerCode);
+        request.put("orderId", payment.getMaGiaoDich());
+        request.put("requestId", requestId);
+        request.put("amount", amountText);
+        request.put("transId", payment.getMaGiaoDichMoMo());
+        request.put("lang", "vi");
+        request.put("description", description);
+        request.put("signature", signRefund(request));
+
+        Map<?, ?> response;
+        try {
+            response = postToMomo(refundEndpoint, request);
+        } catch (RuntimeException ex) {
+            log.error("Không thể kết nối MoMo để hoàn tiền với requestId {}", requestId, ex);
+            throw new AppException(HttpStatus.BAD_GATEWAY, "Không thể kết nối cổng hoàn tiền MoMo");
+        }
+        if (response == null || !"0".equals(value(response, "resultCode"))) {
+            String message = value(response, "message");
+            log.warn("MoMo từ chối hoàn tiền yêu cầu {}: resultCode={}, message={}",
+                    requestId, value(response, "resultCode"), message);
+            throw new AppException(HttpStatus.BAD_GATEWAY,
+                    "MoMo từ chối hoàn tiền" + (message.isBlank() ? "" : ": " + message));
+        }
+        String refundTransactionId = value(response, "transId");
+        return refundTransactionId.isBlank() ? requestId : refundTransactionId;
     }
 
     public void processIpn(Map<String, Object> payload) {
@@ -189,7 +360,25 @@ public class MomoPaymentService {
 
         // Bước 1: Tra cứu bản ghi ThanhToan trước để xác định đơn hàng tương ứng
         ThanhToan paymentRef = thanhToanRepository.findByMaGiaoDich(orderId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch MoMo"));
+                .orElse(null);
+
+        String resultCode = required(payload, "resultCode");
+        String transId = required(payload, "transId");
+        var sessionResult = checkoutPaymentSessionService.processCallback(
+                orderId,
+                PhuongThucTt.VI_DIEN_TU,
+                amount,
+                "0".equals(resultCode),
+                transId);
+        if (sessionResult.isPresent()) {
+            if (sessionResult.get().status() == CheckoutPaymentCallbackResult.Status.AMOUNT_MISMATCH) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền thanh toán MoMo không hợp lệ");
+            }
+            return;
+        }
+        if (paymentRef == null) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch MoMo");
+        }
 
         // Bước 2: KHÓA DonHang TRƯỚC (tuân thủ nghiêm ngặt thứ tự khóa toàn hệ thống: DonHang -> ThanhToan để triệt tiêu Deadlock)
         DonHang order = donHangRepository.findByIdForUpdate(paymentRef.getDonHang().getMaDonHang())
@@ -210,8 +399,6 @@ public class MomoPaymentService {
             return;
         }
 
-        String resultCode = required(payload, "resultCode");
-        String transId = required(payload, "transId");
         payment.setMaGiaoDichMoMo(transId);
 
         if ("0".equals(resultCode)) {
@@ -240,10 +427,12 @@ public class MomoPaymentService {
                     // Trường hợp 3: Thanh toán thành công hợp lệ đầu tiên
                     payment.setTrangThai(TrangThaiThanhToan.DA_THANH_TOAN);
                     thanhToanRepository.save(payment);
+                    donHangService.xacNhanSauThanhToan(order);
 
                     sendCustomerSuccessNotification(order, amountStr);
                 }
             }
+
         } else {
             // Thanh toán thất bại từ MoMo
             if (payment.getTrangThai() == TrangThaiThanhToan.CHO_THANH_TOAN) {
@@ -252,6 +441,35 @@ public class MomoPaymentService {
                 log.warn("Thanh toán MoMo thất bại cho mã GD {}: resultCode={}, message={}, transId={}",
                         orderId, resultCode, payload.get("message"), transId);
             }
+        }
+    }
+
+    @TransactionalEventListener
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void refundCheckoutPaymentIfOrderCannotBeCreated(CheckoutRefundRequiredEvent event) {
+        if (event.phuongThuc() != PhuongThucTt.VI_DIEN_TU) {
+            return;
+        }
+        ThanhToan payment = new ThanhToan();
+        payment.setMaGiaoDich(event.sessionId());
+        payment.setMaGiaoDichMoMo(event.providerTransactionId());
+        payment.setSoTien(event.amount());
+        try {
+            String refundId = submitRefund(
+                    payment, event.amount(), "RF" + event.sessionId(), "Hoan tien checkout " + event.sessionId());
+            checkoutPaymentSessionService.markRefunded(event.sessionId(), refundId);
+            thongBaoService.gui(event.customerId(),
+                    "Không thể tạo đơn hàng sau khi thanh toán. MoMo đã hoàn tiền thành công.",
+                    null);
+        } catch (AppException ex) {
+            log.error("Không thể tự động hoàn giao dịch MoMo cho checkout {}", event.sessionId(), ex);
+            thongBaoService.guiQuanTri("Checkout " + event.sessionId() + " đã thu tiền nhưng chưa tạo được đơn hàng. "
+                    + "Cần hoàn tiền thủ công; mã giao dịch MoMo: " + event.providerTransactionId()
+                    + ". Nguyên nhân: " + event.reason());
+            thongBaoService.gui(event.customerId(),
+                    "Thanh toán thành công nhưng không thể tạo đơn do thông tin hàng hóa đã thay đổi. "
+                            + "Cửa hàng đang xử lý hoàn tiền cho bạn.",
+                    null);
         }
     }
 
@@ -317,6 +535,20 @@ public class MomoPaymentService {
         task.run();
     }
 
+    private Map<?, ?> postToMomo(String uri, Map<String, String> request) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .build()
+                .post()
+                .uri(uri)
+                .body(request)
+                .retrieve()
+                .body(Map.class);
+    }
+
     private ThanhToan findPayment(String maDonHang) {
         List<ThanhToan> payments = thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(maDonHang);
         if (payments.isEmpty()) {
@@ -344,6 +576,21 @@ public class MomoPaymentService {
                 + "&orderId=" + request.get("orderId") + "&orderInfo=" + request.get("orderInfo")
                 + "&partnerCode=" + partnerCode + "&redirectUrl=" + request.get("redirectUrl")
                 + "&requestId=" + request.get("requestId") + "&requestType=" + REQUEST_TYPE);
+    }
+
+    private String appendQuery(String url, String name, String value) {
+        return url + (url.contains("?") ? "&" : "?")
+                + java.net.URLEncoder.encode(name, StandardCharsets.UTF_8)
+                + "=" + java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String signRefund(Map<String, String> request) {
+        return hmac("accessKey=" + accessKey + "&amount=" + request.get("amount")
+                + "&description=" + request.get("description")
+                + "&orderId=" + request.get("orderId")
+                + "&partnerCode=" + partnerCode
+                + "&requestId=" + request.get("requestId")
+                + "&transId=" + request.get("transId"));
     }
 
     private String signIpn(Map<String, Object> payload) {

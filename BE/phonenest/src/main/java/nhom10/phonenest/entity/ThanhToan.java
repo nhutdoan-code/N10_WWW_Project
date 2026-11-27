@@ -34,6 +34,9 @@ public class ThanhToan {
     @Column(length = 100)
     private String maGiaoDichMoMo;
 
+    @Column(length = 100, unique = true)
+    private String maGiaoDichNganHang;
+
     private LocalDateTime ngayTao;
     private LocalDateTime ngayThanhToan;
 }

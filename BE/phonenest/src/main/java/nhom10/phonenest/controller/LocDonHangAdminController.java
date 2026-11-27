@@ -2,10 +2,14 @@
 package nhom10.phonenest.controller;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.entity.DonHang;
+import nhom10.phonenest.entity.ThanhToan;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDonHang;
+import nhom10.phonenest.enums.TrangThaiThanhToan;
 import nhom10.phonenest.mapper.DonHangMapper;
 import nhom10.phonenest.repository.DonHangRepository;
 
@@ -120,6 +124,28 @@ public class LocDonHangAdminController {
         Specification<DonHang> spec = (root, query, cb) -> {
 
             List<Predicate> ps = new ArrayList<>();
+
+            Subquery<Integer> paymentExists = query.subquery(Integer.class);
+            var payment = paymentExists.from(ThanhToan.class);
+            paymentExists.select(cb.literal(1)).where(
+                    cb.equal(payment.get("donHang"), root),
+                    cb.or(
+                            cb.equal(payment.get("phuongThuc"), PhuongThucTt.COD),
+                            cb.and(
+                                    cb.equal(payment.get("phuongThuc"), PhuongThucTt.CHUYEN_KHOAN),
+                                    payment.get("trangThai").in(
+                                            TrangThaiThanhToan.DA_THANH_TOAN,
+                                            TrangThaiThanhToan.CAN_HOAN_TIEN)
+                            ),
+                            cb.and(
+                                    cb.equal(payment.get("phuongThuc"), PhuongThucTt.VI_DIEN_TU),
+                                            payment.get("trangThai").in(
+                                                    TrangThaiThanhToan.DA_THANH_TOAN,
+                                                    TrangThaiThanhToan.CAN_HOAN_TIEN)
+                            )
+                    )
+            );
+            ps.add(cb.exists(paymentExists));
 
             // Lọc trạng thái
             if (trangThai != null) {

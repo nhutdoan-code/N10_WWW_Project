@@ -48,7 +48,16 @@ class MomoPaymentServiceTest {
     private ThanhToanRepository thanhToanRepository;
 
     @Mock
+    private DonHangService donHangService;
+
+    @Mock
+    private CheckoutPaymentSessionService checkoutPaymentSessionService;
+
+    @Mock
     private ThongBaoService thongBaoService;
+
+    @Mock
+    private NhatKyHoatDongService nhatKyHoatDongService;
 
     @InjectMocks
     private MomoPaymentService momoPaymentService;
@@ -142,9 +151,9 @@ class MomoPaymentServiceTest {
     // KỊCH BẢN 1: IPN THÀNH CÔNG TRONG KỊCH BẢN THÔNG THƯỜNG
     // =========================================================================
     @Test
-    @DisplayName("Scenario 1: IPN thành công - Cập nhật DA_THANH_TOAN, transId, giữ nguyên trạng thái đơn hàng và gửi thông báo cho khách")
+    @DisplayName("Scenario 1: IPN thành công - thanh toán xong mới chuyển đơn sang chờ xác nhận")
     void scenario1_successfulIpnStandardFlow() {
-        DonHang order = createMockOrder("DH001", new BigDecimal("5000000"), TrangThaiDonHang.CHO_XAC_NHAN);
+        DonHang order = createMockOrder("DH001", new BigDecimal("5000000"), TrangThaiDonHang.CHO_THANH_TOAN);
         ThanhToan payment = createMockPayment("TT001", "GD001", order, TrangThaiThanhToan.CHO_THANH_TOAN);
 
         when(thanhToanRepository.findByMaGiaoDich("GD001")).thenReturn(Optional.of(payment));
@@ -158,10 +167,10 @@ class MomoPaymentServiceTest {
         assertThat(payment.getTrangThai()).isEqualTo(TrangThaiThanhToan.DA_THANH_TOAN);
         assertThat(payment.getMaGiaoDichMoMo()).isEqualTo("MOMO_TRANS_001");
         assertThat(payment.getNgayThanhToan()).isNotNull();
-        // Không tự ý nhảy sang DA_XAC_NHAN để chờ admin duyệt
-        assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
+        assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_THANH_TOAN);
 
         verify(thanhToanRepository).save(payment);
+        verify(donHangService).xacNhanSauThanhToan(order);
         verify(thongBaoService).gui(eq("KH001"), contains("DH001"), eq("/orders/DH001"));
         verify(thongBaoService, never()).guiQuanTri(anyString());
     }
@@ -172,7 +181,7 @@ class MomoPaymentServiceTest {
     @Test
     @DisplayName("Scenario 2: IPN thất bại - Cập nhật THAT_BAI, đơn hàng không bị đổi trạng thái sai")
     void scenario2_failedIpnStandardFlow() {
-        DonHang order = createMockOrder("DH002", new BigDecimal("3500000"), TrangThaiDonHang.CHO_XAC_NHAN);
+        DonHang order = createMockOrder("DH002", new BigDecimal("3500000"), TrangThaiDonHang.CHO_THANH_TOAN);
         ThanhToan payment = createMockPayment("TT002", "GD002", order, TrangThaiThanhToan.CHO_THANH_TOAN);
 
         when(thanhToanRepository.findByMaGiaoDich("GD002")).thenReturn(Optional.of(payment));
@@ -183,7 +192,8 @@ class MomoPaymentServiceTest {
         momoPaymentService.processIpn(payload);
 
         assertThat(payment.getTrangThai()).isEqualTo(TrangThaiThanhToan.THAT_BAI);
-        assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_XAC_NHAN);
+        assertThat(order.getTrangThai()).isEqualTo(TrangThaiDonHang.CHO_THANH_TOAN);
+        verify(donHangService, never()).xacNhanSauThanhToan(any());
 
         verify(thanhToanRepository).save(payment);
         verify(thongBaoService, never()).gui(anyString(), anyString(), any());

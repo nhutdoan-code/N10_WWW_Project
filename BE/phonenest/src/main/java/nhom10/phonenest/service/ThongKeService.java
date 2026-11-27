@@ -258,6 +258,7 @@ public class ThongKeService {
         if (t == null) return "—";
 
         return switch (t) {
+            case CHO_THANH_TOAN -> "Chờ thanh toán";
             case CHO_XAC_NHAN -> "Chờ xác nhận";
             case DA_XAC_NHAN -> "Đã xác nhận";
             case DANG_CHUAN_BI -> "Đang chuẩn bị hàng";

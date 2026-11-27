@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import AddressForm from '../components/AddressForm';
 import Icon from '../components/Icon';
 import Modal from '../components/Modal';
-import { PAYMENT_METHODS } from '../config/constants';
+import { CHECKOUT_PAYMENT_METHODS } from '../config/constants';
 import useCart from '../hooks/useCart';
 import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
@@ -202,7 +202,7 @@ export default function CheckoutPage() {
       toast('Chưa tải được thông tin đơn hàng. Vui lòng kiểm tra giỏ hàng và thử lại.', 'error');
       return;
     }
-    if (!PAYMENT_METHODS.some((method) => method.value === payment)) {
+    if (!CHECKOUT_PAYMENT_METHODS.some((method) => method.value === payment)) {
       toast('Vui lòng chọn phương thức thanh toán hợp lệ.', 'error');
       return;
     }
@@ -224,6 +224,33 @@ export default function CheckoutPage() {
         maSanPham: maPhienBanMua || undefined,
         soLuong: muaNgay ? slMua : undefined,
       };
+      if (payment !== 'COD') {
+        const session = await orderService.startPrepaidCheckout(
+          duLieu,
+          chonGio,
+          idempotencyKeyRef.current
+        );
+        if (session.orderId) {
+          daDatThanhCongRef.current = true;
+          try {
+            sessionStorage.removeItem('phonenest_checkout_key');
+            sessionStorage.removeItem('phonenest_checkout_sig');
+          } catch {
+            // ignore
+          }
+          try {
+            await refresh?.();
+          } catch {
+            toast('Đơn hàng đã tạo nhưng giỏ hàng chưa tải lại được. Vui lòng tải lại trang.', 'warning');
+          }
+          navigate(`/orders/${session.orderId}`);
+          return;
+        }
+        daDatThanhCongRef.current = true;
+        window.location.assign(session.payUrl);
+        return;
+      }
+
       const order = chonGio
         ? await orderService.checkoutSelected(duLieu, chonGio, idempotencyKeyRef.current)
         : await orderService.checkout(duLieu, idempotencyKeyRef.current);
@@ -238,17 +265,6 @@ export default function CheckoutPage() {
       // Thanh toán một phần: các sản phẩm chưa chọn vẫn nằm trong giỏ, tải lại giỏ từ máy chủ.
       if (chonGio) refresh?.();
       else if (!muaNgay) reset();
-
-      if (payment === 'VI_DIEN_TU') {
-        try {
-          const momo = await orderService.createMomoPayment(order.maDonHang);
-          window.location.assign(momo.payUrl);
-        } catch (err) {
-          toast(`Đơn hàng đã được tạo nhưng chưa thể khởi tạo thanh toán MoMo: ${errorMessage(err)}`, 'warning');
-          navigate(`/orders/${order.maDonHang}`);
-        }
-        return;
-      }
 
       navigate(`/orders/${order.maDonHang}`);
     } catch (err) {
@@ -268,8 +284,22 @@ export default function CheckoutPage() {
           // ignore
         }
       } else if (code === 'IDEMPOTENCY_IN_PROGRESS') {
-        // Request trước đó vẫn đang được xử lý hoặc chờ đối soát: GIỮ NGUYÊN idempotency key, cảnh báo người dùng chờ
+        // Request trước đó vẫn đang được xử lý hoặc chờ đối soát: giữ nguyên idempotency key.
         toast(msg || 'Yêu cầu đặt hàng của bạn đang được xử lý hoặc đang chờ đối soát, vui lòng chờ trong giây lát.', 'warning');
+      } else if (payment !== 'COD' && (code === 'PAYMENT_PROVIDER_UNCERTAIN' || !err.response)) {
+        // Provider có thể đã nhận request; retry phải dùng lại cùng phiên để tránh tạo giao dịch trùng.
+        toast(msg || 'Chưa nhận được phản hồi thanh toán. Vui lòng thử lại bằng phiên hiện tại.', 'warning');
+      } else if (payment !== 'COD') {
+        const newKey = generateUUID();
+        setIdempotencyKey(newKey);
+        idempotencyKeyRef.current = newKey;
+        try {
+          sessionStorage.setItem('phonenest_checkout_key', newKey);
+          sessionStorage.setItem('phonenest_checkout_sig', currentPayloadSig);
+        } catch {
+          // ignore
+        }
+        toast(msg || errorMessage(err), 'error');
       } else if (code === 'VOUCHER_USAGE_LIMIT_REACHED') {
         // Mã lỗi ổn định: Voucher đã hết lượt hoặc vượt quá giới hạn mỗi khách
         toast(msg || 'Mã khuyến mãi đã hết lượt sử dụng hoặc vượt quá giới hạn. Vui lòng chọn mã khác.', 'error');
@@ -341,7 +371,7 @@ export default function CheckoutPage() {
           </button>
 
           <h3>Phương thức thanh toán</h3>
-          {PAYMENT_METHODS.map((m) => (
+          {CHECKOUT_PAYMENT_METHODS.map((m) => (
             <label key={m.value} className="option" data-testid={`pm-${m.value}`}>
               <input
                 type="radio"
@@ -354,8 +384,8 @@ export default function CheckoutPage() {
                 {/* 2B.7D: PAYMENT_METHODS dung {value, label}; truoc day doc m.id/m.name -> nhan rong va chon = undefined */}
                 <b>{m.label}</b>
                 {m.value === 'COD' && <div className="muted">Thanh toán khi nhận được hàng</div>}
-                {m.value === 'CHUYEN_KHOAN' && <div className="muted">Chuyển khoản theo hướng dẫn của cửa hàng</div>}
-                {m.value === 'VI_DIEN_TU' && <div className="muted">Chuyển sang cổng MoMo sau khi tạo đơn</div>}
+                {m.value === 'CHUYEN_KHOAN' && <div className="muted">Thanh toán qua cổng VNPay; đơn hàng chỉ được Admin tiếp nhận sau khi ngân hàng xác nhận thành công</div>}
+                {m.value === 'VI_DIEN_TU' && <div className="muted">Thanh toán qua MoMo; đơn hàng chỉ được Admin tiếp nhận sau khi thanh toán thành công</div>}
               </div>
             </label>
           ))}

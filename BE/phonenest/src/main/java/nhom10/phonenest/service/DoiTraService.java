@@ -27,6 +27,7 @@ public class DoiTraService {
     private final ThongBaoService thongBao;
     private final NhatKyHoatDongService nhatKyHoatDongService;
     private final KhoService khoService;
+    private final MomoPaymentService momoPaymentService;
 
     public DoiTraDto tao(String maKh, DoiTraDto.Request r) {
         // 2B.7E: khoa dong don hang (serialize cac yeu cau dong thoi); kiem tra trung tung san pham
@@ -217,19 +218,30 @@ public class DoiTraService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Hình thức hoàn tiền không hợp lệ");
         }
         tinhSoTienHoanDuKien(y);
-        if (tongTienHoan(y).signum() <= 0) {
+        BigDecimal soTienHoan = tongTienHoan(y);
+        if (soTienHoan.signum() <= 0) {
             throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn dự kiến phải lớn hơn 0");
+        }
+        String maGiaoDich;
+        if ("MOMO".equals(method)) {
+            maGiaoDich = momoPaymentService.refund(
+                    y.getDonHang().getMaDonHang(), soTienHoan, y.getMaYeuCau());
+        } else {
+            if (request.maGiaoDich() == null || request.maGiaoDich().isBlank()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập mã giao dịch/đối soát");
+            }
+            maGiaoDich = request.maGiaoDich().trim();
         }
         Map<String, Object> truoc = snapshot(y);
         y.setHinhThucHoanTien(method);
-        y.setMaGiaoDichHoanTien(request.maGiaoDich().trim());
+        y.setMaGiaoDichHoanTien(maGiaoDich);
         y.setNgayHoanTien(LocalDateTime.now());
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
                 LoaiDoiTuongAudit.RETURN, ma, truoc, snapshot(y));
         return dto(y);
     }
 
-    // Chỉ tính số tiền dự kiến được hoàn, KHÔNG thực hiện chuyển tiền qua cổng thanh toán.
+    // Phân bổ giảm giá theo từng dòng hàng để tính đúng số tiền phải hoàn.
     private void tinhSoTienHoanDuKien(YeuCauDoiTra y) {
         DonHang don = y.getDonHang();
         BigDecimal tam = don.getTamTinh() == null ? BigDecimal.ZERO : don.getTamTinh();
