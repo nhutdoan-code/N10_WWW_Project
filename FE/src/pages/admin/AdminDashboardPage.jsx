@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BarList, Donut, LineChart, StackBar } from '../../components/Charts';
 import useDebounce from '../../hooks/useDebounce';
 import useFetch from '../../hooks/useFetch';
@@ -17,7 +17,9 @@ const Stat = ({ label, value, sub, to, className = '' }) => {
     </>
   );
   return to ? (
-    <Link to={to} className={`card stat stat-link ${className}`}>{body}</Link>
+    <Link to={to} className={`card stat stat-link ${className}`} aria-label={`Mở danh sách liên quan: ${label}`}>
+      {body}
+    </Link>
   ) : (
     <div className={`card stat ${className}`}>{body}</div>
   );
@@ -52,8 +54,33 @@ const STATUS_LABELS = {
 
 const fmtDay = (k) => `${k.slice(8, 10)}/${k.slice(5, 7)}`;
 const fmtMonth = (k) => `${k.slice(5, 7)}/${k.slice(0, 4)}`;
+const orderLink = ({ status, from, to, dateField = 'ngayMua' } = {}) => {
+  const params = new URLSearchParams();
+  if (status) params.set('trangThai', status);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (dateField !== 'ngayMua') {
+    params.set('ngayTheo', dateField);
+    if (dateField === 'ngayGiao') params.set('sort', 'ngay_giao_moi');
+  }
+  const query = params.toString();
+  return `/admin/orders${query ? `?${query}` : ''}`;
+};
+
+const returnQueueLink = (from, to) => {
+  const params = new URLSearchParams({ status: 'open', source: 'return' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return `/admin/returns?${params.toString()}`;
+};
+
+const localToday = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
 
 export default function AdminDashboardPage() {
+  const navigate = useNavigate();
   const [range, setRange] = useState({ tu: '', den: '' });
   const [q, setQ] = useState('');
   const debounced = useDebounce(q.trim(), 400);
@@ -95,9 +122,25 @@ export default function AdminDashboardPage() {
     return rows.map((r) => ({
       label: group === 'thang' ? `Tháng ${fmtMonth(r.ngay)}` : r.ngay.split('-').reverse().join('/'),
       short: group === 'thang' ? fmtMonth(r.ngay) : fmtDay(r.ngay),
+      date: r.ngay,
       value: Number(r[metric] || 0),
     }));
   }, [s, metric, group]);
+
+  const openChartOrders = (point) => {
+    let from = point.date;
+    let to = point.date;
+    if (group === 'thang') {
+      const [year, month] = point.date.split('-').map(Number);
+      const lastDay = new Date(year, month, 0).getDate();
+      const monthFrom = `${point.date}-01`;
+      const monthTo = `${point.date}-${String(lastDay).padStart(2, '0')}`;
+      from = range.tu && range.tu > monthFrom ? range.tu : monthFrom;
+      const maxTo = range.den || localToday();
+      to = maxTo < monthTo ? maxTo : monthTo;
+    }
+    navigate(orderLink({ status: 'DA_GIAO', from, to, dateField: 'ngayGiao' }));
+  };
 
   const hasSearchResults = found && (
     found.sanPhams?.length > 0 ||
@@ -156,7 +199,7 @@ export default function AdminDashboardPage() {
         <div>
           <h2>Thống kê & Tổng quan vận hành</h2>
           <p className="dashboard-subtitle">
-            Doanh thu và đơn đã giao được thống kê theo ngày giao; các trạng thái đơn khác và tồn kho theo thời điểm hiện tại / ngày đặt.
+            Doanh thu và đơn đã giao được thống kê theo ngày giao; yêu cầu đổi trả còn mở theo ngày tạo; các trạng thái đơn khác và tồn kho theo thời điểm hiện tại / ngày đặt.
           </p>
         </div>
         <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -224,12 +267,14 @@ export default function AdminDashboardPage() {
               className="stat-primary"
               label="Doanh thu đã ghi nhận"
               value={formatPrice(s.doanhThu)}
+              to={orderLink({ status: 'DA_GIAO', from: range.tu, to: range.den, dateField: 'ngayGiao' })}
               sub="Chỉ tính đơn đã giao thành công"
             />
             <Stat
               className="stat-pipeline"
               label="Giá trị đang xử lý (Pipeline GMV)"
               value={formatPrice(s.giaTriDangXuLy)}
+              to={orderLink({ status: 'DANG_XU_LY', from: range.tu, to: range.den })}
               sub="Đơn đang xác nhận, chuẩn bị hoặc giao"
             />
           </div>
@@ -239,28 +284,32 @@ export default function AdminDashboardPage() {
             <Stat
               label="Tổng đơn hàng"
               value={formatNumber(s.soDon)}
+              to={orderLink({ from: range.tu, to: range.den })}
               sub="Đơn đặt trong kỳ"
             />
             <Stat
               label="Đã giao"
               value={formatNumber(s.soDonThanhCong)}
+              to={orderLink({ status: 'DA_GIAO', from: range.tu, to: range.den, dateField: 'ngayGiao' })}
               sub="Giao thành công"
             />
             <Stat
               label="Đang xử lý"
               value={formatNumber(s.soDonDangXuLy)}
+              to={orderLink({ status: 'DANG_XU_LY', from: range.tu, to: range.den })}
               sub="Chờ & luân chuyển"
             />
             <Stat
               label="Đã hủy"
               value={formatNumber(s.soDonHuy)}
+              to={orderLink({ status: 'DA_HUY', from: range.tu, to: range.den })}
               sub="Hủy trong kỳ"
             />
             <Stat
               label="Yêu cầu đổi trả"
               value={formatNumber(s.soYeuCauDoiTra)}
-              to="/admin/returns"
-              sub="Cần duyệt / xử lý"
+              to={returnQueueLink(range.tu, range.den)}
+              sub="Đang chờ xử lý trong kỳ"
             />
           </div>
 
@@ -269,7 +318,7 @@ export default function AdminDashboardPage() {
             <div className="row between">
               <div className="dashboard-card-header">
                 <h3>{metric === 'doanhThu' ? 'Doanh thu giao thành công' : 'Số đơn đã giao'} theo {group === 'ngay' ? 'ngày giao' : 'tháng giao'}</h3>
-                <p>Chuỗi thời gian thống kê theo ngày giao hàng thực tế (ngayGiao)</p>
+                <p>Bấm một điểm để xem các đơn đã giao trong ngày hoặc tháng tương ứng.</p>
               </div>
               <div className="row">
                 <div className="chips">
@@ -292,6 +341,7 @@ export default function AdminDashboardPage() {
                 format={metric === 'doanhThu' ? 'money' : 'count'}
                 color={metric === 'doanhThu' ? COLORS.blue : COLORS.aqua}
                 label="Biểu đồ doanh thu giao thành công"
+                onPointClick={openChartOrders}
               />
             )}
           </div>
@@ -301,32 +351,35 @@ export default function AdminDashboardPage() {
             <div className="card">
               <div className="dashboard-card-header">
                 <h3>Phân bố trạng thái đơn hàng</h3>
-                <p>Tổng số đơn theo từng trạng thái (theo ngày đặt hàng)</p>
+                <p>Bấm một trạng thái để xem các đơn tương ứng trong kỳ.</p>
               </div>
               <Donut
                 centerLabel="Đơn hàng"
-                items={Object.keys(STATUS_LABELS).map((k) => ({
+                items={Object.keys(STATUS_LABELS).filter((k) => k !== 'DANG_XU_LY').map((k) => ({
+                  key: k,
                   name: STATUS_LABELS[k],
                   value: s.donTheoTrangThai?.[k] || 0,
                   color: STATUS_COLORS[k] || COLORS.blue,
                 }))}
+                onSelect={(item) => navigate(orderLink({ status: item.key, from: range.tu, to: range.den }))}
               />
             </div>
 
             <div className="card">
               <div className="dashboard-card-header">
-                <h3>Doanh số sản phẩm theo hãng</h3>
-                <p>Tổng giá trị sản phẩm bán ra từ đơn đã giao (chưa trừ voucher / phí vận chuyển)</p>
+                <h3>Doanh số sản phẩm theo danh mục</h3>
+                <p>Bấm một nhóm để tìm sản phẩm thuộc danh mục đó.</p>
               </div>
               {s.theoHang?.length === 0 ? (
                 <p className="muted" style={{ padding: '24px 0', textAlign: 'center' }}>
-                  Chưa có dữ liệu doanh số theo hãng trong kỳ.
+                  Chưa có dữ liệu doanh số theo danh mục trong kỳ.
                 </p>
               ) : (
                 <BarList
                   items={s.theoHang.map((h) => ({ name: h.ten, value: Number(h.doanhThu) }))}
                   color={COLORS.blue}
                   format={formatPrice}
+                  onSelect={(item) => navigate(`/admin/products?q=${encodeURIComponent(item.name)}`)}
                 />
               )}
             </div>
@@ -346,7 +399,7 @@ export default function AdminDashboardPage() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {s.banChay.map((b, idx) => (
-                    <div key={b.maSanPham} className="top-product-item">
+                    <Link key={b.maSanPham} to={`/admin/products?q=${encodeURIComponent(b.maSanPham)}`} className="top-product-item top-product-link">
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         <span className={`top-rank top-rank-${idx + 1}`}>{idx + 1}</span>
                         <div>
@@ -355,7 +408,7 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
                       <b style={{ color: 'var(--brand)', whiteSpace: 'nowrap' }}>{formatNumber(b.daBan)} máy</b>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -367,15 +420,16 @@ export default function AdminDashboardPage() {
                   <h3>Tình trạng tồn kho theo phiên bản (SKU)</h3>
                   <Link to="/admin/inventory" className="muted" style={{ fontSize: '0.85rem' }}>Quản lý kho →</Link>
                 </div>
-                <p>Theo dõi tồn kho theo từng phiên bản SKU (Ngưỡng sắp hết: 1–10)</p>
+                <p>Bấm một phần biểu đồ hoặc chú giải để mở tồn kho theo nhóm (ngưỡng sắp hết: 1–10).</p>
               </div>
 
               <StackBar
                 items={[
-                  { name: 'Còn hàng (>10)', value: s.soConHang, color: COLORS.aqua },
-                  { name: 'Sắp hết (1–10)', value: s.soSapHetHang, color: COLORS.yellow },
-                  { name: 'Hết hàng (0)', value: s.soHetHang, color: COLORS.red },
+                  { key: 'con-hang', name: 'Còn hàng (>10)', value: s.soConHang, color: COLORS.aqua },
+                  { key: 'sap-het', name: 'Sắp hết (1–10)', value: s.soSapHetHang, color: COLORS.yellow },
+                  { key: 'het', name: 'Hết hàng (0)', value: s.soHetHang, color: COLORS.red },
                 ]}
+                onSelect={(item) => navigate(`/admin/inventory?loc=${item.key}`)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 18 }}>
@@ -389,7 +443,7 @@ export default function AdminDashboardPage() {
                   <b style={{ color: COLORS.yellow }}>{formatNumber(s.soSapHetHang)}</b>
                   <span className="sub">SKU</span>
                 </Link>
-                <Link to="/admin/inventory" className="card stat stat-link" style={{ padding: 10, textAlign: 'center' }}>
+                <Link to="/admin/inventory?loc=con-hang" className="card stat stat-link" style={{ padding: 10, textAlign: 'center' }}>
                   <span className="muted" style={{ fontSize: '0.75rem' }}>Tồn kho an toàn</span>
                   <b style={{ color: COLORS.aqua }}>{formatNumber(s.soConHang)}</b>
                   <span className="sub">SKU</span>

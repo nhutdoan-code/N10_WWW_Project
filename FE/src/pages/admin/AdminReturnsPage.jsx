@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
@@ -11,7 +12,24 @@ import {
 } from '../../utils/afterSalesAdmin';
 import { afterSalesActions, afterSalesStatusLabel } from '../../utils/afterSalesWorkflow';
 
-const initial = { query: '', status: '', type: '', from: '', to: '', sort: 'priority' };
+const initial = { query: '', status: '', source: '', type: '', from: '', to: '', sort: 'priority' };
+const readFilters = (params) => ({
+  ...initial,
+  query: params.get('query') || '',
+  status: ['open', 'waiting', 'approved', 'overdue', 'today', 'processing', 'completed', 'rejected'].includes(params.get('status')) ? params.get('status') : '',
+  source: ['return', 'after'].includes(params.get('source')) ? params.get('source') : '',
+  type: params.get('type') || '',
+  from: params.get('from') || '',
+  to: params.get('to') || '',
+  sort: ['priority', 'dateDesc', 'dateAsc', 'statusAsc', 'statusDesc'].includes(params.get('sort')) ? params.get('sort') : 'priority',
+});
+const filtersToParams = (filters) => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value && value !== initial[key]) params.set(key, String(value));
+  });
+  return params;
+};
 const actionsFor = request => request?.source === 'after'
   ? afterSalesActions(request)
   : (RETURN_ACTIONS[request?.trangThai] || []);
@@ -20,12 +38,13 @@ const statusLabel = (request, status = request?.trangThai) => request?.source ==
   : (STATUS_LABELS[status] || status);
 
 export default function AdminReturnsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {user} = useContext(AuthContext) || {};
   const { data, loading, error, reload } = useFetch(async () => {
     const [returns, afterSales] = await Promise.all([adminService.returns(), adminService.afterSales()]);
     return { returns: returns || [], afterSales: afterSales || [] };
   });
-  const [filters, setFilters] = useState(initial);
+  const [filters, setFilters] = useState(() => readFilters(searchParams));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selected, setSelected] = useState(null);
@@ -98,7 +117,20 @@ export default function AdminReturnsPage() {
     } catch (e) { toast(errorMessage(e), 'error'); }
     finally { setSavingInternal(false); }
   };
-  const setFilter = (key, value) => setFilters(s => ({ ...s, [key]: value }));
+  const setFilter = (key, value) => {
+    const next = { ...filters, [key]: value };
+    setFilters(next);
+    setSearchParams(filtersToParams(next), { replace: true });
+  };
+  const selectStat = (status) => {
+    const next = { ...initial, status };
+    setFilters(next);
+    setSearchParams(filtersToParams(next), { replace: true });
+  };
+  const clearFilters = () => {
+    setFilters(initial);
+    setSearchParams({}, { replace: true });
+  };
   const statusSort = () => setFilter('sort', filters.sort === 'statusAsc' ? 'statusDesc' : 'statusAsc');
   const dateSort = () => setFilter('sort', filters.sort === 'dateDesc' ? 'dateAsc' : 'dateDesc');
   const doneToday = rows.filter(r => completedToday(r)).length;
@@ -164,7 +196,7 @@ export default function AdminReturnsPage() {
   const refundBase = Number(detail?.soTienHoanDuKien || 0);
 
   const actionNames = {TRIAGE:'Tiếp nhận để thẩm định',REPLY:'Gửi phản hồi',REQUEST_INFO:'Yêu cầu bổ sung thông tin/ảnh',TRANSFER:'Chuyển bộ phận',RECEIVE_CHECK:'Xác nhận nhận máy và kiểm tra',EXCHANGE_HANDOVER:'Xác nhận đã giao máy đổi',WARRANTY_RECEIVE:'Nhận máy bảo hành',WARRANTY_REPAIR:'Ghi nhận đã xử lý kỹ thuật',WARRANTY_HANDOVER:'Xác nhận trả máy cho khách',RESTOCK:'Nhập kho',REFUND:'Ghi nhận hoàn tiền',INTERNAL_NOTE:'Lưu ghi chú nội bộ',STATUS:'Cập nhật trạng thái'};
-  const statCards = [['waiting','Chờ tiếp nhận',countPending(rows)],['processing','Đang xử lý',rows.filter(r=>GROUPS.processing.includes(r.trangThai)).length],['overdue','Quá hạn phản hồi',rows.filter(r=>isOverdue(r)).length],['today','Hoàn tất hôm nay',doneToday],['','Tổng yêu cầu',rows.length]];
+  const statCards = [['waiting','Chờ tiếp nhận',countPending(rows)],['processing','Đang xử lý',rows.filter(r=>GROUPS.processing.includes(r.trangThai)).length],['open','Cần duyệt / xử lý',rows.filter(r=>GROUPS.open.includes(r.trangThai)).length],['overdue','Quá hạn phản hồi',rows.filter(r=>isOverdue(r)).length],['today','Hoàn tất hôm nay',doneToday],['','Tổng yêu cầu',rows.length]];
   return <div className="after-sales-admin">
     <h2>Quản lý hậu mãi</h2>
     <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tất không đồng nghĩa đã chuyển tiền hoàn thực tế.</p>
@@ -172,7 +204,7 @@ export default function AdminReturnsPage() {
     {error && <p className="error">{error} <button className="btn" onClick={reload}>Tải lại</button></p>}
     {!loading && !error && data && <>
       <div className="as-stats">
-        {statCards.map(([status,label,count])=><button type="button" key={label} className={`as-stat-card ${filters.status===status?'active':''}`} onClick={()=>setFilters({...initial,status})}><span>{label}</span><strong>{count}</strong></button>)}
+        {statCards.map(([status,label,count])=><button type="button" key={label} className={`as-stat-card ${filters.status===status?'active':''}`} onClick={()=>selectStat(status)}><span>{label}</span><strong>{count}</strong></button>)}
       </div>
       <p className="muted">HM: bảo hành/khiếu nại · YC: đổi trả. Hai trạng thái chờ được hiển thị chung là Chờ tiếp nhận. SLA phản hồi dự kiến: {SLA_HOURS} giờ lịch.</p>
       <div className="as-filters">
@@ -180,7 +212,10 @@ export default function AdminReturnsPage() {
           <input aria-label="Tìm kiếm hậu mãi" placeholder="Ví dụ: YC001, HM002, DH003, Nguyễn Văn A..." value={filters.query} onChange={e => setFilter('query',e.target.value)} />
         </label>
         <label>Trạng thái<select value={filters.status} onChange={e=>setFilter('status',e.target.value)}>
-          <option value="">Tất cả</option><option value="waiting">Chờ tiếp nhận</option><option value="approved">Đã duyệt</option><option value="overdue">Quá hạn phản hồi</option><option value="today">Hoàn tất hôm nay</option><option value="processing">Đang xử lý</option><option value="completed">Hoàn tất</option><option value="rejected">Từ chối</option>
+          <option value="">Tất cả</option><option value="open">Cần duyệt / xử lý</option><option value="waiting">Chờ tiếp nhận</option><option value="approved">Đã duyệt</option><option value="overdue">Quá hạn phản hồi</option><option value="today">Hoàn tất hôm nay</option><option value="processing">Đang xử lý</option><option value="completed">Hoàn tất</option><option value="rejected">Từ chối</option>
+        </select></label>
+        <label>Nguồn yêu cầu<select value={filters.source} onChange={e=>setFilter('source',e.target.value)}>
+          <option value="">Tất cả nguồn</option><option value="return">Đổi / trả</option><option value="after">Bảo hành / khiếu nại</option>
         </select></label>
         <label>Loại yêu cầu<select value={filters.type} onChange={e=>setFilter('type',e.target.value)}>
           <option value="">Tất cả</option>{Object.entries(TYPE_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}
@@ -190,7 +225,7 @@ export default function AdminReturnsPage() {
         <label>Sắp xếp<select value={filters.sort} onChange={e=>setFilter('sort',e.target.value)}>
           <option value="priority">Ưu tiên xử lý</option><option value="dateDesc">Ngày mới nhất</option><option value="dateAsc">Ngày cũ nhất</option><option value="statusAsc">Chờ xử lý trước</option><option value="statusDesc">Hoàn tất trước</option>
         </select></label>
-        <button className="btn" onClick={() => setFilters(initial)}>Xóa bộ lọc</button>
+        <button className="btn" onClick={clearFilters}>Xóa bộ lọc</button>
       </div>
       <div className="as-list-top"><h3>Danh sách yêu cầu ({results.length})</h3><label>Hiển thị <select value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}><option value={10}>10</option><option value={20}>20</option></select> dòng / trang</label></div>
       <div className="after-sales-table-wrap"><table className="table as-table">

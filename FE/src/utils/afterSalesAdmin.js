@@ -15,6 +15,7 @@ export const AFTER_ACTIONS = {
 export const GROUPS = {
   waiting: ['CHO_DUYET', 'CHO_TIEP_NHAN'],
   processing: ['DA_DUYET', 'DANG_KIEM_TRA', 'DANG_XAC_MINH', 'DANG_XU_LY'],
+  open: ['CHO_DUYET', 'CHO_TIEP_NHAN', 'DA_DUYET', 'DANG_KIEM_TRA', 'DANG_XAC_MINH', 'DANG_XU_LY'],
   approved: ['DA_DUYET'],
   completed: ['HOAN_TAT', 'DA_HOAN_TIEN'],
   rejected: ['TU_CHOI'],
@@ -34,6 +35,7 @@ export function filterRequests(rows, filters = {}) {
     const haystack = [r.maYeuCau, r.maDonHang, r.tenKhach, r.soDienThoai, r.tenSanPham].filter(Boolean).join(' ').toLocaleLowerCase('vi-VN');
     const day = String(r.ngayTao || '').slice(0,10);
     return (!query || haystack.includes(query)) &&
+      (!filters.source || r.source === filters.source) &&
       (!filters.status || (filters.status === 'overdue' ? isOverdue(r) : filters.status === 'today' ? completedToday(r) : GROUPS[filters.status]?.includes(r.trangThai))) &&
       (!filters.type || r.loai === filters.type) &&
       (!start || day >= start) && (!end || day <= end);

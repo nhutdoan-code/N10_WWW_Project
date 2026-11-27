@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
@@ -16,8 +17,11 @@ const FILTERS = [
 ];
 
 export default function AdminInventoryPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedLoc = searchParams.get('loc') || '';
+  const initialLoc = FILTERS.some((filter) => filter.value === requestedLoc) ? requestedLoc : '';
   const [query, setQuery] = useState('');
-  const [loc, setLoc] = useState('');
+  const [loc, setLoc] = useState(initialLoc);
   const [page, setPage] = useState(0);
   const pageSize = 10;
   const [selected, setSelected] = useState(null);
@@ -27,6 +31,10 @@ export default function AdminInventoryPage() {
   const [historyVariant, setHistoryVariant] = useState(null);
   const [form, setForm] = useState({ amount: '', note: '' });
   const toast = useToast();
+  useEffect(() => {
+    setLoc(FILTERS.some((filter) => filter.value === requestedLoc) ? requestedLoc : '');
+    setPage(0);
+  }, [requestedLoc]);
   const { data: result, loading, error, reload } = useFetch(() => adminService.inventory(query, loc, page, pageSize), [query, loc, page]);
   const { data: stats, reload: reloadStats } = useFetch(() => adminService.inventoryStats(), []);
   const { data: history } = useFetch(
@@ -36,6 +44,15 @@ export default function AdminInventoryPage() {
     [historyVariant]
   );
   const historyRows = Array.isArray(history) ? history : (history?.content || []);
+
+  const changeLocationFilter = (value) => {
+    setLoc(value);
+    setPage(0);
+    const params = new URLSearchParams(searchParams);
+    if (value) params.set('loc', value);
+    else params.delete('loc');
+    setSearchParams(params, { replace: true });
+  };
 
   const legacyRows = Array.isArray(result)
     ? result.flatMap((product) => (product.phienBans || []).map((variant) => ({
@@ -153,15 +170,27 @@ export default function AdminInventoryPage() {
         <button className="btn btn-primary" onClick={() => setBatchImport(true)}>Nhập kho</button>
       </div>
       <div className="stats-grid">
-        <div className="stat-card"><span>Tổng phiên bản</span><b>{visibleStats.tongPhienBan}</b></div>
-        <div className="stat-card"><span>Còn hàng</span><b>{visibleStats.conHang}</b></div>
-        <div className="stat-card"><span>Sắp hết hàng</span><b>{visibleStats.sapHet}</b></div>
-        <div className="stat-card"><span>Hết hàng</span><b>{visibleStats.hetHang}</b></div>
+        {[
+          ['', 'Tổng phiên bản', visibleStats.tongPhienBan],
+          ['con-hang', 'Còn hàng', visibleStats.conHang],
+          ['sap-het', 'Sắp hết hàng', visibleStats.sapHet],
+          ['het', 'Hết hàng', visibleStats.hetHang],
+        ].map(([filter, label, count]) => (
+          <button
+            key={label}
+            type="button"
+            className={`stat-card stat-card-button${loc === filter ? ' active' : ''}`}
+            aria-pressed={loc === filter}
+            onClick={() => changeLocationFilter(filter)}
+          >
+            <span>{label}</span><b>{count}</b>
+          </button>
+        ))}
       </div>
       <div className="row" style={{ margin: '18px 0', alignItems: 'center' }}>
         <input className="input" placeholder="Tìm SKU, mã sản phẩm hoặc tên máy" value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} />
         {FILTERS.map((filter) => (
-          <button key={filter.value} className={loc === filter.value ? 'btn active' : 'btn'} onClick={() => { setLoc(filter.value); setPage(0); }}>{filter.label}</button>
+          <button key={filter.value} className={loc === filter.value ? 'btn active' : 'btn'} onClick={() => changeLocationFilter(filter.value)}>{filter.label}</button>
         ))}
         <button className="btn" onClick={() => setHistoryVariant({ maPhienBan: '' })}>Lịch sử kho</button>
       </div>

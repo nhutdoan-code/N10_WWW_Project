@@ -1,11 +1,13 @@
 package nhom10.phonenest.repository;
 
 import nhom10.phonenest.entity.YeuCauDoiTra;
+import nhom10.phonenest.enums.TrangThaiDoiTra;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, String>, KhoaYeuCauDoiTraRepository {
@@ -18,4 +20,12 @@ public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, Stri
            "WHERE (:start IS NULL OR y.ngayTao >= :start) " +
            "  AND (:end IS NULL OR y.ngayTao < :end)")
     long countByNgayTaoRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(y) FROM YeuCauDoiTra y " +
+           "WHERE y.trangThai IN :statuses " +
+           "  AND (:start IS NULL OR y.ngayTao >= :start) " +
+           "  AND (:end IS NULL OR y.ngayTao < :end)")
+    long countOpenByNgayTaoRange(@Param("statuses") Collection<TrangThaiDoiTra> statuses,
+                                 @Param("start") LocalDateTime start,
+                                 @Param("end") LocalDateTime end);
 }

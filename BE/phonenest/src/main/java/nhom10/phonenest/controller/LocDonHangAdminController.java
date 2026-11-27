@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,6 +36,12 @@ public class LocDonHangAdminController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false)
             TrangThaiDonHang trangThai,
+
+            @RequestParam(required = false)
+            String nhomTrangThai,
+
+            @RequestParam(defaultValue = "ngayMua")
+            String ngayTheo,
 
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -66,6 +73,16 @@ public class LocDonHangAdminController {
                     HttpStatus.BAD_REQUEST,
                     "Phân trang không hợp lệ"
             );
+        }
+
+        if (nhomTrangThai != null && !"DANG_XU_LY".equals(nhomTrangThai)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nhóm trạng thái không hợp lệ");
+        }
+        if (nhomTrangThai != null && trangThai != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ chọn trạng thái đơn hoặc nhóm trạng thái");
+        }
+        if (!List.of("ngayMua", "ngayGiao").contains(ngayTheo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trường ngày lọc không hợp lệ");
         }
 
         // Kiểm tra khoảng ngày
@@ -100,6 +117,11 @@ public class LocDonHangAdminController {
                     Sort.Order.asc("maDonHang")
             );
 
+            case "ngay_giao_moi" -> Sort.by(
+                    Sort.Order.desc("ngayGiao"),
+                    Sort.Order.desc("maDonHang")
+            );
+
             case "tien_cao" -> Sort.by(
                     Sort.Order.desc("tongThanhToan"),
                     Sort.Order.desc("maDonHang")
@@ -127,12 +149,21 @@ public class LocDonHangAdminController {
                         root.get("trangThai"),
                         trangThai
                 ));
+            } else if ("DANG_XU_LY".equals(nhomTrangThai)) {
+                ps.add(root.get("trangThai").in(List.of(
+                        TrangThaiDonHang.CHO_XAC_NHAN,
+                        TrangThaiDonHang.DA_XAC_NHAN,
+                        TrangThaiDonHang.DANG_CHUAN_BI,
+                        TrangThaiDonHang.DANG_GIAO
+                )));
             }
+
+            jakarta.persistence.criteria.Path<LocalDateTime> datePath = root.<LocalDateTime>get(ngayTheo);
 
             // Từ ngày
             if (from != null) {
                 ps.add(cb.greaterThanOrEqualTo(
-                        root.get("ngayMua"),
+                        datePath,
                         from.atStartOfDay()
                 ));
             }
@@ -140,7 +171,7 @@ public class LocDonHangAdminController {
             // Đến ngày (bao gồm hết ngày)
             if (to != null) {
                 ps.add(cb.lessThan(
-                        root.get("ngayMua"),
+                        datePath,
                         to.plusDays(1).atStartOfDay()
                 ));
             }
