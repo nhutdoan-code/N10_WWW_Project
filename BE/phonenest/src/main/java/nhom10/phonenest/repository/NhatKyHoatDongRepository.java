@@ -22,6 +22,9 @@ public interface NhatKyHoatDongRepository
     List<NhatKyHoatDong> findTop200ByLoaiDoiTuongAndMaDoiTuongOrderByThoiGianDescMaNhatKyDesc(
             LoaiDoiTuongAudit loaiDoiTuong, String maDoiTuong);
 
+    List<NhatKyHoatDong> findByLoaiDoiTuongAndMaDoiTuongOrderByThoiGianDescMaNhatKyDesc(
+            LoaiDoiTuongAudit loaiDoiTuong, String maDoiTuong);
+
     /** Thao tac phe duyet gan nhat thuoc cac loai cho truoc (dung cho tach quyen mo khoa/duyet). */
     Optional<NhatKyHoatDong> findFirstByLoaiDoiTuongAndMaDoiTuongAndHanhDongInOrderByThoiGianDescMaNhatKyDesc(
             LoaiDoiTuongAudit loaiDoiTuong, String maDoiTuong, Collection<HanhDongAudit> hanhDongs);

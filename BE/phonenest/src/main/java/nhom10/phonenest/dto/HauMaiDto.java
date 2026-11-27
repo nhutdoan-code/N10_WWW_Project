@@ -25,10 +25,15 @@ public record HauMaiDto(
         LocalDateTime ngayCapNhat,
         List<LichSu> lichSu) {
 
+    @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
+    public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }
+    @com.fasterxml.jackson.annotation.JsonProperty("anhMinhChung")
+    public List<String> anhMinhChung() { return hinhAnhMinhChung == null ? List.of() : hinhAnhMinhChung.lines().filter(x -> !x.isBlank()).toList(); }
+
     public record LichSu(TrangThaiHauMai trangThai, String ghiChu, LocalDateTime thoiGian) {}
 
     public record Request(
-            @NotBlank(message = "Vui lòng chọn đơn hàng") String maDonHang,
+            String maDonHang,
             @NotNull(message = "Vui lòng chọn loại yêu cầu") LoaiHauMai loai,
             String maPhienBan,
             @NotBlank(message = "Vui lòng mô tả vấn đề")

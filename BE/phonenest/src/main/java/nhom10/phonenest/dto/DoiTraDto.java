@@ -29,7 +29,25 @@ public record DoiTraDto(
         String hinhThucHoanTien,
         String maGiaoDichHoanTien,
         LocalDateTime ngayHoanTien,
-        boolean daNhapKho) {
+        boolean daNhapKho, LocalDateTime ngayTaoChinhXac) {
+
+    @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
+    public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }
+    @com.fasterxml.jackson.annotation.JsonProperty("anhMinhChung")
+    public List<String> anhMinhChung() { return hinhAnhMinhChung == null ? List.of() : hinhAnhMinhChung.lines().filter(x -> !x.isBlank()).toList(); }
+
+    /** Customer responses must not disclose the full refund bank account. Admin DTOs remain unchanged. */
+    public DoiTraDto customerView() {
+        return new DoiTraDto(maYeuCau, maDonHang, tenKhach, soDienThoai, maskAccount(lyDo), hinhAnhMinhChung,
+                ngayTao, ngayCapNhat, trangThai, loaiYeuCau, tenSanPham, soLuong, maskAccount(ghiChuXuLy), chiTiet,
+                soTienHoanDuKien, hinhThucHoanTien, maGiaoDichHoanTien, ngayHoanTien, daNhapKho, ngayTaoChinhXac);
+    }
+
+    static String maskAccount(String text) {
+        if (text == null) return null;
+        return java.util.regex.Pattern.compile("(?m)^(Số tài khoản:[ \\t]*)([0-9]{4,30})(?=[ \\t]*\\r?$)")
+                .matcher(text).replaceAll(m -> java.util.regex.Matcher.quoteReplacement(m.group(1) + "•••• " + m.group(2).substring(m.group(2).length() - 4)));
+    }
 
     public record ChiTietDto(String maPhienBan, String tenSanPham, int soLuong,
                              LoaiYeuCauDoiTra loaiYeuCau, boolean daNhapKho,
@@ -37,7 +55,11 @@ public record DoiTraDto(
 
     public record XacNhanHoanTienRequest(
             @NotBlank(message = "Vui lòng chọn hình thức hoàn tiền") @Size(max = 60) String hinhThuc,
-            @NotBlank(message = "Vui lòng nhập mã giao dịch/đối soát") @Size(max = 150) String maGiaoDich) {}
+            @NotBlank(message = "Vui lòng nhập mã giao dịch/đối soát") @Size(max = 150) String maGiaoDich,
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) Integer phanTram, BigDecimal soTien, @Size(max = 500) String lyDoDieuChinh, LocalDateTime thoiDiemHoan) {
+        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich, Integer phanTram) { this(hinhThuc, maGiaoDich, phanTram, null, null, null); }
+        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich) { this(hinhThuc, maGiaoDich, 100, null, null, null); }
+    }
 
     public record Request(
             @NotBlank(message = "Vui lòng chọn đơn hàng") String maDonHang,

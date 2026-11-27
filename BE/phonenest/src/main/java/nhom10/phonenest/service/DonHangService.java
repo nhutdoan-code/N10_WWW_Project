@@ -123,7 +123,7 @@ public class DonHangService {
             c.setHinhAnh(SanPhamMapper.anhTheoMau(p.getSanPham(), p));
             c.setSoLuong(e.getValue());
             c.setDonGia(p.getGiaBan());
-            c.setBaoHanhThang(p.getSanPham().getThoiHanBaoHanhThang());
+            c.setBaoHanhThang(nhom10.phonenest.util.AfterSalesPolicy.WARRANTY_MONTHS);
             d.getChiTiet().add(c);
             tam = tam.add(p.getGiaBan().multiply(BigDecimal.valueOf(e.getValue())));
         }

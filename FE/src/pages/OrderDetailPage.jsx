@@ -11,8 +11,9 @@ import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
-import { errorMessage, formatDate, formatPrice } from '../utils/format';
+import { errorMessage, formatDate, formatDay, formatPrice } from '../utils/format';
 import { getOrderActions } from '../utils/orderActions';
+import { returnActive, warrantyActive, warrantyEnd } from '../utils/warrantyPolicy';
 import { formatKhoangNgayGiao } from '../utils/shipping';
 
 export default function OrderDetailPage() {
@@ -28,8 +29,12 @@ export default function OrderDetailPage() {
     [ma, o?.phuongThucTt]
   );
   const [cancelForm, setCancelForm] = useState(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [reviewing, setReviewing] = useState(null);
   const [confirmReceive, setConfirmReceive] = useState(false);
+  useEffect(() => {
+    if (o?.trangThai === 'CHO_KHACH_XAC_NHAN' && searchParams.get('confirmReceive') === '1') setConfirmReceive(true);
+  }, [o?.trangThai, ma, searchParams]);
   const [submitting, setSubmitting] = useState(false);
   const [paying, setPaying] = useState(false);
   const [reorderPicker, setReorderPicker] = useState(false);
@@ -107,8 +112,15 @@ export default function OrderDetailPage() {
     e.preventDefault();
     const khac = cancelForm.lyDo === 'Lý do khác';
     if (khac && !cancelForm.khac.trim()) return toast('Vui lòng nhập lý do hủy', 'error');
-    await run(() => orderService.cancel(o.maDonHang, cancelForm.lyDo, khac ? cancelForm.khac.trim() : null), 'Hủy đơn hàng thành công');
-    setCancelForm(null);
+    if (cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      await orderService.cancel(o.maDonHang, cancelForm.lyDo, khac ? cancelForm.khac.trim() : null);
+      toast('Hủy đơn hàng thành công');
+      setCancelForm(null);
+      reload();
+    } catch (e) { toast(errorMessage(e), 'error'); }
+    finally { setCancelBusy(false); }
   };
   const submitReceived = async () => {
     setSubmitting(true);
@@ -129,6 +141,7 @@ export default function OrderDetailPage() {
   const actions = getOrderActions(o.trangThai);
   const hasAfterSalesRequest = Boolean(o.trangThaiDoiTra) ||
     (existingRequests || []).some((req) => req.maDonHang === o.maDonHang);
+  const openWarranty = (existingRequests || []).some(r => r.maDonHang === o.maDonHang && r.loai === 'BAO_HANH' && ['CHO_TIEP_NHAN','DANG_XU_LY','DA_DUYET'].includes(r.trangThai));
   const huy = o.trangThai === 'DA_HUY';
   const ngayGiaoDuKien = formatKhoangNgayGiao(o.ngayGiaoDuKienTu, o.ngayGiaoDuKienDen);
   const dangChoGiao = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'].includes(o.trangThai);
@@ -148,7 +161,7 @@ export default function OrderDetailPage() {
           <h2 style={{ marginBottom: 0 }}>Đơn hàng {o.maDonHang}</h2>
           <p className="muted">Đặt lúc {formatDate(o.ngayMua)} · {PAYMENT_METHODS.find((m) => m.value === o.phuongThucTt)?.label}</p>
         </div>
-        <StatusBadge status={o.trangThai} />
+        <div className="as-order-status"><StatusBadge status={o.trangThai} />{openWarranty && <Link className="as-deadline-badge" to="/returns">Bảo hành: Đang xử lý</Link>}</div>
       </div>
 
       <div className="order-layout">
@@ -259,7 +272,7 @@ export default function OrderDetailPage() {
                       )}
                     </div>
                     {r?.duocDanhGia && !r.danhGia && (
-                      <button type="button" className="btn btn-primary" onClick={() => setReviewing(d)}>Đánh giá</button>
+                      <button type="button" className={openWarranty ? "btn" : "btn btn-primary"} onClick={() => setReviewing(d)}>Đánh giá</button>
                     )}
                   </div>
                 );
@@ -319,18 +332,19 @@ export default function OrderDetailPage() {
           <Link className="btn" to={`/orders/${o.maDonHang}/invoice`}>
             {actions.afterDelivery ? 'Xuất hóa đơn (PDF)' : 'Tải thông tin đơn hàng (PDF)'}
           </Link>
-          {actions.afterDelivery && (
-            <>
-              <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=TRA_HANG_HOAN_TIEN`}>Đổi / trả hàng</Link>
-              <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=BAO_HANH`}>Yêu cầu bảo hành</Link>
-            </>
-          )}
-          {actions.complain && (
-            <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=KHIEU_NAI`}>Gửi khiếu nại</Link>
-          )}
-          {hasAfterSalesRequest && (
-            <Link className="btn" to="/returns">Theo dõi yêu cầu hậu mãi</Link>
-          )}
+          {(actions.afterDelivery || actions.complain || hasAfterSalesRequest) && <details className="as-support-menu" open={openWarranty || undefined}>
+            <summary className="btn">Hỗ trợ sau mua {openWarranty && <span className="as-deadline-badge">Đang xử lý</span>}</summary>
+            <div className="as-support-menu-items">
+              {actions.afterDelivery && <>
+                {returnActive(o) ? <Link className="btn" to={`/returns?orderId=${encodeURIComponent(o.maDonHang)}&loai=TRA_HANG_HOAN_TIEN`}>Yêu cầu đổi trả</Link> : <span className="btn as-disabled-action" role="link" aria-disabled="true" tabIndex={0} title="Đã quá hạn hoặc chưa đủ điều kiện đổi trả">Yêu cầu đổi trả</span>}
+                {!returnActive(o) && <small className="muted">Đã quá hạn hoặc chưa đủ điều kiện đổi trả.</small>}
+                {warrantyActive(o) ? <Link className="btn" to={`/returns?orderId=${encodeURIComponent(o.maDonHang)}&loai=BAO_HANH`}>Yêu cầu bảo hành</Link> : <span className="btn as-disabled-action" role="link" aria-disabled="true" tabIndex={0} title="Không còn đủ điều kiện bảo hành">Yêu cầu bảo hành</span>}
+                {warrantyEnd(o) && <small className="muted">Hạn bảo hành: {formatDay(warrantyEnd(o))}</small>}
+              </>}
+              {actions.complain && <Link className="btn" to={`/returns?maDonHang=${encodeURIComponent(o.maDonHang)}&loai=KHIEU_NAI`}>Gửi khiếu nại</Link>}
+              {hasAfterSalesRequest && <Link className="btn" to="/returns">Theo dõi yêu cầu</Link>}
+            </div>
+          </details>}
           {actions.cancel && (
             <button className="btn btn-danger" onClick={() => setCancelForm({ lyDo: CANCEL_REASONS[0], khac: '' })}>Hủy đơn hàng</button>
           )}
@@ -360,7 +374,7 @@ export default function OrderDetailPage() {
         )}
         {confirmReceive && (
             <Modal title="Xác nhận đã nhận hàng" onClose={() => !submitting && setConfirmReceive(false)}>
-              <p>Bạn xác nhận đã nhận đầy đủ sản phẩm của đơn hàng này? Sau khi xác nhận, đơn hàng sẽ được hoàn tất.</p>
+              <p>Bạn xác nhận đã nhận đầy đủ sản phẩm của đơn hàng này? Chỉ xác nhận khi bạn đã thực sự nhận đủ hàng. Sau khi xác nhận, đơn hàng sẽ hoàn tất và bắt đầu tính thời hạn đổi trả, bảo hành.</p>
               <div className="row end">
                 <button className="btn" disabled={submitting} onClick={() => setConfirmReceive(false)}>Hủy</button>
                 <button className="btn btn-primary" disabled={submitting} onClick={submitReceived}>{submitting ? 'Đang xử lý...' : 'Xác nhận đã nhận'}</button>
@@ -368,9 +382,9 @@ export default function OrderDetailPage() {
             </Modal>
         )}
         {cancelForm && (
-          <Modal title="Hủy đơn hàng" onClose={() => setCancelForm(null)}>
-            <form className="stack" onSubmit={submitCancel}>
-              <p>Bạn chắc chắn muốn hủy đơn <b>{o.maDonHang}</b>? Số lượng sản phẩm sẽ được hoàn lại kho.</p>
+          <Modal title="Hủy đơn hàng" onClose={() => { if (!cancelBusy) setCancelForm(null); }}>
+            <form className="cancel-order-form" onSubmit={submitCancel}>
+              <div className="cancel-order-summary"><small>Đơn hàng cần hủy</small><strong>{o.maDonHang}</strong><p>Bạn có chắc chắn muốn hủy đơn hàng này? Thao tác không thể hoàn tác.</p></div>
               <label className="field">
                 <span>Lý do hủy đơn</span>
                 <select value={cancelForm.lyDo} onChange={(e) => setCancelForm({ ...cancelForm, lyDo: e.target.value })}>
@@ -378,11 +392,11 @@ export default function OrderDetailPage() {
                 </select>
               </label>
               {cancelForm.lyDo === 'Lý do khác' && (
-                <textarea rows="3" placeholder="Nhập lý do của bạn" value={cancelForm.khac} onChange={(e) => setCancelForm({ ...cancelForm, khac: e.target.value })} />
+                <textarea required maxLength={500} rows="3" placeholder="Nhập lý do của bạn" value={cancelForm.khac} onChange={(e) => setCancelForm({ ...cancelForm, khac: e.target.value })} />
               )}
-              <div className="row end">
-                <button type="button" className="btn" onClick={() => setCancelForm(null)}>Đóng</button>
-                <button className="btn btn-danger">Xác nhận hủy</button>
+              <div className="cancel-order-actions">
+                <button type="button" className="btn" disabled={cancelBusy} onClick={() => setCancelForm(null)}>Giữ đơn hàng</button>
+                <button type="submit" className="btn btn-danger" disabled={cancelBusy}>{cancelBusy ? "Đang hủy…" : "Xác nhận hủy đơn"}</button>
               </div>
             </form>
           </Modal>

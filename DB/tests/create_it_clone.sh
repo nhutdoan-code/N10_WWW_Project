@@ -26,6 +26,8 @@ DB="${PN_IT_DB_NAME:-phonenest_it_$(date +%Y%m%d%H%M%S)}"
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/22_shipping_zone_eta_notification_link.sql"
 # Migration 23: voucher % co tran / tien mat theo bac.
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/23_voucher_discount_type.sql"
+# M24: don hang tuy chon cho khieu nai
+"$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/24_after_sales_optional_order.sql"
 echo
 echo "Clone san sang. Chay test:"
 echo "  export PHONENEST_IT_DB_URL=jdbc:mariadb://$HOST:$PORT/$DB"

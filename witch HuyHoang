@@ -1,0 +1,553 @@
+ .gitignore                                         |   21 [32m+[m
+ API_DOCUMENTATION.md                               |   45 [32m+[m[31m-[m
+ BE/phonenest/application-local.properties.example  |   30 [32m+[m
+ BE/phonenest/pom.xml                               |   12 [32m+[m
+ .../nhom10/phonenest/config/VectorStoreConfig.java |   33 [32m+[m
+ .../java/nhom10/phonenest/config/WebConfig.java    |    7 [32m+[m
+ .../config/schema/SchemaCompatibilityChecker.java  |  181 [32m+[m
+ .../config/schema/SchemaCompatibilityVerifier.java |  135 [32m+[m
+ .../controller/AdminHanhViController.java          |    3 [32m+[m
+ .../phonenest/controller/AdminKhoController.java   |    2 [32m+[m[31m-[m
+ .../controller/AdminKhuyenMaiController.java       |   11 [32m+[m
+ .../controller/AdminQuanLyController.java          |   26 [32m+[m
+ .../controller/AdminSanPhamController.java         |   65 [32m+[m
+ .../controller/AdminThuongHieuController.java      |   13 [32m+[m
+ .../controller/AdminTuongTacController.java        |   31 [32m+[m
+ .../phonenest/controller/ChatController.java       |   27 [32m+[m[31m-[m
+ .../phonenest/controller/DonHangController.java    |    6 [32m+[m[31m-[m
+ .../controller/LocDonHangAdminController.java      |    4 [32m+[m
+ .../controller/ThanhToanDaChonController.java      |   45 [32m+[m
+ .../controller/TimKiemPhoBienController.java       |   29 [32m+[m
+ .../nhom10/phonenest/dto/AdminApprovalDto.java     |   52 [32m+[m
+ .../java/nhom10/phonenest/dto/AdminUnblockDto.java |   30 [32m+[m
+ .../main/java/nhom10/phonenest/dto/ChatDto.java    |   35 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/dto/CheckoutDto.java     |   11 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/DoiTraDto.java  |   18 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/DonHangDto.java |   45 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/GioHangDto.java |    8 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/HanhViDto.java  |   44 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/HoSoDto.java    |    4 [32m+[m[31m-[m
+ .../nhom10/phonenest/dto/KetQuaPhiVanChuyen.java   |   40 [32m+[m
+ .../java/nhom10/phonenest/dto/KhoDieuChinhDto.java |    4 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/dto/KhuyenMaiDto.java    |   56 [32m+[m[31m-[m
+ .../nhom10/phonenest/dto/PheDuyetChiTietDto.java   |   42 [32m+[m
+ .../java/nhom10/phonenest/dto/PhiVanChuyenDto.java |   13 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/dto/SanPhamDto.java |   64 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/dto/TaiKhoanDto.java     |   12 [32m+[m
+ .../java/nhom10/phonenest/dto/ThongBaoDto.java     |    3 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/dto/ThuongHieuDto.java   |   14 [32m+[m[31m-[m
+ .../nhom10/phonenest/entity/ChiTietDoiTra.java     |    2 [32m+[m[31m-[m
+ .../nhom10/phonenest/entity/CuocHoiThoaiChat.java  |   39 [32m+[m
+ .../main/java/nhom10/phonenest/entity/DonHang.java |    4 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/entity/HuyDonHang.java   |    4 [32m+[m
+ .../java/nhom10/phonenest/entity/KhuyenMai.java    |    4 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/entity/PhiVanChuyen.java |   10 [32m+[m
+ .../nhom10/phonenest/entity/PhienBanSanPham.java   |   87 [32m+[m[31m-[m
+ .../main/java/nhom10/phonenest/entity/SanPham.java |    3 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/entity/ThongBao.java     |    2 [32m+[m
+ .../java/nhom10/phonenest/entity/TinNhanChat.java  |   40 [32m+[m
+ .../java/nhom10/phonenest/entity/YeuCauDoiTra.java |    2 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/enums/HanhDongAudit.java |    9 [32m+[m
+ .../main/java/nhom10/phonenest/enums/KieuGiam.java |   10 [32m+[m
+ .../java/nhom10/phonenest/enums/LoaiDiaBan.java    |   20 [32m+[m
+ .../nhom10/phonenest/enums/LoaiDoiTuongAudit.java  |    2 [32m+[m
+ .../java/nhom10/phonenest/enums/LyDoKhoaBan.java   |   17 [32m+[m
+ .../nhom10/phonenest/enums/TrangThaiPheDuyet.java  |   15 [32m+[m
+ .../phonenest/event/BienTheThayDoiEvent.java       |    8 [32m+[m
+ .../exception/GlobalExceptionHandler.java          |   51 [32m+[m
+ .../nhom10/phonenest/mapper/DonHangMapper.java     |    2 [32m+[m[31m-[m
+ .../nhom10/phonenest/mapper/SanPhamMapper.java     |   25 [32m+[m[31m-[m
+ .../repository/CuocHoiThoaiChatRepository.java     |   23 [32m+[m
+ .../phonenest/repository/DanhGiaRepository.java    |    4 [32m+[m[31m-[m
+ .../phonenest/repository/DonHangRepository.java    |    6 [32m+[m[31m-[m
+ .../repository/HanhViNguoiDungRepository.java      |   33 [32m+[m
+ .../phonenest/repository/HoiDapRepository.java     |   27 [32m+[m
+ .../repository/KhoaDonHangRepository.java          |   10 [32m+[m
+ .../repository/KhoaDonHangRepositoryImpl.java      |   19 [32m+[m
+ .../repository/KhoaKhuyenMaiRepository.java        |   10 [32m+[m
+ .../repository/KhoaKhuyenMaiRepositoryImpl.java    |   19 [32m+[m
+ .../nhom10/phonenest/repository/KhoaNapMoi.java    |   34 [32m+[m
+ .../repository/KhoaPhienBanRepository.java         |   17 [32m+[m
+ .../repository/KhoaPhienBanRepositoryImpl.java     |   33 [32m+[m
+ .../repository/KhoaThanhToanRepository.java        |   10 [32m+[m
+ .../repository/KhoaThanhToanRepositoryImpl.java    |   19 [32m+[m
+ .../repository/KhoaYeuCauDoiTraRepository.java     |   10 [32m+[m
+ .../repository/KhoaYeuCauDoiTraRepositoryImpl.java |   19 [32m+[m
+ .../phonenest/repository/KhuyenMaiRepository.java  |   19 [32m+[m[31m-[m
+ .../repository/NhatKyHoatDongRepository.java       |   14 [32m+[m
+ .../repository/PhienBanSanPhamRepository.java      |   11 [32m+[m[31m-[m
+ .../phonenest/repository/SanPhamRepository.java    |   45 [32m+[m[31m-[m
+ .../phonenest/repository/TaiKhoanRepository.java   |   22 [32m+[m
+ .../phonenest/repository/ThanhToanRepository.java  |    7 [32m+[m[31m-[m
+ .../repository/TinNhanChatRepository.java          |   29 [32m+[m
+ .../repository/YeuCauDoiTraRepository.java         |    7 [32m+[m[31m-[m
+ .../phonenest/security/config/SecurityConfig.java  |    6 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/ChatCartService.java  |  383 [32m+[m
+ .../phonenest/service/ChatHistoryService.java      |  172 [32m+[m
+ .../java/nhom10/phonenest/service/ChatService.java |  348 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/DanhGiaService.java   |    4 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/DoiTraService.java    |  103 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/DonHangService.java   |  106 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/GioHangService.java   |   74 [32m+[m[31m-[m
+ .../phonenest/service/HanhViNguoiDungService.java  |   80 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/HauMaiService.java    |    3 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/HoiDapService.java    |   11 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/KhachHangService.java |    5 [32m+[m[31m-[m
+ .../java/nhom10/phonenest/service/KhoService.java  |   38 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/KhuyenMaiService.java |   99 [32m+[m[31m-[m
+ .../phonenest/service/MomoPaymentService.java      |   28 [32m+[m[31m-[m
+ .../phonenest/service/NhatKyHoatDongService.java   |   10 [32m+[m
+ .../phonenest/service/PheDuyetBanHangPolicy.java   |  281 [32m+[m
+ .../phonenest/service/PheDuyetBanHangService.java  |  437 [32m+[m
+ .../phonenest/service/PhiVanChuyenService.java     |  131 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/SanPhamService.java   |  180 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/TaiKhoanService.java  |   90 [32m+[m[31m-[m
+ .../phonenest/service/ThanhToanDaChonService.java  |  140 [32m+[m
+ .../nhom10/phonenest/service/ThanhToanService.java |  136 [32m+[m[31m-[m
+ .../nhom10/phonenest/service/ThongBaoService.java  |   21 [32m+[m[31m-[m
+ .../phonenest/service/ThuongHieuService.java       |   50 [32m+[m[31m-[m
+ .../phonenest/service/TimKiemPhoBienService.java   |   71 [32m+[m
+ .../nhom10/phonenest/service/TimKiemService.java   |    2 [32m+[m[31m-[m
+ .../service/UploadOrphanAuditService.java          |  187 [32m+[m
+ .../service/UserPreferenceAggregationService.java  |    4 [32m+[m[31m-[m
+ .../phonenest/service/ai/ChatPriceGuard.java       |   96 [32m+[m
+ .../service/ai/PhoneNestEmbeddingModel.java        |   48 [32m+[m[31m-[m
+ .../service/ai/PhoneNestProductTools.java          |  185 [32m+[m
+ .../service/ai/ProductSemanticDocumentBuilder.java |   41 [32m+[m[31m-[m
+ .../service/ai/SemanticSearchService.java          |  236 [32m+[m[31m-[m
+ .../service/ai/VectorIndexSyncListener.java        |   29 [32m+[m
+ .../java/nhom10/phonenest/util/DungLuongUtil.java  |   15 [32m+[m
+ .../src/main/resources/application.properties      |   22 [32m+[m[31m-[m
+ BE/phonenest/src/main/resources/catalog/README.md  |   12 [32m+[m
+ .../main/resources/catalog/SP001/titan-den.webp    |  Bin [31m0[m -> [32m13354[m bytes
+ .../main/resources/catalog/SP001/titan-trang.webp  |  Bin [31m0[m -> [32m15008[m bytes
+ .../resources/catalog/SP001/titan-tu-nhien.webp    |  Bin [31m0[m -> [32m9802[m bytes
+ .../main/resources/catalog/SP001/titan-xanh.webp   |  Bin [31m0[m -> [32m13320[m bytes
+ .../src/main/resources/catalog/SP002/den.webp      |  Bin [31m0[m -> [32m9106[m bytes
+ .../src/main/resources/catalog/SP002/hong.webp     |  Bin [31m0[m -> [32m11546[m bytes
+ .../src/main/resources/catalog/SP002/vang.webp     |  Bin [31m0[m -> [32m10720[m bytes
+ .../main/resources/catalog/SP002/xanh-duong.webp   |  Bin [31m0[m -> [32m10678[m bytes
+ .../src/main/resources/catalog/SP002/xanh-la.webp  |  Bin [31m0[m -> [32m8936[m bytes
+ .../src/main/resources/catalog/SP003/den.webp      |  Bin [31m0[m -> [32m6820[m bytes
+ .../src/main/resources/catalog/SP003/do.webp       |  Bin [31m0[m -> [32m17440[m bytes
+ .../src/main/resources/catalog/SP003/hong.webp     |  Bin [31m0[m -> [32m14924[m bytes
+ .../src/main/resources/catalog/SP003/trang.webp    |  Bin [31m0[m -> [32m7658[m bytes
+ .../main/resources/catalog/SP003/xanh-duong.webp   |  Bin [31m0[m -> [32m15642[m bytes
+ .../src/main/resources/catalog/SP003/xanh-la.webp  |  Bin [31m0[m -> [32m7644[m bytes
+ .../src/main/resources/catalog/SP004/den.webp      |  Bin [31m0[m -> [32m14546[m bytes
+ .../src/main/resources/catalog/SP004/tim.webp      |  Bin [31m0[m -> [32m14588[m bytes
+ .../src/main/resources/catalog/SP004/vang.webp     |  Bin [31m0[m -> [32m14226[m bytes
+ .../src/main/resources/catalog/SP004/xam.webp      |  Bin [31m0[m -> [32m14712[m bytes
+ .../src/main/resources/catalog/SP005/den.webp      |  Bin [31m0[m -> [32m9986[m bytes
+ .../src/main/resources/catalog/SP005/tim.webp      |  Bin [31m0[m -> [32m14838[m bytes
+ .../src/main/resources/catalog/SP005/vang.webp     |  Bin [31m0[m -> [32m14036[m bytes
+ .../src/main/resources/catalog/SP005/xam.webp      |  Bin [31m0[m -> [32m9270[m bytes
+ .../src/main/resources/catalog/SP006/den.webp      |  Bin [31m0[m -> [32m14488[m bytes
+ .../src/main/resources/catalog/SP006/tim.webp      |  Bin [31m0[m -> [32m15402[m bytes
+ .../main/resources/catalog/SP006/xanh-nhat.webp    |  Bin [31m0[m -> [32m18084[m bytes
+ .../src/main/resources/catalog/SP007/den.webp      |  Bin [31m0[m -> [32m17032[m bytes
+ .../src/main/resources/catalog/SP007/trang.webp    |  Bin [31m0[m -> [32m19590[m bytes
+ .../src/main/resources/catalog/SP007/xanh.webp     |  Bin [31m0[m -> [32m19612[m bytes
+ .../src/main/resources/catalog/SP008/den.webp      |  Bin [31m0[m -> [32m9162[m bytes
+ .../src/main/resources/catalog/SP008/tim.webp      |  Bin [31m0[m -> [32m21046[m bytes
+ .../src/main/resources/catalog/SP008/xanh-la.webp  |  Bin [31m0[m -> [32m21008[m bytes
+ .../src/main/resources/catalog/SP009/den.webp      |  Bin [31m0[m -> [32m15810[m bytes
+ .../src/main/resources/catalog/SP009/vang.webp     |  Bin [31m0[m -> [32m23346[m bytes
+ .../src/main/resources/catalog/SP009/xam.webp      |  Bin [31m0[m -> [32m15320[m bytes
+ .../src/main/resources/catalog/SP010/den.webp      |  Bin [31m0[m -> [32m21494[m bytes
+ .../main/resources/catalog/SP010/xanh-duong.webp   |  Bin [31m0[m -> [32m21212[m bytes
+ .../src/main/resources/catalog/SP010/xanh-la.webp  |  Bin [31m0[m -> [32m12058[m bytes
+ .../src/main/resources/catalog/SP012/xanh-den.webp |  Bin [31m0[m -> [32m15042[m bytes
+ .../main/resources/catalog/SP012/xanh-duong.webp   |  Bin [31m0[m -> [32m29618[m bytes
+ .../src/main/resources/catalog/SP013/den.webp      |  Bin [31m0[m -> [32m12384[m bytes
+ .../src/main/resources/catalog/SP013/tim.webp      |  Bin [31m0[m -> [32m20832[m bytes
+ .../resources/catalog/SP1793202488261001/den.webp  |  Bin [31m0[m -> [32m12118[m bytes
+ .../resources/catalog/SP1793202488261001/hong.webp |  Bin [31m0[m -> [32m9446[m bytes
+ .../resources/catalog/SP1793202488261001/xam.webp  |  Bin [31m0[m -> [32m11692[m bytes
+ .../resources/catalog/SP1793202488261001/xanh.webp |  Bin [31m0[m -> [32m14716[m bytes
+ .../src/main/resources/catalog/SP260001/den.webp   |  Bin [31m0[m -> [32m10924[m bytes
+ .../resources/catalog/SP260001/tim-oai-huong.webp  |  Bin [31m0[m -> [32m10874[m bytes
+ .../src/main/resources/catalog/SP260001/trang.webp |  Bin [31m0[m -> [32m9038[m bytes
+ .../catalog/SP260001/xanh-la-xo-thom.webp          |  Bin [31m0[m -> [32m11534[m bytes
+ .../resources/catalog/SP260001/xanh-lam-khoi.webp  |  Bin [31m0[m -> [32m11944[m bytes
+ .../src/main/resources/catalog/SP260002/bac.webp   |  Bin [31m0[m -> [32m12226[m bytes
+ .../resources/catalog/SP260002/cam-vu-tru.webp     |  Bin [31m0[m -> [32m13894[m bytes
+ .../main/resources/catalog/SP260002/xanh-dam.webp  |  Bin [31m0[m -> [32m12340[m bytes
+ .../src/main/resources/catalog/SP260003/bac.webp   |  Bin [31m0[m -> [32m9680[m bytes
+ .../resources/catalog/SP260003/cam-vu-tru.webp     |  Bin [31m0[m -> [32m12436[m bytes
+ .../main/resources/catalog/SP260003/xanh-dam.webp  |  Bin [31m0[m -> [32m9986[m bytes
+ .../resources/catalog/SP260004/den-khong-gian.webp |  Bin [31m0[m -> [32m6036[m bytes
+ .../main/resources/catalog/SP260004/trang-may.webp |  Bin [31m0[m -> [32m6978[m bytes
+ .../main/resources/catalog/SP260004/vang-nhat.webp |  Bin [31m0[m -> [32m7530[m bytes
+ .../resources/catalog/SP260004/xanh-da-troi.webp   |  Bin [31m0[m -> [32m7992[m bytes
+ .../resources/catalog/SP260005/den-classic.webp    |  Bin [31m0[m -> [32m7210[m bytes
+ .../resources/catalog/SP260005/tim-cobalt.webp     |  Bin [31m0[m -> [32m8878[m bytes
+ .../resources/catalog/SP260005/trang-classic.webp  |  Bin [31m0[m -> [32m7104[m bytes
+ .../resources/catalog/SP260005/xanh-sky-blue.webp  |  Bin [31m0[m -> [32m19880[m bytes
+ .../resources/catalog/SP260006/den-classic.webp    |  Bin [31m0[m -> [32m7194[m bytes
+ .../resources/catalog/SP260006/tim-cobalt.webp     |  Bin [31m0[m -> [32m8750[m bytes
+ .../resources/catalog/SP260006/trang-classic.webp  |  Bin [31m0[m -> [32m17084[m bytes
+ .../resources/catalog/SP260006/xanh-sky-blue.webp  |  Bin [31m0[m -> [32m8914[m bytes
+ .../resources/catalog/SP260007/den-classic.webp    |  Bin [31m0[m -> [32m7194[m bytes
+ .../resources/catalog/SP260007/tim-cobalt.webp     |  Bin [31m0[m -> [32m8750[m bytes
+ .../resources/catalog/SP260007/trang-classic.webp  |  Bin [31m0[m -> [32m15532[m bytes
+ .../resources/catalog/SP260007/xanh-sky-blue.webp  |  Bin [31m0[m -> [32m8914[m bytes
+ .../src/main/resources/catalog/SP260008/tim.webp   |  Bin [31m0[m -> [32m6488[m bytes
+ .../src/main/resources/catalog/SP260008/xam.webp   |  Bin [31m0[m -> [32m6174[m bytes
+ .../main/resources/catalog/SP260008/xanh-den.webp  |  Bin [31m0[m -> [32m6268[m bytes
+ .../resources/catalog/SP260008/xanh-duong.webp     |  Bin [31m0[m -> [32m6594[m bytes
+ .../src/main/resources/catalog/SP260009/den.webp   |  Bin [31m0[m -> [32m15004[m bytes
+ .../src/main/resources/catalog/SP260009/tim.webp   |  Bin [31m0[m -> [32m6496[m bytes
+ .../src/main/resources/catalog/SP260009/trang.webp |  Bin [31m0[m -> [32m6130[m bytes
+ .../resources/catalog/SP260009/xanh-la-dam.webp    |  Bin [31m0[m -> [32m6460[m bytes
+ .../main/resources/catalog/SP260010/den-tuyen.webp |  Bin [31m0[m -> [32m14384[m bytes
+ .../main/resources/catalog/SP260010/xam-bong.webp  |  Bin [31m0[m -> [32m5430[m bytes
+ .../main/resources/catalog/SP260010/xanh-bong.webp |  Bin [31m0[m -> [32m14596[m bytes
+ .../main/resources/catalog/SP260011/den-tuyen.webp |  Bin [31m0[m -> [32m10204[m bytes
+ .../main/resources/catalog/SP260011/do-san-ho.webp |  Bin [31m0[m -> [32m15364[m bytes
+ .../main/resources/catalog/SP260011/xanh-bong.webp |  Bin [31m0[m -> [32m7734[m bytes
+ .../src/main/resources/catalog/SP260012/den.webp   |  Bin [31m0[m -> [32m18712[m bytes
+ .../src/main/resources/catalog/SP260012/tim.webp   |  Bin [31m0[m -> [32m10354[m bytes
+ .../src/main/resources/catalog/SP260012/trang.webp |  Bin [31m0[m -> [32m9198[m bytes
+ .../src/main/resources/catalog/SP260013/den.webp   |  Bin [31m0[m -> [32m24450[m bytes
+ .../src/main/resources/catalog/SP260013/tim.webp   |  Bin [31m0[m -> [32m12244[m bytes
+ .../src/main/resources/catalog/SP260013/xam.webp   |  Bin [31m0[m -> [32m10598[m bytes
+ .../src/main/resources/catalog/SP260014/trang.webp |  Bin [31m0[m -> [32m17404[m bytes
+ .../resources/catalog/SP260014/xanh-duong.webp     |  Bin [31m0[m -> [32m19874[m bytes
+ .../main/resources/catalog/SP260015/cam-nhat.webp  |  Bin [31m0[m -> [32m12586[m bytes
+ .../main/resources/catalog/SP260015/tim-nhat.webp  |  Bin [31m0[m -> [32m9804[m bytes
+ .../src/main/resources/catalog/SP260015/xam.webp   |  Bin [31m0[m -> [32m10798[m bytes
+ .../src/main/resources/catalog/SP260016/cam.webp   |  Bin [31m0[m -> [32m11436[m bytes
+ .../src/main/resources/catalog/SP260016/den.webp   |  Bin [31m0[m -> [32m13190[m bytes
+ .../resources/catalog/SP260016/vang-trang.webp     |  Bin [31m0[m -> [32m21410[m bytes
+ .../src/main/resources/catalog/SP260017/tim.webp   |  Bin [31m0[m -> [32m17992[m bytes
+ .../main/resources/catalog/SP260017/xam-dam.webp   |  Bin [31m0[m -> [32m19428[m bytes
+ .../src/main/resources/catalog/SP260018/bac.webp   |  Bin [31m0[m -> [32m21954[m bytes
+ .../src/main/resources/catalog/SP260018/tim.webp   |  Bin [31m0[m -> [32m13424[m bytes
+ .../src/main/resources/catalog/SP260018/titan.webp |  Bin [31m0[m -> [32m32346[m bytes
+ .../src/main/resources/catalog/SP260019/tim.webp   |  Bin [31m0[m -> [32m17678[m bytes
+ .../src/main/resources/catalog/SP260019/xam.webp   |  Bin [31m0[m -> [32m17108[m bytes
+ .../src/main/resources/catalog/SP260020/hong.webp  |  Bin [31m0[m -> [32m16184[m bytes
+ .../resources/catalog/SP260020/xanh-duong.webp     |  Bin [31m0[m -> [32m23394[m bytes
+ .../main/resources/catalog/SP260020/xanh-la.webp   |  Bin [31m0[m -> [32m18238[m bytes
+ .../src/main/resources/catalog/SP500135/den.webp   |  Bin [31m0[m -> [32m9880[m bytes
+ .../src/main/resources/catalog/SP500138/den.webp   |  Bin [31m0[m -> [32m11824[m bytes
+ .../src/main/resources/catalog/SP500138/nau.webp   |  Bin [31m0[m -> [32m18900[m bytes
+ .../src/main/resources/catalog/SP500138/trang.webp |  Bin [31m0[m -> [32m13402[m bytes
+ .../resources/catalog/SP500138/xanh-duong.webp     |  Bin [31m0[m -> [32m22718[m bytes
+ .../src/main/resources/catalog/SP500187/den.webp   |  Bin [31m0[m -> [32m22378[m bytes
+ .../src/main/resources/catalog/SP500187/trang.webp |  Bin [31m0[m -> [32m26358[m bytes
+ .../src/main/resources/catalog/SP500269/den.webp   |  Bin [31m0[m -> [32m7754[m bytes
+ .../src/main/resources/catalog/SP500269/do.webp    |  Bin [31m0[m -> [32m10134[m bytes
+ .../src/main/resources/catalog/SP500269/tim.webp   |  Bin [31m0[m -> [32m11642[m bytes
+ .../src/main/resources/catalog/SP500269/trang.webp |  Bin [31m0[m -> [32m8566[m bytes
+ .../src/main/resources/catalog/SP500269/vang.webp  |  Bin [31m0[m -> [32m10716[m bytes
+ .../src/main/resources/catalog/SP500269/xanh.webp  |  Bin [31m0[m -> [32m12450[m bytes
+ .../src/main/resources/catalog/SP500290/den.webp   |  Bin [31m0[m -> [32m15614[m bytes
+ .../src/main/resources/catalog/SP500290/do.webp    |  Bin [31m0[m -> [32m25030[m bytes
+ .../src/main/resources/catalog/SP500290/trang.webp |  Bin [31m0[m -> [32m35866[m bytes
+ .../src/main/resources/catalog/SP500290/xanh.webp  |  Bin [31m0[m -> [32m36060[m bytes
+ .../src/main/resources/catalog/SP500291/den.webp   |  Bin [31m0[m -> [32m19416[m bytes
+ .../resources/catalog/SP500291/xanh-duong.webp     |  Bin [31m0[m -> [32m29930[m bytes
+ .../main/resources/catalog/SP500291/xanh-la.webp   |  Bin [31m0[m -> [32m19280[m bytes
+ .../src/main/resources/catalog/SP500309/bac.webp   |  Bin [31m0[m -> [32m22578[m bytes
+ .../src/main/resources/catalog/SP500309/den.webp   |  Bin [31m0[m -> [32m11668[m bytes
+ .../src/main/resources/catalog/SP500309/tim.webp   |  Bin [31m0[m -> [32m5396[m bytes
+ .../src/main/resources/catalog/SP500309/vang.webp  |  Bin [31m0[m -> [32m14202[m bytes
+ .../src/main/resources/catalog/SP500310/den.webp   |  Bin [31m0[m -> [32m12130[m bytes
+ .../src/main/resources/catalog/SP500310/kem.webp   |  Bin [31m0[m -> [32m14050[m bytes
+ .../src/main/resources/catalog/SP500310/tim.webp   |  Bin [31m0[m -> [32m12786[m bytes
+ .../main/resources/catalog/SP500310/xanh-la.webp   |  Bin [31m0[m -> [32m7292[m bytes
+ .../src/main/resources/catalog/SP500329/den.webp   |  Bin [31m0[m -> [32m28300[m bytes
+ .../src/main/resources/catalog/SP500344/den.webp   |  Bin [31m0[m -> [32m9106[m bytes
+ .../src/main/resources/catalog/SP500344/hong.webp  |  Bin [31m0[m -> [32m7272[m bytes
+ .../src/main/resources/catalog/SP500344/vang.webp  |  Bin [31m0[m -> [32m7546[m bytes
+ .../resources/catalog/SP500344/xanh-duong.webp     |  Bin [31m0[m -> [32m6786[m bytes
+ .../main/resources/catalog/SP500344/xanh-la.webp   |  Bin [31m0[m -> [32m7010[m bytes
+ .../src/main/resources/catalog/SP500345/kem.webp   |  Bin [31m0[m -> [32m12488[m bytes
+ .../main/resources/catalog/SP500345/xanh-mint.webp |  Bin [31m0[m -> [32m12534[m bytes
+ .../src/main/resources/catalog/SP500346/den.webp   |  Bin [31m0[m -> [32m9396[m bytes
+ .../src/main/resources/catalog/SP500346/xam.webp   |  Bin [31m0[m -> [32m10162[m bytes
+ .../main/resources/catalog/SP500360/titan-den.webp |  Bin [31m0[m -> [32m13354[m bytes
+ .../resources/catalog/SP500360/titan-trang.webp    |  Bin [31m0[m -> [32m15008[m bytes
+ .../resources/catalog/SP500360/titan-tu-nhien.webp |  Bin [31m0[m -> [32m9802[m bytes
+ .../resources/catalog/SP500360/titan-xanh.webp     |  Bin [31m0[m -> [32m13320[m bytes
+ .../src/main/resources/catalog/SP500361/xam.webp   |  Bin [31m0[m -> [32m7204[m bytes
+ .../resources/catalog/SP500361/xanh-duong.webp     |  Bin [31m0[m -> [32m7480[m bytes
+ .../main/resources/catalog/SP500361/xanh-la.webp   |  Bin [31m0[m -> [32m7732[m bytes
+ .../src/main/resources/catalog/SP500362/den.webp   |  Bin [31m0[m -> [32m25512[m bytes
+ .../src/main/resources/catalog/SP500362/xam.webp   |  Bin [31m0[m -> [32m11076[m bytes
+ .../src/main/resources/catalog/SP500362/xanh.webp  |  Bin [31m0[m -> [32m11038[m bytes
+ .../src/main/resources/catalog/SP500375/den.webp   |  Bin [31m0[m -> [32m9462[m bytes
+ .../src/main/resources/catalog/SP500375/trang.webp |  Bin [31m0[m -> [32m9432[m bytes
+ .../main/resources/catalog/SP500376/xam-bac.webp   |  Bin [31m0[m -> [32m7530[m bytes
+ .../resources/catalog/SP500376/xanh-da-troi.webp   |  Bin [31m0[m -> [32m8118[m bytes
+ .../main/resources/catalog/SP500376/xanh-la.webp   |  Bin [31m0[m -> [32m16550[m bytes
+ .../main/resources/catalog/SP500376/xanh-navy.webp |  Bin [31m0[m -> [32m17034[m bytes
+ .../src/main/resources/catalog/SP500377/den.webp   |  Bin [31m0[m -> [32m16472[m bytes
+ .../src/main/resources/catalog/SP500377/trang.webp |  Bin [31m0[m -> [32m17344[m bytes
+ .../src/main/resources/catalog/SP500390/den.webp   |  Bin [31m0[m -> [32m7294[m bytes
+ .../src/main/resources/catalog/SP500390/hong.webp  |  Bin [31m0[m -> [32m9838[m bytes
+ .../src/main/resources/catalog/SP500390/trang.webp |  Bin [31m0[m -> [32m8074[m bytes
+ .../resources/catalog/SP500390/xanh-luu-ly.webp    |  Bin [31m0[m -> [32m10544[m bytes
+ .../resources/catalog/SP500390/xanh-mong-ket.webp  |  Bin [31m0[m -> [32m10478[m bytes
+ .../main/resources/catalog/SP500391/xam-bac.webp   |  Bin [31m0[m -> [32m7530[m bytes
+ .../resources/catalog/SP500391/xanh-da-troi.webp   |  Bin [31m0[m -> [32m8118[m bytes
+ .../main/resources/catalog/SP500391/xanh-la.webp   |  Bin [31m0[m -> [32m7916[m bytes
+ .../main/resources/catalog/SP500391/xanh-navy.webp |  Bin [31m0[m -> [32m17034[m bytes
+ .../src/main/resources/catalog/SP500392/bac.webp   |  Bin [31m0[m -> [32m26966[m bytes
+ .../src/main/resources/catalog/SP500392/den.webp   |  Bin [31m0[m -> [32m24816[m bytes
+ .../src/main/resources/catalog/SP500393/tim.webp   |  Bin [31m0[m -> [32m22872[m bytes
+ .../src/main/resources/catalog/SP500393/xam.webp   |  Bin [31m0[m -> [32m34510[m bytes
+ .../src/main/resources/catalog/SP500404/den.webp   |  Bin [31m0[m -> [32m7730[m bytes
+ .../src/main/resources/catalog/SP500404/hong.webp  |  Bin [31m0[m -> [32m9794[m bytes
+ .../src/main/resources/catalog/SP500404/trang.webp |  Bin [31m0[m -> [32m8018[m bytes
+ .../resources/catalog/SP500404/xanh-luu-ly.webp    |  Bin [31m0[m -> [32m10288[m bytes
+ .../resources/catalog/SP500404/xanh-mong-ket.webp  |  Bin [31m0[m -> [32m11730[m bytes
+ .../src/main/resources/catalog/SP500405/den.webp   |  Bin [31m0[m -> [32m15430[m bytes
+ .../main/resources/catalog/SP500405/trang-bac.webp |  Bin [31m0[m -> [32m7274[m bytes
+ .../src/main/resources/catalog/SP500405/xam.webp   |  Bin [31m0[m -> [32m17104[m bytes
+ .../resources/catalog/SP500405/xanh-duong.webp     |  Bin [31m0[m -> [32m16592[m bytes
+ .../main/resources/catalog/SP500417/titan-den.webp |  Bin [31m0[m -> [32m10676[m bytes
+ .../resources/catalog/SP500417/titan-sa-mac.webp   |  Bin [31m0[m -> [32m12390[m bytes
+ .../resources/catalog/SP500417/titan-trang.webp    |  Bin [31m0[m -> [32m11192[m bytes
+ .../resources/catalog/SP500417/titan-tu-nhien.webp |  Bin [31m0[m -> [32m11206[m bytes
+ .../src/main/resources/catalog/SP500421/bac.webp   |  Bin [31m0[m -> [32m23244[m bytes
+ .../src/main/resources/catalog/SP500421/cam.webp   |  Bin [31m0[m -> [32m21678[m bytes
+ .../main/resources/catalog/SP500430/titan-den.webp |  Bin [31m0[m -> [32m10676[m bytes
+ .../resources/catalog/SP500430/titan-sa-mac.webp   |  Bin [31m0[m -> [32m12390[m bytes
+ .../resources/catalog/SP500430/titan-trang.webp    |  Bin [31m0[m -> [32m11192[m bytes
+ .../resources/catalog/SP500430/titan-tu-nhien.webp |  Bin [31m0[m -> [32m11206[m bytes
+ .../src/main/resources/catalog/SP500435/den.webp   |  Bin [31m0[m -> [32m24054[m bytes
+ .../src/main/resources/catalog/SP500435/vang.webp  |  Bin [31m0[m -> [32m19612[m bytes
+ .../src/main/resources/catalog/SP500445/den.webp   |  Bin [31m0[m -> [32m33300[m bytes
+ .../src/main/resources/catalog/SP500445/xanh.webp  |  Bin [31m0[m -> [32m21092[m bytes
+ .../src/main/resources/catalog/SP500448/den.webp   |  Bin [31m0[m -> [32m13758[m bytes
+ .../src/main/resources/catalog/SP500448/kem.webp   |  Bin [31m0[m -> [32m13282[m bytes
+ .../resources/catalog/SP500448/xanh-duong.webp     |  Bin [31m0[m -> [32m13682[m bytes
+ .../src/main/resources/catalog/SP500455/den.webp   |  Bin [31m0[m -> [32m7230[m bytes
+ .../src/main/resources/catalog/SP500455/hong.webp  |  Bin [31m0[m -> [32m11532[m bytes
+ .../src/main/resources/catalog/SP500455/trang.webp |  Bin [31m0[m -> [32m5796[m bytes
+ .../src/main/resources/catalog/SP500455/xam.webp   |  Bin [31m0[m -> [32m12484[m bytes
+ .../resources/catalog/SP500455/xanh-duong.webp     |  Bin [31m0[m -> [32m6546[m bytes
+ .../src/main/resources/catalog/SP500468/den.webp   |  Bin [31m0[m -> [32m8764[m bytes
+ .../src/main/resources/catalog/SP500468/do.webp    |  Bin [31m0[m -> [32m10688[m bytes
+ .../src/main/resources/catalog/SP500468/tim.webp   |  Bin [31m0[m -> [32m7258[m bytes
+ .../src/main/resources/catalog/SP500468/trang.webp |  Bin [31m0[m -> [32m6102[m bytes
+ .../src/main/resources/catalog/SP500468/vang.webp  |  Bin [31m0[m -> [32m7410[m bytes
+ .../main/resources/catalog/SP500468/xanh-la.webp   |  Bin [31m0[m -> [32m9394[m bytes
+ .../src/main/resources/catalog/SP500470/xam.webp   |  Bin [31m0[m -> [32m13824[m bytes
+ .../resources/catalog/SP500470/xanh-trang.webp     |  Bin [31m0[m -> [32m31842[m bytes
+ .../src/main/resources/catalog/SP500470/xanh.webp  |  Bin [31m0[m -> [32m21708[m bytes
+ .../src/main/resources/catalog/SP500472/den.webp   |  Bin [31m0[m -> [32m14396[m bytes
+ .../main/resources/catalog/SP500472/xam-xanh.webp  |  Bin [31m0[m -> [32m10370[m bytes
+ .../src/main/resources/catalog/SP500472/xanh.webp  |  Bin [31m0[m -> [32m18032[m bytes
+ .../src/main/resources/catalog/SP500476/kem.webp   |  Bin [31m0[m -> [32m13728[m bytes
+ .../src/main/resources/catalog/SP500476/tim.webp   |  Bin [31m0[m -> [32m13618[m bytes
+ .../src/main/resources/catalog/SP500476/xam.webp   |  Bin [31m0[m -> [32m13024[m bytes
+ .../main/resources/catalog/SP500476/xanh-la.webp   |  Bin [31m0[m -> [32m13634[m bytes
+ .../src/main/resources/catalog/SP500481/den.webp   |  Bin [31m0[m -> [32m8574[m bytes
+ .../src/main/resources/catalog/SP500481/vang.webp  |  Bin [31m0[m -> [32m13034[m bytes
+ .../src/main/resources/catalog/SP500481/xam.webp   |  Bin [31m0[m -> [32m12520[m bytes
+ .../resources/catalog/SP500481/xanh-duong.webp     |  Bin [31m0[m -> [32m8396[m bytes
+ .../main/resources/catalog/SP500481/xanh-la.webp   |  Bin [31m0[m -> [32m13272[m bytes
+ .../src/main/resources/catalog/SP500482/vang.webp  |  Bin [31m0[m -> [32m23896[m bytes
+ .../src/main/resources/catalog/SP500482/xam.webp   |  Bin [31m0[m -> [32m23158[m bytes
+ .../resources/catalog/SP500482/xanh-duong.webp     |  Bin [31m0[m -> [32m24416[m bytes
+ .../main/resources/catalog/SP500482/xanh-la.webp   |  Bin [31m0[m -> [32m23652[m bytes
+ .../src/main/resources/catalog/SP500486/den.webp   |  Bin [31m0[m -> [32m23824[m bytes
+ .../src/main/resources/catalog/SP500486/trang.webp |  Bin [31m0[m -> [32m32124[m bytes
+ .../resources/catalog/SP500486/xanh-duong.webp     |  Bin [31m0[m -> [32m25068[m bytes
+ .../src/main/resources/catalog/SP500488/den.webp   |  Bin [31m0[m -> [32m21230[m bytes
+ .../src/main/resources/catalog/SP500488/xanh.webp  |  Bin [31m0[m -> [32m21818[m bytes
+ .../src/main/resources/catalog/SP500494/den.webp   |  Bin [31m0[m -> [32m19808[m bytes
+ .../src/main/resources/catalog/SP500494/vang.webp  |  Bin [31m0[m -> [32m21746[m bytes
+ .../main/resources/catalog/SP500494/xanh-la.webp   |  Bin [31m0[m -> [32m12050[m bytes
+ .../src/main/resources/catalog/SP500497/bac.webp   |  Bin [31m0[m -> [32m30948[m bytes
+ .../src/main/resources/catalog/SP500497/den.webp   |  Bin [31m0[m -> [32m20428[m bytes
+ .../src/main/resources/catalog/SP500498/den.webp   |  Bin [31m0[m -> [32m19860[m bytes
+ .../src/main/resources/catalog/SP500498/tim.webp   |  Bin [31m0[m -> [32m21044[m bytes
+ .../src/main/resources/catalog/SP500498/trang.webp |  Bin [31m0[m -> [32m19686[m bytes
+ .../src/main/resources/catalog/nguon-anh.csv       |  250 [32m+[m
+ .../schema/SchemaCompatibilityCheckerTest.java     |  132 [32m+[m
+ ...SchemaCompatibilityVerifierIntegrationTest.java |   40 [32m+[m
+ .../phonenest/enums/AuditEnumContractTest.java     |   26 [32m+[m[31m-[m
+ .../ApprovalConcurrencyIntegrationTest.java        |  400 [32m+[m
+ .../service/ApprovalWorkflowIntegrationTest.java   |  505 [32m++[m
+ .../phonenest/service/ChatCartServiceTest.java     |  158 [32m+[m
+ .../service/ChatbotPriceIntegrationTest.java       |  133 [32m+[m
+ .../service/CheckoutIdempotencyServiceTest.java    |   26 [32m+[m
+ .../service/DiscontinuedProductSafetyTest.java     |  443 [32m++[m
+ .../service/DonHangKhoConcurrencyTest.java         |    8 [32m+[m[31m-[m
+ .../service/HanhViNguoiDungServiceTest.java        |   12 [32m+[m[31m-[m
+ .../service/KhoIntegrityIntegrationTest.java       |  185 [32m+[m
+ .../phonenest/service/KhuyenMaiGioHangFixTest.java |  299 [32m+[m
+ .../phonenest/service/KhuyenMaiKieuGiamTest.java   |  114 [32m+[m
+ .../MomoIpnUnconfiguredIntegrationTest.java        |   36 [32m+[m
+ .../phonenest/service/MomoPaymentServiceTest.java  |   14 [32m+[m[31m-[m
+ .../service/OrderTotalIntegrationTest.java         |  143 [32m+[m
+ .../PaymentReturnConcurrencyIntegrationTest.java   |  319 [32m+[m
+ .../service/PheDuyetBanHangPolicyTest.java         |  109 [32m+[m
+ .../phonenest/service/PheDuyetTachQuyenTest.java   |  123 [32m+[m
+ .../phonenest/service/PhiVanChuyenServiceTest.java |  105 [32m+[m
+ .../PostManualTestSafetyIntegrationTest.java       |   26 [32m+[m[31m-[m
+ .../service/ProductLostUpdateIntegrationTest.java  |  169 [32m+[m
+ .../PublicPriceExposureIntegrationTest.java        |  212 [32m+[m
+ .../RepresentativeBusinessIntegrationTest.java     |   39 [32m+[m[31m-[m
+ .../service/SalesApprovalIntegrationTest.java      |  572 [32m++[m
+ .../service/SemanticSearchServiceTest.java         |    2 [32m+[m
+ .../service/UploadOrphanAuditIntegrationTest.java  |   74 [32m+[m
+ .../service/UploadOrphanAuditServiceTest.java      |   58 [32m+[m
+ .../UserBehaviorTrackingRealIntegrationTest.java   |   51 [32m+[m[31m-[m
+ .../VoucherConcurrencyAndUsageLimitTest.java       |    6 [32m+[m[31m-[m
+ .../phonenest/service/ai/ChatPriceGuardTest.java   |   41 [32m+[m
+ .../nhom10/phonenest/support/ItDatabaseGuard.java  |   58 [32m+[m
+ .../phonenest/support/ItDatabaseGuardTest.java     |   32 [32m+[m
+ .../java/nhom10/phonenest/support/ItHttpBase.java  |  127 [32m+[m
+ .../nhom10/phonenest/support/TestShipping.java     |   22 [32m+[m
+ .../nhom10/phonenest/support/TestVariants.java     |   27 [32m+[m
+ .../src/test/resources/application-test.properties |   18 [32m+[m
+ CLAUDE.md                                          |   67 [32m+[m
+ DB/README.md                                       |   32 [32m+[m[31m-[m
+ DB/admin/create_restricted_accounts_DRAFT.sql      |   59 [32m+[m
+ DB/admin/setup_test_accounts_on_clone.sh           |   41 [32m+[m
+ DB/migrations/12_streamline_products_75.sql        |  233 [32m+[m
+ .../12_streamline_products_75_rollback.sql         |  134 [32m+[m
+ DB/migrations/13_normalize_product_specs_draft.sql |  231 [32m+[m
+ .../13_normalize_product_specs_draft_rollback.sql  |  143 [32m+[m
+ .../13b_propose_vivo_y100_pricing_draft.sql        |   14 [32m+[m
+ ...3b_propose_vivo_y100_pricing_draft_rollback.sql |   14 [32m+[m
+ DB/migrations/13b_propose_vivo_y100_specs_only.sql |  151 [32m+[m
+ .../13b_propose_vivo_y100_specs_only_rollback.sql  |   85 [32m+[m
+ .../14_propose_flagship_pricing_draft.sql          |   14 [32m+[m
+ .../14_propose_flagship_pricing_draft_rollback.sql |   14 [32m+[m
+ .../15_16_restore_approval_from_backup.sql         |  185 [32m+[m
+ DB/migrations/15_add_sales_approval_status.sql     |  289 [32m+[m
+ .../15_add_sales_approval_status_rollback.sql      |  145 [32m+[m
+ .../16_add_approval_verification_data.sql          |  207 [32m+[m
+ .../16_add_approval_verification_data_rollback.sql |  102 [32m+[m
+ .../{12_after_sales.sql => 17_after_sales.sql}     |    0
+ DB/migrations/17_after_sales_rollback.sql          |    5 [32m+[m
+ ...ate_time.sql => 18_after_sales_update_time.sql} |    2 [32m+[m[31m-[m
+ .../18_after_sales_update_time_rollback.sql        |    5 [32m+[m
+ DB/migrations/19_new_customer_voucher.sql          |   18 [32m+[m
+ DB/migrations/19_new_customer_voucher_rollback.sql |    9 [32m+[m
+ DB/migrations/20_return_refund_restock_admin.sql   |   12 [32m+[m
+ .../20_return_refund_restock_admin_rollback.sql    |   10 [32m+[m
+ DB/migrations/21_chat_history_vector_store.sql     |   55 [32m+[m
+ .../21_chat_history_vector_store_rollback.sql      |    8 [32m+[m
+ .../22_shipping_zone_eta_notification_link.sql     |  143 [32m+[m
+ ...hipping_zone_eta_notification_link_rollback.sql |   40 [32m+[m
+ DB/migrations/23_voucher_discount_type.sql         |   80 [32m+[m
+ .../23_voucher_discount_type_rollback.sql          |   28 [32m+[m
+ DB/phonenest_full.sql                              | 8410 [32m++++++++++++++[m[31m------[m
+ DB/schema/01_schema.sql                            |    6 [32m+[m
+ DB/seed/02_data_75_clean.sql                       | 3926 [32m+++++++++[m
+ DB/seed/05_safe_restore_data.sql                   |  117 [32m+[m
+ DB/tests/create_it_clone.sh                        |   34 [32m+[m
+ DB/tests/prepare_e2e_clone.sh                      |   21 [32m+[m
+ DB/tests/rehearse_upgrade_main_snapshot.sh         |  107 [32m+[m
+ DB/tests/test_db_privileges_and_startup.sh         |   99 [32m+[m
+ DB/tests/test_migrations_12_14.sh                  |  156 [32m+[m
+ DB/tests/test_migrations_15_16.sh                  |  164 [32m+[m
+ FE/e2e/README.md                                   |   14 [32m+[m
+ FE/e2e/approval.e2e.js                             |  448 [32m++[m
+ FE/e2e/regression.e2e.js                           |  232 [32m+[m
+ FE/e2e/start-backend-on-clone.sh                   |   14 [32m+[m
+ FE/index.html                                      |   24 [32m+[m[31m-[m
+ FE/package-lock.json                               |   50 [32m+[m[31m-[m
+ FE/package.json                                    |    1 [32m+[m
+ FE/playwright.config.js                            |   25 [32m+[m
+ FE/public/videos/SP500481.jpg                      |  Bin [31m0[m -> [32m19935[m bytes
+ FE/public/videos/SP500481.mp4                      |  Bin [31m0[m -> [32m291551[m bytes
+ FE/public/videos/SP500488.jpg                      |  Bin [31m0[m -> [32m36691[m bytes
+ FE/public/videos/SP500488.mp4                      |  Bin [31m0[m -> [32m153532[m bytes
+ FE/public/videos/SP500497.jpg                      |  Bin [31m0[m -> [32m35622[m bytes
+ FE/public/videos/SP500497.mp4                      |  Bin [31m0[m -> [32m134309[m bytes
+ FE/public/videos/SP500498.jpg                      |  Bin [31m0[m -> [32m38714[m bytes
+ FE/public/videos/SP500498.mp4                      |  Bin [31m0[m -> [32m231907[m bytes
+ FE/scripts/tao-video-hero.sh                       |   55 [32m+[m
+ FE/src/App.jsx                                     |   21 [32m+[m[31m-[m
+ FE/src/assets/logo.svg                             |    2 [32m+[m[31m-[m
+ FE/src/assets/logoPaths.js                         |   14 [32m+[m
+ FE/src/components/AccountMenu.jsx                  |   10 [32m+[m[31m-[m
+ FE/src/components/AdminPagination.jsx              |   35 [32m+[m
+ FE/src/components/ChatWidget.jsx                   |  145 [32m+[m[31m-[m
+ FE/src/components/HeroStage.jsx                    |  156 [32m+[m
+ FE/src/components/Icon.jsx                         |    8 [32m+[m
+ FE/src/components/Logo.jsx                         |   30 [32m+[m
+ FE/src/components/ProductCard.jsx                  |   49 [32m+[m[31m-[m
+ FE/src/components/QuestionSection.jsx              |    4 [32m+[m[31m-[m
+ FE/src/components/SearchBox.jsx                    |    4 [32m+[m[31m-[m
+ FE/src/components/ThemeToggle.jsx                  |   22 [32m+[m
+ FE/src/components/VariantColorRow.jsx              |    5 [32m+[m[31m-[m
+ FE/src/components/VoucherCard.jsx                  |    7 [32m+[m[31m-[m
+ FE/src/config/constants.js                         |    3 [32m+[m
+ FE/src/config/heroMedia.js                         |   13 [32m+[m
+ FE/src/context/CartContext.jsx                     |   78 [32m+[m[31m-[m
+ FE/src/context/ThemeContext.jsx                    |   34 [32m+[m
+ FE/src/hooks/usePageTransition.js                  |   19 [32m+[m
+ FE/src/hooks/useScrollReveal.js                    |   56 [32m+[m
+ FE/src/hooks/useScrollToHash.js                    |   25 [32m+[m
+ FE/src/hooks/useTheme.js                           |    6 [32m+[m
+ FE/src/layouts/AdminLayout.jsx                     |   81 [32m+[m[31m-[m
+ FE/src/layouts/MainLayout.jsx                      |  198 [32m+[m[31m-[m
+ FE/src/pages/AddressesPage.jsx                     |   79 [32m+[m[31m-[m
+ FE/src/pages/CartPage.jsx                          |  255 [32m+[m[31m-[m
+ FE/src/pages/CheckoutPage.jsx                      |  187 [32m+[m[31m-[m
+ FE/src/pages/ComparePage.jsx                       |   19 [32m+[m[31m-[m
+ FE/src/pages/ForgotPasswordPage.jsx                |   10 [32m+[m[31m-[m
+ FE/src/pages/HomePage.jsx                          |  129 [32m+[m[31m-[m
+ FE/src/pages/InvoicePage.jsx                       |    2 [32m+[m
+ FE/src/pages/LoginPage.jsx                         |   34 [31m-[m
+ FE/src/pages/NotificationsPage.jsx                 |   43 [32m+[m[31m-[m
+ FE/src/pages/OrderDetailPage.jsx                   |   94 [32m+[m[31m-[m
+ FE/src/pages/ProductDetailPage.jsx                 |  274 [32m+[m[31m-[m
+ FE/src/pages/ProfilePage.jsx                       |   10 [32m+[m[31m-[m
+ FE/src/pages/RegisterPage.jsx                      |   34 [31m-[m
+ FE/src/pages/ReturnsPage.jsx                       |    6 [32m+[m[31m-[m
+ FE/src/pages/WishlistPage.jsx                      |    8 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminAccountsPage.jsx           |   85 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminAnalyticsPage.jsx          |  114 [32m+[m
+ FE/src/pages/admin/AdminApprovalsPage.jsx          |  442 [32m+[m
+ FE/src/pages/admin/AdminAuditLogsPage.jsx          |   14 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminCategoriesPage.jsx         |   53 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminDashboardPage.jsx          |   14 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminFeedbackPage.jsx           |   80 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminInventoryPage.jsx          |    6 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminOrdersPage.jsx             |   84 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminProductsPage.jsx           |   72 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminPromotionsPage.jsx         |  404 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminReturnsPage.jsx            |   37 [32m+[m[31m-[m
+ FE/src/pages/admin/AdminShippingPage.jsx           |   96 [32m+[m[31m-[m
+ FE/src/routes/AppRoutes.jsx                        |    4 [32m+[m
+ FE/src/service/adminService.js                     |   21 [32m+[m[31m-[m
+ FE/src/service/chatService.js                      |   41 [32m+[m[31m-[m
+ FE/src/service/orderService.js                     |   15 [32m+[m[31m-[m
+ FE/src/service/productService.js                   |    2 [32m+[m
+ FE/src/service/trackingService.js                  |    1 [32m+[m
+ FE/src/styles/main.css                             | 2543 [32m+++[m[31m---[m
+ FE/src/utils/approvalUi.js                         |   52 [32m+[m
+ FE/src/utils/catalogInsights.js                    |   82 [32m+[m
+ FE/src/utils/chart.js                              |   18 [32m+[m[31m-[m
+ FE/src/utils/colorSwatch.js                        |   27 [32m+[m
+ FE/src/utils/discontinuedProductRules.js           |  125 [32m+[m
+ FE/src/utils/format.js                             |   13 [32m+[m
+ FE/src/utils/guestCart.js                          |   28 [32m+[m
+ FE/src/utils/notificationLink.js                   |   16 [32m+[m
+ FE/src/utils/shipping.js                           |   27 [32m+[m
+ FE/src/utils/specs.js                              |    3 [32m+[m[31m-[m
+ FE/src/utils/variantForm.js                        |    6 [32m+[m[31m-[m
+ FE/src/utils/voucherAdmin.js                       |   78 [32m+[m
+ FE/tests/approvalUi.test.js                        |   82 [32m+[m
+ FE/tests/catalogInsights.test.js                   |   38 [32m+[m
+ FE/tests/discontinuedProducts.test.js              |  417 [32m+[m
+ FE/tests/shippingNotification.test.js              |   26 [32m+[m
+ FE/tests/voucherAdmin.test.js                      |   43 [32m+[m
+ FE/vite.config.js                                  |    7 [32m+[m
+ HUONG_DAN_HAU_MAI_NHOM10.md                        |   10 [32m+[m[31m-[m
+ docs/CHINH_SACH_UPLOAD_MO_COI.md                   |   34 [32m+[m
+ docs/DANH_GIA_TRIEN_KHAI_M12_M16.md                |  149 [32m+[m
+ docs/HUONG_DAN_CAU_HINH_LOCAL.md                   |  204 [32m+[m
+ docs/KE_HOACH_TAI_KHOAN_DB_VA_SECRET.md            |   54 [32m+[m
+ 552 files changed, 30685 insertions(+), 4691 deletions(-)

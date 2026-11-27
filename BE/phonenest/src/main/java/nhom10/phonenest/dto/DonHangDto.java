@@ -40,6 +40,11 @@ public record DonHangDto(
         LocalDate ngayGiaoDuKienTu,
         LocalDate ngayGiaoDuKienDen) {
 
+    @com.fasterxml.jackson.annotation.JsonProperty("hanDoiTra")
+    public LocalDateTime hanDoiTra() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, false); }
+    @com.fasterxml.jackson.annotation.JsonProperty("hanBaoHanh")
+    public LocalDateTime hanBaoHanh() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, true); }
+
     /** Constructor trước M22 (không có chi tiết phí / ngày giao dự kiến), giữ cho test và caller cũ. */
     public DonHangDto(
             String maDonHang, String maKh, String maKm, String maKmVanChuyen,

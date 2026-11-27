@@ -282,8 +282,34 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
     }
 
     private int yeuCauDoiTra(String don) throws Exception {
-        return goi(post("/api/customer/returns"), customer, Map.of("maDonHang", don, "lyDo", "Máy lỗi màn hình khi nhận hàng"))
+        return goi(post("/api/customer/returns"), customer, Map.of("maDonHang", don, "maPhienBan", PB, "loaiYeuCau", "TRA_HANG_HOAN_TIEN", "soLuong", 1, "lyDo", "Khách hàng đổi ý sau khi nhận hàng", "chiTiet", Map.of("reason", "Đổi ý", "condition", "Còn nguyên seal", "sealConfirmed", "true", "refund", "Chuyển khoản", "bank", "Vietcombank", "account", "12345678", "holder", "Khach hang test")))
                 .getResponse().getStatus();
+    }
+
+    @Test
+    void directApiBlocksUnconfirmedOrderAndAcceptsStandaloneComplaint() throws Exception {
+        String don = datDon("COD", null);
+        for (String tt : List.of("DA_XAC_NHAN", "DANG_CHUAN_BI", "DANG_GIAO")) {
+            assertThat(goi(put("/api/admin/orders/" + don + "/status").param("trangThai", tt), admin, null).getResponse().getStatus()).isEqualTo(200);
+        }
+        assertThat(goi(put("/api/admin/orders/" + don + "/mark-delivered"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        assertThat(yeuCauDoiTra(don)).isEqualTo(400);
+        // Upload một ảnh PNG hợp lệ cho yêu cầu bảo hành; nếu vẫn 400 vì trạng thái, server đã chặn độc lập với UI.
+        byte[] png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD6cAAAAASUVORK5CYII=");
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "test.png", "image/png", png);
+        var upload = goi(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/customer/after-sales/images").file(file), customer, null);
+        assertThat(upload.getResponse().getStatus()).isEqualTo(200);
+        String proof = json(upload).get("url").asText();
+        var warranty = goi(post("/api/customer/after-sales"), customer, Map.of("maDonHang",don,"maPhienBan",PB,"loai","BAO_HANH","lyDo","Máy nhận được đang gặp lỗi màn hình", "anhMinhChung",List.of(proof), "chiTiet",Map.of("serialKind","SERIAL","serial","TEST123","appearance","Bình thường","fault","Màn hình / cảm ứng")));
+        assertThat(warranty.getResponse().getStatus()).isEqualTo(400);
+        assertThat(json(warranty).get("message").asText()).contains("xác nhận đã nhận hàng");
+        var complaint = goi(post("/api/customer/after-sales"),customer,Map.of("loai","KHIEU_NAI","lyDo","Góp ý về trải nghiệm tìm kiếm sản phẩm", "chiTiet",Map.of("topic","Khác")));
+        assertThat(complaint.getResponse().getStatus()).isIn(200,201);
+        String requestId = json(complaint).get("maYeuCau").asText();
+        assertThat(json(complaint).get("maDonHang").isNull()).isTrue();
+        assertThat(goi(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/customer/after-sales/"+requestId),customer,null).getResponse().getStatus()).isEqualTo(200);
+        assertThat(goi(put("/api/customer/orders/" + don + "/confirm-received"), customer, null).getResponse().getStatus()).isEqualTo(200);
+        assertThat(yeuCauDoiTra(don)).isIn(200,201);
     }
 
     @Test
@@ -305,6 +331,14 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         assertThat(yeuCauDoiTra(don)).isIn(200, 201);
         String yc = jdbc.queryForObject("SELECT maYeuCau FROM yeucaudoitra WHERE maDonHang=?", String.class, don);
         assertThat(goi(put("/api/admin/returns/" + yc + "/status").param("trangThai", "DA_DUYET"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        assertThat(goi(put("/api/admin/returns/" + yc + "/status").param("trangThai", "DANG_XU_LY"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/restock"), admin, null).getResponse().getStatus()).isIn(400,409);
+        assertThat(goi(post("/api/admin/after-sales-workflow/return/" + yc), admin, Map.of("action", "RECEIVE_CHECK", "note", "Đã nhận đủ và kiểm tra máy" )).getResponse().getStatus()).isEqualTo(200);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/restock"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        BigDecimal eligible = jdbc.queryForObject("SELECT tamTinh - IFNULL(giamGia,0) FROM donhang WHERE maDonHang=?", BigDecimal.class, don);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible.add(BigDecimal.ONE))).getResponse().getStatus()).isIn(400,409);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible.subtract(BigDecimal.ONE))).getResponse().getStatus()).isIn(400,409);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible)).getResponse().getStatus()).isEqualTo(200);
         List<Integer> kq = song(
                 () -> goi(put("/api/admin/returns/" + yc + "/status").param("trangThai", "HOAN_TAT"), admin, null).getResponse().getStatus(),
                 () -> goi(put("/api/admin/returns/" + yc + "/status").param("trangThai", "HOAN_TAT"), admin, null).getResponse().getStatus(),

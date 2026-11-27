@@ -37,9 +37,13 @@ DB/
 
 ## 2. Cách khởi tạo Database
 
+### Migration 24 — Hậu mãi V2
+
+Nếu đã cài database trước đó, sao lưu và chạy `DB/migrations/24_after_sales_optional_order.sql` trên database đang sử dụng trước khi chạy backend V2. Không xóa hoặc import đè database. Nếu cài mới, import `phonenest_full.sql` rồi chạy M24. M24 thêm `YeuCauHauMai.maKh`, điền chủ sở hữu từ đơn cũ, cho phép khiếu nại không gắn đơn và giữ nguyên dữ liệu cũ. Không rollback về cấu trúc cũ khi đã có khiếu nại độc lập.
+
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
+File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là file khởi tạo chính cho máy mới (sau đó chạy M24): 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
 
 | Dữ liệu | Số lượng |
 |---|---|

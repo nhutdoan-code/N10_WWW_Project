@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import useFetch from '../hooks/useFetch';
@@ -7,246 +7,304 @@ import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatDay, formatPrice } from '../utils/format';
-import { ORDER_STATUS } from '../config/constants';
-import { getOrderActions } from '../utils/orderActions';
+import { eligible, remainingLabel, warrantyEnd, returnEnd, deadlineTone } from '../utils/warrantyPolicy';
+import { TYPES, REASONS, allowedConditions, refundOptions, FAULTS, descriptionHint, APPEARANCES, TOPICS, MAX_IMAGES, imageError, proofRequired, validateForm, deviceIdentifiers, MISMATCHES, BANKS, accountDigits, normalizeHolder, preferredCondition, refundEstimate, maskAccount, evidenceHint, clearFieldErrors, validationAfterChange, visibleValidationErrors, descriptionMin, selectedFaults, toggleFault, warrantyAppearanceWarning } from '../utils/afterSalesForm';
 
-const LOAI = {
-  TRA_HANG_HOAN_TIEN: 'Trả hàng / đề nghị hoàn tiền',
-  DOI_HANG: 'Đổi sản phẩm',
-  BAO_HANH: 'Bảo hành',
-  KHIEU_NAI: 'Khiếu nại',
+import { downloadReceipt, printReceipt } from '../utils/afterSalesReceipt';
+
+const EMPTY = { maDonHang: '', maPhienBan: '', soLuong: 1, lyDo: '', reason: '', condition: '', fault: '', sealConfirmed: '', mismatch: '', refund: '', bank: '', account: '', holder: '', targetId: '', serial: '', serialKind: 'IMEI', appearance: '', topic: '' };
+const STATUS = { CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DANG_XU_LY: 'Đang xử lý', DA_DUYET: 'Đã duyệt', TU_CHOI: 'Từ chối', HOAN_TAT: 'Hoàn tất' };
+const HINTS = { TRA_HANG_HOAN_TIEN: 'Ví dụ: máy không lên nguồn khi mở hộp, đã thử sạc...', DOI_HANG: 'Nêu lý do đổi và phiên bản bạn mong muốn...', KHIEU_NAI: 'Nêu sự việc, thời điểm và cách bạn mong muốn được hỗ trợ...' };
+const policyLines = (type, p) => {
+  const days = p?.returnDays ? `trong ${p.returnDays} ngày` : 'trong thời hạn quy định';
+  const months = p?.warrantyMonths ? `${p.warrantyMonths} tháng` : 'theo thời hạn quy định';
+  const returns = [`Đổi trả ${days} kể từ ngày bạn xác nhận đã nhận hàng.`, 'Cửa hàng kiểm tra máy, phụ kiện và minh chứng trước khi duyệt.'];
+  const warranty = [`Bảo hành ${months} kể từ ngày nhận hàng.`, 'Cửa hàng thẩm định để sửa chữa, thay linh kiện hoặc đổi máy tương đương nếu không thể sửa.'];
+  if (type === 'KHIEU_NAI') return ['Bạn có thể phản ánh chung hoặc liên quan đến một đơn hàng.', 'Cửa hàng sẽ tiếp nhận và phản hồi sau khi xác minh.'];
+  if (type === 'BAO_HANH') return warranty;
+  if (type === 'TRA_HANG_HOAN_TIEN') return [...returns, 'Dự kiến hoàn tiền trong 3–7 ngày làm việc sau khi nhận và kiểm tra máy.'];
+  if (type === 'DOI_HANG') return [...returns, 'Giá và tồn kho phiên bản đổi được kiểm tra lại khi xử lý.'];
+  return [returns[0], warranty[0], returns[1]];
 };
 
-const FORM_RONG = {
-  maDonHang: '', maPhienBan: '', soLuong: 1, lyDo: '',
-};
-
+function Field({ name, label, required = true, error, children }) {
+  return <div className="field as-field"><label htmlFor={`as-${name}`}>{label}{required && <span className="as-required"> *</span>}</label>{children}{error && <small className="as-error" id={`as-${name}-error`} role="alert">{error}</small>}</div>;
+}
+function Preview({ file, remove }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => { const objectUrl = URL.createObjectURL(file); setUrl(objectUrl); return () => URL.revokeObjectURL(objectUrl); }, [file]);
+  return <div className="as-thumb">{url && <img src={url} alt={`Ảnh ${file.name}`} />}<small>{file.name}</small><button className="btn" type="button" aria-label={`Xóa ${file.name}`} onClick={remove}>Xóa ảnh</button></div>;
+}
+const requestType = r => r.loai || r.loaiYeuCau || 'TRA_HANG_HOAN_TIEN';
+const requestImages = r => r.anhMinhChung || (r.hinhAnhMinhChung ? [r.hinhAnhMinhChung] : []);
 export default function ReturnsPage() {
   const [params] = useSearchParams();
-  const queryLoai = params.get('loai');
-  const [loai, setLoai] = useState(LOAI[queryLoai] ? queryLoai : 'TRA_HANG_HOAN_TIEN');
-  const [form, setForm] = useState({ ...FORM_RONG, maDonHang: params.get('maDonHang') || '' });
+  const requestedOrder = params.get('orderId') || params.get('maDonHang') || '';
+  const [loai, setLoai] = useState(TYPES[params.get('loai')] ? params.get('loai') : '');
+  const [form, setForm] = useState({...EMPTY, maDonHang: requestedOrder});
+  const [interaction, setInteraction] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const validationEpoch = useRef(0);
+  const renderEpoch = validationEpoch.current;
+  const [bankQuery, setBankQuery] = useState('');
+  const [bankOpen, setBankOpen] = useState(false);
+  const [catalog, setCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [targetQuery, setTargetQuery] = useState('');
+  const [targetOpen, setTargetOpen] = useState(false);
+  const [catalogRetry, setCatalogRetry] = useState(0);
+  const typeChanging = useRef(false);
+  const [images, setImages] = useState([]);
+  const [imageErrors, setImageErrors] = useState([]);
   const [locLoai, setLocLoai] = useState('');
-  const [dangGui, setDangGui] = useState(false);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
+  const [locStatus, setLocStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [receipt, setReceipt] = useState(null);
+  const [orderPicker, setOrderPicker] = useState(false);
+  const [recent, setRecent] = useState([]);
+  const lock = useRef(false);
+  const formRef = useRef(null);
   const toast = useToast();
-
+  const {data: orders, loading: orderLoading, error: orderError, reload: reloadOrders} = useFetch(orderService.list);
+  const lastOrderRefresh = useRef(0);
   useEffect(() => {
-    if (!imageFile) {
-      setImagePreview('');
-      return undefined;
+    if (!loai || loai === 'KHIEU_NAI') return;
+    function refreshOnReturn() {
+      if (document.visibilityState !== 'visible' || orderLoading || busy) return;
+      const now = Date.now();
+      if (now - lastOrderRefresh.current < 1000) return;
+      lastOrderRefresh.current = now;
+      reloadOrders();
     }
-    const url = URL.createObjectURL(imageFile);
-    setImagePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [imageFile]);
-
-  const chonAnh = (event) => {
-    const file = event.target.files?.[0] || null;
-    event.target.value = '';
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast('Chỉ hỗ trợ JPG, PNG hoặc WEBP', 'error');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Ảnh không được vượt quá 5MB', 'error');
-      return;
-    }
-    setImageFile(file);
-  };
-
-  const { data: orders, error: orderError } = useFetch(orderService.list);
-  const { data: requests, loading, error, reload } = useFetch(async () => {
-    const [doiTra, hauMai] = await Promise.all([
-      customerService.returns(), customerService.afterSales(),
-    ]);
-    return [
-      ...(doiTra || []).map((r) => ({ ...r, loai: r.loaiYeuCau || 'TRA_HANG_HOAN_TIEN' })),
-      ...(hauMai || []),
-    ].sort((a, b) => new Date(b.ngayTao) - new Date(a.ngayTao));
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+  }, [loai, orderLoading, busy, reloadOrders]);
+  const {data: policy} = useFetch(customerService.afterSalesPolicy);
+  const {data: requests, loading, error, reload} = useFetch(async () => {
+    const [returns, after] = await Promise.all([customerService.returns(), customerService.afterSales()]);
+    return [...(returns || []), ...(after || [])];
   });
   useScrollToHash(!loading && requests != null);
-
-  const donHopLe = useMemo(() => (orders || []).filter((o) => {
-    const actions = getOrderActions(o.trangThai);
-    return loai === 'KHIEU_NAI' ? actions.complain : actions.afterDelivery;
-  }), [orders, loai]);
-  const donDangChon = donHopLe.find((o) => o.maDonHang === form.maDonHang);
-  const nhanDon = (don) => {
-    const dsSanPham = don.chiTiet || [];
-    const ten = dsSanPham[0]?.tenMay || 'Không có tên sản phẩm';
-    const them = dsSanPham.length > 1 ? ` + ${dsSanPham.length - 1} sản phẩm khác` : '';
-    return `Đơn ${don.maDonHang} · ${formatDay(don.ngayMua)} · ${formatPrice(don.tongTien)} · ${ten}${them}`;
-  };
-  const sanPhamDangChon = donDangChon?.chiTiet?.find((d) => d.maPhienBan === form.maPhienBan);
-  const canChonSanPham = loai !== 'KHIEU_NAI';
-  const laDoiTra = loai === 'DOI_HANG' || loai === 'TRA_HANG_HOAN_TIEN';
-  const dangLoc = (requests || []).filter((r) => !locLoai || r.loai === locLoai);
-
-  const doiLoai = (value) => {
-    setLoai(value);
-    setForm({ ...FORM_RONG, maDonHang: value === 'KHIEU_NAI' ? form.maDonHang : '' });
-  };
-
-  const guiYeuCau = async (e) => {
-    e.preventDefault();
-    if (dangGui) return;
-    if (!donDangChon || (canChonSanPham && !sanPhamDangChon)) {
-      toast('Vui lòng chọn đơn hàng và sản phẩm hợp lệ', 'error');
-      return;
+  const allOrders = orders || [];
+  const validOrders = allOrders.filter(o => eligible(o, loai));
+  const order = validOrders.find(o => o.maDonHang === form.maDonHang);
+  const product = order?.chiTiet?.find(d => d.maPhienBan === form.maPhienBan);
+  const target = catalog.find(v => v.id === form.targetId && v.stock >= Number(form.soLuong));
+  const targetMatches = catalog.filter(v => v.stock >= Number(form.soLuong) && targetQuery.toLocaleLowerCase('vi').trim().split(/\s+/).every(word => v.label.toLocaleLowerCase('vi').includes(word))).slice(0,20);
+  useEffect(() => {
+    if (loai !== 'DOI_HANG') return;
+    let active = true; setCatalogLoading(true); setCatalogError(''); setCatalog([]);
+    customerService.exchangeOptions().then(data => { if (active) setCatalog(data || []); }).catch(err => { if (active) setCatalogError(errorMessage(err)); }).finally(() => { if (active) setCatalogLoading(false); });
+    return () => { active = false; };
+  }, [loai, catalogRetry]);
+  useEffect(() => {
+    if (loai && loai !== 'KHIEU_NAI' && !form.maDonHang && validOrders.length === 1) setForm(f => ({...f, maDonHang:validOrders[0].maDonHang}));
+  }, [loai, form.maDonHang, validOrders.length, validOrders[0]?.maDonHang]);
+  useEffect(() => {
+    if (loai && loai !== 'KHIEU_NAI' && order?.chiTiet?.length === 1 && !form.maPhienBan) setForm(f => ({...f, maPhienBan:order.chiTiet[0].maPhienBan}));
+  }, [loai, order?.maDonHang, form.maPhienBan, order?.chiTiet?.length]);
+  useEffect(() => {
+    if (loai === 'TRA_HANG_HOAN_TIEN' && order?.phuongThucTt === 'COD') setForm(f => f.refund === 'Chuyển khoản' ? f : {...f,refund:'Chuyển khoản'});
+  }, [loai, order?.maDonHang, order?.phuongThucTt]);
+  const identifiers = deviceIdentifiers(product, form.serialKind);
+  useEffect(() => {
+    if (loai === 'BAO_HANH' && identifiers.length === 1) setForm(f => f.serial ? f : {...f, serial:identifiers[0]});
+  }, [loai, form.maDonHang, form.maPhienBan, form.serialKind, identifiers.join('|')]);
+  useEffect(() => {
+    if (orders && loai && form.maDonHang && !orders.some(o => o.maDonHang === form.maDonHang && eligible(o, loai))) {
+      setForm(f => ({...f, maDonHang:'', maPhienBan:'', soLuong:1, targetId:'', serial:'', refund:'', bank:'', account:'', holder:'', sealConfirmed:'', ...(loai === 'BAO_HANH' ? {fault:'', appearance:''} : {})}));
+      setInteraction(e => clearFieldErrors(e,'maDonHang')); setSubmitError(''); setBankQuery(''); setBankOpen(false); setTargetQuery(''); setTargetOpen(false);
     }
-    setDangGui(true);
-    try {
-      const uploadedUrl = imageFile ? (await customerService.uploadAfterSaleImage(imageFile)).url : null;
-      const common = {
-        maDonHang: form.maDonHang,
-        lyDo: form.lyDo.trim(),
-        hinhAnhMinhChung: uploadedUrl,
-      };
-      if (laDoiTra) {
-        await customerService.requestReturn({
-          ...common, loaiYeuCau: loai, maPhienBan: form.maPhienBan,
-          soLuong: Number(form.soLuong),
-        });
-      } else {
-        await customerService.createAfterSale({
-          ...common, loai, maPhienBan: loai === 'BAO_HANH' ? form.maPhienBan : null,
-        });
+  }, [orders, loai, form.maDonHang]);
+  const pending = allOrders.filter(o => o.trangThai === 'CHO_KHACH_XAC_NHAN');
+  const isReturn = loai === 'TRA_HANG_HOAN_TIEN' || loai === 'DOI_HANG';
+  const requiredProof = proofRequired(loai, form.reason, form.condition);
+  const estimate = refundEstimate(order, product, form.soLuong);
+  const bankMatches = BANKS.filter(bank => bank.toLowerCase().includes(bankQuery.toLowerCase().trim()));
+  const allRequests = [...new Map([...(requests || []), ...recent.filter(r => !(requests || []).some(x => x.maYeuCau === r.maYeuCau))].map(r => [r.maYeuCau, r])).values()].sort((a,b) => new Date(b.ngayTao) - new Date(a.ngayTao));
+  const filtered = allRequests.filter(r => (!locLoai || requestType(r) === locLoai) && (!locStatus || r.trangThai === locStatus || (locStatus === 'HOAN_TAT' && r.trangThai === 'DA_HOAN_TIEN')));
+  const invalidFields = validateForm(loai, form, order, product, images);
+  if (loai === 'DOI_HANG' && !target) invalidFields.targetId = 'Vui lòng chọn phiên bản còn đủ hàng từ danh mục.';
+  const errors = {...visibleValidationErrors(invalidFields, interaction), submit:submitError};
+  const minDescription = descriptionMin(loai, form.reason);
+  const allowed = allowedConditions(form.reason);
+  function change(name, value) {
+    if (name === 'reason' && value !== form.reason) { resetValidation(); setImageErrors([]); }
+    setForm(f => {
+      const next = {...f, [name]:value};
+      if (name === 'maDonHang' || name === 'maPhienBan') { Object.assign(next,{soLuong:1,serial:'',targetId:'',sealConfirmed:''}); if (loai === 'BAO_HANH') Object.assign(next,{fault:'',appearance:''}); if (name === 'maDonHang') Object.assign(next,{maPhienBan:'',refund:'',bank:'',account:'',holder:''}); }
+      if (name === 'serialKind') next.serial = '';
+      if (name === 'reason') {
+        next.condition = preferredCondition(value) || (allowedConditions(value).includes(f.condition) ? f.condition : '');
+        next.fault = ''; next.mismatch = ''; next.sealConfirmed = '';
       }
-      toast('Đã gửi yêu cầu. Bạn có thể theo dõi tiến độ ngay bên dưới.');
-      setForm({ ...FORM_RONG });
-      setImageFile(null);
-      reload();
-    } catch (err) {
-      toast(errorMessage(err), 'error');
-    } finally {
-      setDangGui(false);
+      if (name === 'soLuong' || next.reason !== 'Đổi ý') next.sealConfirmed = '';
+      if (loai !== 'BAO_HANH' && next.reason !== 'Máy lỗi') next.fault = '';
+      if (next.reason !== 'Không đúng mô tả') next.mismatch = '';
+      if (name === 'refund' && value !== 'Chuyển khoản') Object.assign(next,{bank:'',account:'',holder:''});
+      if (name === 'soLuong' && target && target.stock < Number(value)) next.targetId = '';
+      return next;
+    });
+    if (['maDonHang','maPhienBan'].includes(name) || (name === 'soLuong' && target && target.stock < Number(value))) { setTargetQuery(''); setTargetOpen(false); }
+    if (name === 'maDonHang' || (name === 'refund' && value !== 'Chuyển khoản')) { setBankQuery(''); setBankOpen(false); }
+    // New dependent fields start clean even after a previous submit.
+    setInteraction(e => validationAfterChange(e,name)); setSubmitError('');
+  }
+  function resetValidation() { validationEpoch.current += 1; setInteraction({}); setSubmitError(''); }
+  function changeType(value) {
+    typeChanging.current = true; resetValidation(); setBankQuery(''); setBankOpen(false); setLoai(value); setOrderPicker(false); setReceipt(null); setTargetQuery(''); setTargetOpen(false);
+    setForm(f => ({...EMPTY, maDonHang: eligible(allOrders.find(o => o.maDonHang === f.maDonHang), value) ? f.maDonHang : (!orders || eligible(allOrders.find(o => o.maDonHang === requestedOrder), value)) ? requestedOrder : ''}));
+    setImages([]); setImageErrors([]); setSuccess(''); requestAnimationFrame(() => {typeChanging.current = false;});
+  }
+  async function copyOrder(code) { try { await navigator.clipboard.writeText(code); toast('Đã sao chép mã đơn hàng'); } catch { toast('Không thể sao chép. Mã đơn: ' + code, 'error'); } }
+  function addFiles(files) {
+    const added = [...images]; const issues = [];
+    for (const file of files) {
+      const issue = imageError(file);
+      if (issue) { issues.push(`${file.name}: ${issue}`); continue; }
+      if (added.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) { issues.push(`${file.name}: Ảnh đã được chọn.`); continue; }
+      if (added.length >= MAX_IMAGES) { issues.push(`${file.name}: Chỉ được chọn tối đa ${MAX_IMAGES} ảnh.`); continue; }
+      added.push(file);
     }
-  };
-
-  return (
-    <div className="checkout after-sales-page">
-      <h2>Đổi trả &amp; bảo hành</h2>
-      <p className="muted">Gửi yêu cầu đổi trả, bảo hành, khiếu nại và theo dõi kết quả xử lý ở cùng một nơi.</p>
-
-      <section className="card after-sales-section">
-        <h3>Tạo yêu cầu mới</h3>
-        <p className="muted">Đổi trả được tiếp nhận trong 7 ngày từ khi giao. Bảo hành phụ thuộc thời hạn ghi trên sản phẩm đã mua.</p>
-        {orderError && <p className="error">Không tải được đơn hàng: {orderError}</p>}
-        <form className="form" onSubmit={guiYeuCau}>
-          <label className="field">
-            <span>Loại yêu cầu</span>
-            <select value={loai} onChange={(e) => doiLoai(e.target.value)}>
-              {Object.entries(LOAI).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label className="field">
-            <span>Đơn hàng</span>
-            <select required value={donDangChon ? form.maDonHang : ''}
-              onChange={(e) => setForm({ ...form, maDonHang: e.target.value, maPhienBan: '', soLuong: 1 })}>
-              <option value="">Chọn đơn hàng theo sản phẩm, ngày mua và số tiền</option>
-              {donHopLe.map((o) => <option key={o.maDonHang} value={o.maDonHang}>{nhanDon(o)}</option>)}
-            </select>
-          </label>
-          {donDangChon && (
-            <div className="after-sales-order-preview">
-              <b>Đơn hàng {donDangChon.maDonHang}</b>
-              <div className="muted">Đặt ngày {formatDay(donDangChon.ngayMua)} · {ORDER_STATUS[donDangChon.trangThai] || donDangChon.trangThai}</div>
-              {(donDangChon.chiTiet || []).map((d) => (
-                <div key={d.maPhienBan || d.maSanPham} className="row between">
-                  <span>{d.tenMay} × {d.soLuong}</span>
-                  <span>{formatPrice(Number(d.donGia) * d.soLuong)}</span>
-                </div>
-              ))}
-              <div className="row between"><b>Tổng đơn</b><b>{formatPrice(donDangChon.tongTien)}</b></div>
-              <Link to={`/orders/${donDangChon.maDonHang}`}>Xem chi tiết đơn hàng</Link>
-            </div>
-          )}
-          {canChonSanPham && (
-            <label className="field">
-              <span>Sản phẩm cần {loai === 'BAO_HANH' ? 'bảo hành' : 'đổi trả'}</span>
-              <select required value={form.maPhienBan}
-                onChange={(e) => setForm({ ...form, maPhienBan: e.target.value, soLuong: 1 })}>
-                <option value="">Chọn sản phẩm</option>
-                {(donDangChon?.chiTiet || []).map((d) =>
-                  <option key={d.maPhienBan} value={d.maPhienBan}>{d.tenMay} (đã mua {d.soLuong})</option>
-                )}
-              </select>
-            </label>
-          )}
-          {laDoiTra && sanPhamDangChon && (
-            <label className="field">
-              <span>Số lượng đổi trả</span>
-              <input required type="number" min="1" max={sanPhamDangChon.soLuong} value={form.soLuong}
-                onChange={(e) => setForm({ ...form, soLuong: e.target.value })} />
-            </label>
-          )}
-          <label className="field">
-            <span>Mô tả vấn đề</span>
-            <textarea rows="4" required maxLength="2000" value={form.lyDo} placeholder="Mô tả chi tiết tình trạng sản phẩm hoặc vấn đề gặp phải"
-              onChange={(e) => setForm({ ...form, lyDo: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Ảnh minh chứng (không bắt buộc)</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={chonAnh} disabled={dangGui} />
-            <small className="muted">Tải ảnh từ máy: JPG, PNG hoặc WEBP, tối đa 5MB.</small>
-          </label>
-          {imagePreview && (
-            <div className="after-sales-image-preview">
-              <img src={imagePreview} alt="Ảnh minh chứng đã chọn" />
-              <div>
-                <span className="muted">{imageFile?.name}</span>
-                <button className="btn" type="button" disabled={dangGui} onClick={() => setImageFile(null)}>Bỏ ảnh</button>
+    setImages(added); setImageErrors(issues); setSubmitError('');
+  }
+  const attrs = name => ({id:`as-${name}`, 'aria-invalid': !!errors[name], 'aria-describedby': name === 'lyDo' ? 'as-lyDo-hint' : errors[name] ? `as-${name}-error` : undefined,
+    onBlur: e => {
+      // Validate only a control that actually received focus; grouped controls validate on submit.
+      if (renderEpoch !== validationEpoch.current || typeChanging.current || e.relatedTarget?.id === 'as-loai' || ['loai','reason','condition','refund','mismatch','bank','images','targetId','soLuong','maDonHang','appearance','fault','sealConfirmed'].includes(name)) return;
+      setInteraction(old => ({...old, [name]:'touched'}));
+    }});
+  const select = (name, label, options) => <Field name={name} label={label} error={errors[name]}><select {...attrs(name)} required value={form[name]} onChange={e => change(name,e.target.value)}><option value="" disabled>Chọn {label.toLowerCase()}</option>{options.map(v => <option key={v}>{v}</option>)}</select></Field>;
+  const cards = (name,label,options) => <Field name={name} label={label} error={errors[name]}><div className="as-radio-cards" role="radiogroup" aria-label={label} aria-required="true" aria-describedby={errors[name] ? `as-${name}-error` : undefined}>{options.map((v,i) => <label key={v} className={form[name] === v ? 'selected' : ''}><input type="radio" name={name} {...(i === 0 ? attrs(name) : {onBlur:attrs(name).onBlur})} checked={form[name] === v} value={v} onChange={() => change(name,v)} />{v}</label>)}</div></Field>;
+  const faultPicker = () => <Field name="fault" label="Loại lỗi" error={errors.fault}><div className="as-chips as-fault-chips" role="group" aria-label="Loại lỗi (có thể chọn nhiều)" aria-describedby={errors.fault ? 'as-fault-error' : undefined}>{FAULTS.map((item,i) => <button key={item} type="button" className="btn" {...(i === 0 ? attrs('fault') : {})} aria-pressed={selectedFaults(form.fault).includes(item)} onClick={() => change('fault',toggleFault(form.fault,item))}>{selectedFaults(form.fault).includes(item) && <span aria-hidden="true">✓ </span>}{item}</button>)}</div><small className="muted">Có thể chọn nhiều loại lỗi.</small></Field>;
+  async function submit(e) {
+    e.preventDefault(); if (lock.current) return;
+    const invalid = validateForm(loai, form, order, product, images);
+    if (loai === 'DOI_HANG' && !target) invalid.targetId = 'Vui lòng chọn phiên bản còn đủ hàng từ danh mục.';
+    setInteraction(old => ({...old, ...Object.fromEntries(Object.keys(invalid).map(key => [key,'submitted']))})); setSubmitError('');
+    if (Object.keys(invalid).length) { requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus()); return; }
+    lock.current = true; setBusy(true); setSuccess('');
+    try {
+      const urls = [];
+      for (const file of images) { try { urls.push((await customerService.uploadAfterSaleImage(file)).url); } catch (err) { throw new Error(`${file.name}: ${errorMessage(err)}`); } }
+      const {maDonHang, maPhienBan, soLuong, lyDo, ...chiTiet} = form;
+      const payload = {maDonHang: maDonHang || null, maPhienBan: loai === 'KHIEU_NAI' ? null : maPhienBan, lyDo: lyDo.trim(), chiTiet, anhMinhChung: urls};
+      const saved = isReturn ? await customerService.requestReturn({...payload, loaiYeuCau: loai, soLuong:Number(soLuong)}) : await customerService.createAfterSale({...payload, loai});
+      setReceipt(saved); setRecent(old => [saved, ...old]); setLocLoai(''); setLocStatus(''); setSuccess(`Đã gửi yêu cầu ${saved.maYeuCau}. Dự kiến tiếp nhận trong 1–2 ngày làm việc.`); toast(`Đã gửi yêu cầu ${saved.maYeuCau}`);
+      resetValidation(); setBankQuery(''); setBankOpen(false); setLoai(''); setForm({...EMPTY}); setTargetQuery(''); setTargetOpen(false); setImages([]); setImageErrors([]); reload();
+    } catch (err) { toast(err.response ? errorMessage(err) : err.message || errorMessage(err), 'error'); setSubmitError(err.response ? errorMessage(err) : err.message || errorMessage(err)); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  return <div className="checkout after-sales-page">
+    <h2>Đổi trả &amp; bảo hành</h2><p className="muted">Gửi và theo dõi yêu cầu hỗ trợ sau mua hàng.</p>
+    <section className="card after-sales-section">
+      <div className="row between after-sales-heading"><h3>Tạo yêu cầu mới</h3></div>
+      <div className="as-support"><a href="tel:18006868">Hotline 1800 6868</a><button type="button" className="btn" onClick={() => window.dispatchEvent(new Event('phonenest:open-chat'))}>Mở chat hỗ trợ</button></div>
+      {success && <div className="as-success" role="status">{success}{receipt && <div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(receipt)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(receipt)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>}</div>}
+      <details key={loai || "initial"} className="as-policy-light"><summary>Xem chính sách hỗ trợ sau mua</summary><ul>{policyLines(loai,policy).map(line => <li key={line}>{line}</li>)}</ul></details>
+      {orderError && <p className="as-error" role="alert">Không tải được đơn hàng: {orderError}</p>}
+      <form ref={formRef} className="form" onSubmit={submit} noValidate aria-busy={busy}>
+        <fieldset disabled={busy} className="as-fields">
+          <Field name="loai" label="Loại yêu cầu" error={errors.loai}><select {...attrs('loai')} required value={loai} onChange={e => changeType(e.target.value)}><option value="" disabled>Chọn loại yêu cầu</option>{Object.entries(TYPES).map(([key,v]) => <option key={key} value={key}>{v}</option>)}</select></Field>
+          {loai && <>
+            <Field name="maDonHang" label="Đơn hàng" required={loai !== 'KHIEU_NAI'} error={errors.maDonHang}>
+              {(loai === 'KHIEU_NAI' || validOrders.length !== 1) && <button type="button" {...attrs('maDonHang')} className="as-order-toggle btn" aria-expanded={orderPicker} aria-controls="as-order-options" onClick={() => setOrderPicker(v => !v)}>{order ? `${order.chiTiet?.[0]?.tenMay || 'Đơn hàng'} · Đơn #${order.maDonHang.slice(-8)}` : 'Chọn đơn hàng'} <span aria-hidden="true">▾</span></button>}
+              {orderPicker && <div id="as-order-options" className="as-order-options" role="group" aria-label="Danh sách đơn hàng">
+                {loai === 'KHIEU_NAI' && <button type="button" className="as-order-choice" onClick={() => {change('maDonHang','');setOrderPicker(false);}}>Không liên quan đơn hàng cụ thể</button>}
+                {validOrders.map(o => <button type="button" key={o.maDonHang} className={`as-order-choice ${o.maDonHang === form.maDonHang ? 'selected' : ''}`} aria-pressed={o.maDonHang === form.maDonHang} onClick={() => {change('maDonHang',o.maDonHang);setOrderPicker(false);requestAnimationFrame(() => document.getElementById('as-maDonHang')?.focus());}}><strong>{o.chiTiet?.[0]?.tenMay || 'Sản phẩm'}{o.chiTiet?.length > 1 ? ` +${o.chiTiet.length-1}` : ''}</strong><span className="muted">Đơn #{o.maDonHang.slice(-8)} · {formatDay(o.ngayMua)} · {formatPrice(o.tongTien)}</span>{loai !== 'KHIEU_NAI' && <span className={`as-deadline-badge ${deadlineTone(o,loai)}`}>{remainingLabel(o,loai)}</span>}</button>)}
+              </div>}
+            </Field>
+            {orderLoading && <p className="muted">Đang tải đơn hàng…</p>}
+            {!orderLoading && !orderError && !validOrders.length && loai !== 'KHIEU_NAI' && <p className="as-notice" role="status">{loai === 'BAO_HANH' ? `Bạn chưa có đơn nào đủ điều kiện bảo hành${policy?.warrantyMonths ? ` trong ${policy.warrantyMonths} tháng` : ''}.` : `Bạn chưa có đơn nào đủ điều kiện đổi trả${policy?.returnDays ? ` trong ${policy.returnDays} ngày` : ''}.`}</p>}
+            {order && <div className="after-sales-order-preview as-selected-order">
+              <b>{order.chiTiet?.[0]?.tenMay || 'Đơn hàng'}{order.chiTiet?.length > 1 ? ` +${order.chiTiet.length-1} sản phẩm` : ''}</b>
+              <div className="as-order-meta"><span className="as-order-code">Đơn #{order.maDonHang.slice(-8)}<button type="button" className="as-copy-icon" title="Sao chép mã đơn đầy đủ" aria-label="Sao chép mã đơn đầy đủ" onClick={() => copyOrder(order.maDonHang)}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button></span><span>Mua {formatDay(order.ngayMua)} · {formatPrice(order.tongTien)}</span></div>
+              {loai !== 'KHIEU_NAI' && <><span className={`as-deadline-badge ${deadlineTone(order,loai)}`}>{remainingLabel(order,loai)}</span><small className="as-order-dates">{order.ngayKhachXacNhan ? 'Nhận' : 'Giao'} {formatDay(order.ngayKhachXacNhan || order.ngayGiao)} · {loai === 'BAO_HANH' ? 'Bảo hành đến' : 'Đổi trả đến'} {formatDay(loai === 'BAO_HANH' ? warrantyEnd(order) : returnEnd(order))}</small></>}
+              <Link target="_blank" rel="noopener noreferrer" to={`/orders/${encodeURIComponent(order.maDonHang)}`}>Xem đơn hàng ↗</Link>
+            </div>}
+            {loai !== 'KHIEU_NAI' && pending.length > 0 && <div className="as-pending"><div className="as-pending-head"><span>⚠ Có {pending.length} đơn chưa xác nhận nhận hàng. Cần xác nhận trước khi đổi trả/bảo hành.</span><Link target="_blank" rel="noopener noreferrer" to={pending.length === 1 ? `/orders/${encodeURIComponent(pending[0].maDonHang)}?confirmReceive=1` : '/orders?tt=CHO_KHACH_XAC_NHAN'}>Xem và xác nhận ↗</Link></div></div>}
+            {loai !== 'KHIEU_NAI' && <Field name="maPhienBan" label="Sản phẩm cần xử lý" error={errors.maPhienBan}>{order?.chiTiet?.length === 1 ? <div id="as-maPhienBan" className="as-product-fixed" tabIndex={0} aria-invalid={!!errors.maPhienBan}><strong>{order.chiTiet[0].tenMay}</strong><small>{formatPrice(order.chiTiet[0].donGia)} / máy · Số lượng đã mua: {order.chiTiet[0].soLuong}</small></div> : <select {...attrs('maPhienBan')} required value={form.maPhienBan} onChange={e => change('maPhienBan',e.target.value)}><option value="" disabled>Chọn sản phẩm</option>{(order?.chiTiet || []).map(d => <option key={d.maPhienBan} value={d.maPhienBan}>{d.tenMay} · Mã phiên bản: {d.maPhienBan} · SL {d.soLuong}</option>)}</select>}</Field>}
+            {isReturn && product && product.soLuong > 1 && <Field name="soLuong" label="Số lượng" error={errors.soLuong}><div className="as-stepper"><button type="button" className="btn" disabled={Number(form.soLuong)<=1} aria-label="Giảm số lượng" onClick={() => change('soLuong',Math.max(1,Number(form.soLuong)-1))}>−</button><output {...attrs('soLuong')} tabIndex={0} aria-live="polite">{form.soLuong} / {product.soLuong}</output><button type="button" className="btn" disabled={Number(form.soLuong)>=product.soLuong} aria-label="Tăng số lượng" onClick={() => change('soLuong',Math.min(product.soLuong,Number(form.soLuong)+1))}>+</button></div></Field>}
+            {(isReturn || loai === 'BAO_HANH') && <h4 className="as-group-title">Thông tin sự cố</h4>}
+            {isReturn && cards('reason','Lý do',REASONS)}
+            {isReturn && form.reason === 'Đổi ý' && <p className="as-warning">Đổi ý: máy phải còn nguyên seal, đầy đủ phụ kiện; có thể phát sinh phí sau thẩm định.</p>}
+            {isReturn && form.reason && (allowed.length === 1 ? <Field name="condition" label="Tình trạng máy" error={errors.condition}><div id="as-condition" tabIndex={0} aria-invalid={!!errors.condition} aria-describedby={errors.condition ? 'as-condition-error' : undefined} className="as-fixed-condition"><span aria-hidden="true">✓</span><strong>{allowed[0]}</strong><small>{form.reason === 'Đổi ý' ? 'Theo chính sách đổi ý.' : 'Theo lý do máy lỗi.'}</small></div></Field> : cards('condition','Tình trạng máy',allowed))}
+            {isReturn && form.reason === 'Đổi ý' && <div className="as-field"><label className="as-seal-confirm"><input {...attrs('sealConfirmed')} type="checkbox" required checked={form.sealConfirmed === 'true'} onChange={e => change('sealConfirmed',e.target.checked ? 'true' : '')}/><span>Tôi xác nhận tất cả máy yêu cầu xử lý chưa bóc seal, đầy đủ phụ kiện. <span className="as-required">*</span></span></label>{errors.sealConfirmed && <small className="as-error" id="as-sealConfirmed-error" role="alert">{errors.sealConfirmed}</small>}</div>}
+            {isReturn && form.reason === 'Giao sai hàng' && <small className="muted">Ưu tiên còn nguyên seal; nếu đã mở máy để kiểm tra, chọn Đã kích hoạt. Nếu máy bị hỏng, chọn lý do Máy lỗi.</small>}
+            {isReturn && form.reason === 'Không đúng mô tả' && <>{cards('mismatch','Điểm khác với mô tả',MISMATCHES)}<small className="muted">Chọn điểm khác chính; nêu thêm các điểm khác trong mô tả chi tiết.</small></>}
+            {isReturn && form.reason === 'Máy lỗi' && faultPicker()}
+            {loai === 'DOI_HANG' && <Field name="targetId" label="Sản phẩm/phiên bản muốn đổi" error={errors.targetId}>
+              <div onBlur={e => {if (!e.currentTarget.contains(e.relatedTarget)) setTargetOpen(false);}}>
+              <input {...attrs('targetId')} value={targetQuery} placeholder="Tìm tên máy, dung lượng hoặc màu sắc" onFocus={() => setTargetOpen(true)} onChange={e => {setTargetQuery(e.target.value);change('targetId','');setTargetOpen(true);}} />
+              {catalogLoading && <small>Đang tải danh mục…</small>}{catalogError && <p role="alert" className="as-error">Không tải được danh mục. <button type="button" className="btn" onClick={() => setCatalogRetry(n => n+1)}>Thử lại</button></p>}
+              {targetOpen && !catalogLoading && !catalogError && <div className="as-order-options" role="group" aria-label="Phiên bản còn hàng">{targetMatches.length ? targetMatches.map(v => <button type="button" key={v.id} className={`as-order-choice ${target?.id === v.id ? 'selected' : ''}`} onClick={() => {change('targetId',v.id);setTargetQuery(v.label);setTargetOpen(false);}}><strong>{v.label}</strong><span>{formatPrice(v.price)} · Còn {v.stock} máy</span></button>) : <small>Không có phiên bản phù hợp hoặc đủ số lượng.</small>}</div>}
+              {target && <div className="as-selected-order after-sales-order-preview"><strong>{target.label}</strong><span>{formatPrice(target.price)} / máy</span>{product && (() => {const delta=(Number(target.price)-Number(product.donGia))*Number(form.soLuong);return <small>{delta > 0 ? `Bạn cần bù thêm khoảng ${formatPrice(delta)}.` : delta < 0 ? `Chênh lệch thấp hơn khoảng ${formatPrice(-delta)}; cửa hàng sẽ xác nhận có hoàn chênh lệch hay không.` : 'Không chênh lệch theo đơn giá hiện tại.'} Dự kiến, chưa tính phân bổ ưu đãi và phí; không giữ hàng tự động.</small>;})()}</div>}
               </div>
-            </div>
-          )}
-          <button type="submit" className="btn btn-primary" disabled={dangGui || !donDangChon || (canChonSanPham && !sanPhamDangChon)}>
-            {dangGui ? 'Đang gửi...' : 'Gửi yêu cầu'}
-          </button>
-        </form>
-      </section>
-
-      <section className="after-sales-section">
-        <div className="row between after-sales-heading">
-          <h3>Yêu cầu của tôi</h3>
-          <select aria-label="Lọc loại yêu cầu" value={locLoai} onChange={(e) => setLocLoai(e.target.value)}>
-            <option value="">Tất cả loại yêu cầu</option>
-            {Object.entries(LOAI).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </div>
-        {loading && <p className="muted">Đang tải yêu cầu...</p>}
-        {error && <div className="error">Không tải được yêu cầu: {error} <button className="btn" onClick={reload}>Thử lại</button></div>}
-        {!loading && !error && dangLoc.length === 0 && <p className="muted">Chưa có yêu cầu phù hợp.</p>}
-        {dangLoc.map((r) => (
-          <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request">
-            <div className="row between">
-              <div><b>{LOAI[r.loai] || r.loai}</b> · <span className="muted">{r.maYeuCau}</span></div>
-              <StatusBadge status={r.trangThai} />
-            </div>
-            <p>Đơn hàng: <Link to={`/orders/${r.maDonHang}`}>{r.maDonHang}</Link></p>
-            {r.tenSanPham && <p>Sản phẩm: {r.tenSanPham}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p>}
-            <p>{r.lyDo}</p>
-            {r.hinhAnhMinhChung && <a href={r.hinhAnhMinhChung} rel="noreferrer" target="_blank">Xem ảnh minh chứng</a>}
-            <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>
-            {r.ghiChuXuLy && <p><b>Phản hồi:</b> {r.ghiChuXuLy}</p>}
-            {r.lichSu?.length > 0 && (
-              <details>
-                <summary>Xem lịch sử xử lý ({r.lichSu.length})</summary>
-                <ol className="after-sales-timeline">
-                  {r.lichSu.map((item, index) => (
-                    <li key={`${r.maYeuCau}-${index}`}>
-                      <StatusBadge status={item.trangThai} /> <span className="muted">{formatDate(item.thoiGian)}</span>
-                      {item.ghiChu && <div>{item.ghiChu}</div>}
-                    </li>
-                  ))}
-                </ol>
-              </details>
-            )}
-          </article>
-        ))}
-      </section>
-    </div>
-  );
+            </Field>}
+            {loai === 'BAO_HANH' && <>
+              <Field name="serialKind" label="Loại mã thiết bị"><select id="as-serialKind" value={form.serialKind} onChange={e => change('serialKind',e.target.value)}><option value="IMEI">IMEI (15 chữ số)</option><option value="SERIAL">Số Serial</option></select></Field>
+              <Field name="serial" label={form.serialKind === 'IMEI' ? 'IMEI' : 'Số Serial'} error={errors.serial}>
+                {identifiers.length > 0 && <div className="as-chips" role="group" aria-label="Mã thiết bị đã lưu">{identifiers.map(id => <button type="button" className="btn" key={id} aria-pressed={form.serial === id} onClick={() => change('serial',id)}>{id}</button>)}</div>}
+                <input {...attrs('serial')} required value={form.serial} inputMode={form.serialKind === 'IMEI' ? 'numeric' : 'text'} maxLength={form.serialKind === 'IMEI' ? 15 : 60} autoComplete="off" placeholder={form.serialKind === 'IMEI' ? 'Nhập 15 chữ số' : 'Nhập mã trên máy hoặc hộp'} onChange={e => change('serial',e.target.value)}/>
+                <small className="muted">{form.serialKind === 'IMEI' ? 'Bấm *#06# hoặc xem trên hộp máy. Với iPhone: Cài đặt → Cài đặt chung → Giới thiệu.' : 'Xem trong Cài đặt → Giới thiệu thiết bị hoặc trên hộp máy.'}</small>
+              </Field>
+              <Field name="appearance" label="Tình trạng ngoại hình" error={errors.appearance}><div className="as-chips" role="group" aria-label="Tình trạng ngoại hình">{APPEARANCES.map((item,i) => <button key={item} type="button" {...(i === 0 ? attrs('appearance') : {})} className="btn" aria-pressed={form.appearance === item} onClick={() => change('appearance',item)}>{item}</button>)}</div></Field>
+              {warrantyAppearanceWarning(form.appearance) && <p className="as-warning" role="status">{warrantyAppearanceWarning(form.appearance)}</p>}
+              {faultPicker()}
+              <p className="as-warranty-note">Cửa hàng sẽ kiểm tra lỗi và quyết định sửa chữa, thay linh kiện hoặc đổi máy tương đương nếu không thể sửa. Hoàn tiền được xử lý qua yêu cầu trả hàng.</p>
+            </>}
+            {loai === 'KHIEU_NAI' && select('topic','Chủ đề',TOPICS)}
+            {(isReturn || loai === 'BAO_HANH') && <h4 className="as-group-title">Bằng chứng</h4>}
+            <Field name="lyDo" label="Mô tả chi tiết"><textarea {...attrs('lyDo')} rows="5" required maxLength={1000} placeholder={isReturn || loai === 'BAO_HANH' ? descriptionHint(loai,form.reason) : HINTS[loai]} value={form.lyDo} onChange={e => change('lyDo',e.target.value)} /><div className={`as-count ${!errors.lyDo && form.lyDo.trim().length >= minDescription ? 'as-count-valid' : 'muted'}`}><span id="as-lyDo-hint" className={errors.lyDo ? 'as-error' : undefined} role={errors.lyDo ? 'alert' : undefined}>{errors.lyDo || (form.reason === 'Khác' ? `Nêu rõ lý do khác · tối thiểu ${minDescription} ký tự` : `Tối thiểu ${minDescription} ký tự`)}</span><span>{form.lyDo.length}/1000</span></div></Field>
+            <Field name="images" label="Ảnh minh chứng" required={requiredProof} error={errors.images}>
+              <small className={`as-proof-hint ${requiredProof ? 'as-proof-required' : 'muted'}`}>{evidenceHint(loai,form.reason,form.condition)}</small>
+              <div className="as-drop" onDragOver={e => e.preventDefault()} onDrop={e => {e.preventDefault(); if (!busy) addFiles(e.dataTransfer.files);}}>
+                <input {...attrs('images')} type="file" aria-required={requiredProof} multiple accept="image/jpeg,image/png,image/webp" className="as-file" onChange={e => {addFiles(e.target.files);e.target.value='';}} />
+                <label className="btn as-pick" htmlFor="as-images">Chọn ảnh</label><p>Kéo thả ảnh vào đây.</p><small className="muted">JPG, PNG, WEBP · tối đa 5 MB/ảnh · {images.length}/{MAX_IMAGES} ảnh</small>
+              </div>
+              {imageErrors.map((msg,i) => <small role="alert" className="as-error" key={`${i}-${msg}`}>{msg}</small>)}
+              <div className="as-thumbs">{images.map((file,i) => <Preview key={`${file.name}-${file.lastModified}-${file.size}`} file={file} remove={() => setImages(old => old.filter((_,j) => i !== j))} />)}</div>
+            </Field>
+            {loai === 'TRA_HANG_HOAN_TIEN' && <>
+              <h4 className="as-group-title">Hoàn tiền</h4>
+              {order?.phuongThucTt === 'COD' ? <div className="as-refund-fixed" id="as-refund" tabIndex={0} aria-invalid={!!errors.refund}><strong>Hoàn tiền qua chuyển khoản</strong><small>Đơn của bạn thanh toán COD nên sẽ được hoàn tiền qua chuyển khoản.</small>{errors.refund && <small className="as-error" role="alert">{errors.refund}</small>}</div> : cards('refund','Hình thức hoàn tiền',refundOptions(order))}
+              {form.refund === 'Chuyển khoản' && <div className="as-fields as-subfields">
+                <p className="as-bank-notice">🔒 Chỉ nhập thông tin nhận tiền, không nhập mật khẩu hoặc mã OTP.</p>
+                <Field name="holder" label="Chủ tài khoản" error={errors.holder}><input {...attrs('holder')} required value={form.holder} maxLength={100} autoComplete="off" placeholder="VD: NGUYEN VAN AN" onChange={e => change('holder',normalizeHolder(e.target.value))}/><small className="muted">Nhập đúng họ tên trên tài khoản ngân hàng.</small></Field>
+                <Field name="account" label="Số tài khoản" error={errors.account}><input {...attrs('account')} type="text" required inputMode="numeric" pattern="[0-9]{6,20}" autoComplete="off" maxLength={20} value={form.account} placeholder="Nhập 6–20 chữ số" onChange={e => change('account',accountDigits(e.target.value))}/></Field>
+                <Field name="bank" label="Ngân hàng" error={errors.bank}>
+                  <div onBlur={e => {if (!e.currentTarget.contains(e.relatedTarget)) setBankOpen(false);}}>
+                    <input {...attrs('bank')} autoComplete="off" placeholder="Tìm và chọn ngân hàng" value={bankOpen ? bankQuery : form.bank} aria-expanded={bankOpen} aria-controls="as-bank-options" onFocus={() => {setBankQuery(form.bank);setBankOpen(true);}} onChange={e => {setBankQuery(e.target.value);change('bank','');setBankOpen(true);}} onKeyDown={e => {if(e.key==='Escape') {setBankOpen(false);}}}/>
+                    {bankOpen && <div id="as-bank-options" className="as-order-options as-bank-options" role="group" aria-label="Danh sách ngân hàng">{bankMatches.length ? bankMatches.map(bank => <button key={bank} type="button" className={`as-order-choice ${form.bank===bank?'selected':''}`} onClick={() => {change('bank',bank);setBankQuery(bank);setBankOpen(false);}}>{bank}</button>) : <small>Không tìm thấy ngân hàng. Hãy liên hệ hỗ trợ nếu ngân hàng của bạn chưa có trong danh sách.</small>}</div>}
+                  </div>
+                </Field>
+              </div>}
+              <p className="muted">Dự kiến hoàn tiền trong 3–7 ngày làm việc sau khi cửa hàng nhận và kiểm tra máy.</p>
+              {product && <section className="as-refund-summary" aria-label="Tóm tắt yêu cầu hoàn tiền"><h4>Kiểm tra trước khi gửi</h4><dl><dt>Sản phẩm</dt><dd>{product.tenMay} · SL {form.soLuong}</dd><dt>Lý do</dt><dd>{form.reason || 'Chưa chọn'}</dd><dt>Hình thức hoàn tiền</dt><dd>{form.refund || 'Chưa chọn'}</dd><dt>Tiền hoàn dự kiến</dt><dd className="as-refund-total">{estimate ? formatPrice(estimate.amount) : 'Cửa hàng xác nhận sau'}</dd>{estimate && <><dt>Ưu đãi đã phân bổ</dt><dd>{formatPrice(estimate.discount)}</dd></>}<dt>Thời gian dự kiến</dt><dd>3–7 ngày làm việc sau thẩm định</dd></dl><small className="muted">Ước tính theo giá đã mua sau khi phân bổ ưu đãi hàng hóa; không gồm phí vận chuyển. Số tiền cuối cùng phụ thuộc kết quả kiểm tra và tỷ lệ hoàn được duyệt.</small></section>}
+            </>}
+          </>}
+          {loai === 'BAO_HANH' && product && <section className="as-refund-summary as-warranty-summary" aria-label="Tóm tắt yêu cầu bảo hành"><h4>Kiểm tra trước khi gửi</h4><dl><dt>Sản phẩm</dt><dd>{product.tenMay}</dd><dt>Hạn bảo hành</dt><dd>{formatDay(warrantyEnd(order))}</dd><dt>Ngoại hình</dt><dd>{form.appearance || 'Chưa chọn'}</dd><dt>Loại lỗi</dt><dd>{selectedFaults(form.fault).join(', ') || 'Chưa chọn'}</dd><dt>Ảnh minh chứng</dt><dd>{images.length} / {MAX_IMAGES}</dd><dt>Dự kiến tiếp nhận</dt><dd>1–2 ngày làm việc</dd></dl><small className="muted">Phương án xử lý và chi phí (nếu có) sẽ được cửa hàng thông báo sau khi kiểm tra máy. Gửi yêu cầu không đồng nghĩa đã được duyệt bảo hành miễn phí.</small></section>}
+          {errors.submit && <p className="as-error" role="alert">{errors.submit}</p>}
+          <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+        </fieldset>
+      </form>
+    </section>
+    <section className="after-sales-section">
+      <div className="row between after-sales-heading"><h3>Yêu cầu của tôi</h3><div className="as-filters"><select aria-label="Lọc loại yêu cầu" value={locLoai} onChange={e => setLocLoai(e.target.value)}><option value="">Tất cả loại</option>{Object.entries(TYPES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><select aria-label="Lọc trạng thái" value={locStatus} onChange={e => setLocStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
+      {loading && <p className="muted">Đang tải yêu cầu…</p>}{error && <div className="as-error" role="alert">Không tải được yêu cầu: {error} <button className="btn" onClick={reload}>Thử lại</button></div>}
+      {!loading && !error && filtered.length === 0 && <p className="muted">{allRequests.length ? 'Không có kết quả theo bộ lọc.' : 'Bạn chưa có yêu cầu nào'}</p>}
+      {filtered.map(r => <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request"><div className="row between after-sales-heading"><div><b>{TYPES[requestType(r)]}</b> · <span className="muted">{r.maYeuCau}</span></div><StatusBadge status={r.trangThai}/></div>
+        <p>Đơn hàng: {r.maDonHang ? <Link to={`/orders/${encodeURIComponent(r.maDonHang)}`}>{r.maDonHang}</Link> : 'Không gắn đơn hàng'}</p><p>Sản phẩm: {r.tenSanPham || 'Không chỉ định'}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p><p style={{whiteSpace:'pre-wrap'}}>{maskAccount(r.lyDo)}</p>
+        {r.soTienHoanDuKien != null && <p><b>{r.ngayHoanTien ? 'Đã ghi nhận hoàn tiền' : 'Tiền hoàn dự kiến'}:</b> {formatPrice(r.soTienHoanDuKien)}</p>}
+        <div className="as-thumbs">{requestImages(r).map((url,i) => <a key={url} href={url} target="_blank" rel="noreferrer"><img className="as-evidence" src={url} alt={`Minh chứng ${i+1}`} /></a>)}</div>
+        <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}<div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details><summary>Xem lịch sử xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><StatusBadge status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{item.ghiChu}</div>}</li>)}</ol></details>}
+      </article>)}
+    </section>
+  </div>;
 }
