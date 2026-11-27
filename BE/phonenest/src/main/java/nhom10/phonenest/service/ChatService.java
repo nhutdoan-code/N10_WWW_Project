@@ -148,6 +148,7 @@ public class ChatService {
     private final ChatClient chatClient;
     private final SemanticSearchService semanticSearchService;
     private final UserPreferenceAggregationService userPreferenceService;
+    private final ChatScopeGuard chatScopeGuard;
 
     /** 2B.7E: de lay gia NOI BO chua duyet (danh sach cam). Tuy chon: unit test co the khong co. */
     private nhom10.phonenest.repository.PhienBanSanPhamRepository phienBanRepository;
@@ -304,18 +305,9 @@ public class ChatService {
                 .trim();
     }
 
-    private ChatDto.Response xuLy(ChatDto.Request req, String cauHoiGoc, List<Message> history, Set<String> daGioiThieu,
-                                 String cauHoiTruoc) {
-        if (laYeuCauThemGioHang(cauHoiGoc, history)) {
-            return themVaoGio(cauHoiGoc, history);
-        }
-
-        // "Co lua chon khac khong?": giu dieu kien cua cau hoi truoc, loai san pham da gioi thieu.
-        boolean timLuaChonKhac = laYeuCauLuaChonKhac(chuanHoaVanBan(cauHoiGoc));
-        Set<String> loaiTru = timLuaChonKhac ? daGioiThieu : Set.of();
-        String cauHoi = timLuaChonKhac ? (cauHoiTruoc + " " + cauHoiGoc).trim() : cauHoiGoc;
-
-        if (laCauHoiChaoHoi(cauHoi)) {
+    private ChatDto.Response xuLy(ChatDto.Request req, String cauHoiGoc, List<Message> history, Set<String> daGioiThieu, String cauHoiTruoc) {
+        // BƯỚC 1: XỬ LÝ CHÀO HỎI
+        if (laCauHoiChaoHoi(cauHoiGoc)) {
             return new ChatDto.Response(
                     "Xin chào! Mình là trợ lý AI của PhoneNest. " +
                             "Mình có thể giúp bạn tìm kiếm và tư vấn điện thoại, " +
@@ -326,44 +318,86 @@ public class ChatService {
                     "GREETING"
             );
         }
-
-        List<SanPhamDto> sanPhamChinhXac = timSanPhamChinhXac(cauHoi);
-        if (!sanPhamChinhXac.isEmpty() && sanPhamChinhXac.stream().noneMatch(this::coHang) && laCauHoiTonTaiSanPham(cauHoi)) {
+        // BƯỚC 2: KIỂM TRA PHẠM VI CÂU HỎI
+        String lichSuScope = taoNoiDungLichSuChoScope(history);
+        ChatScopeGuard.KetQua ketQuaScope = chatScopeGuard.kiemTraPhamVi(cauHoiGoc, lichSuScope);
+        if (ketQuaScope == ChatScopeGuard.KetQua.OUT_OF_SCOPE) {
             return new ChatDto.Response(
-                    "PhoneNest có sản phẩm " + sanPhamChinhXac.get(0).tenMay() + " trong danh mục, nhưng hiện tại sản phẩm đã hết hàng. Bạn có muốn tham khảo mẫu điện thoại tương tự không?",
-                    List.of(), "EXACT_PRODUCT_SEARCH"
+                    "Xin lỗi, mình là trợ lý AI của PhoneNest nên chỉ hỗ trợ " +
+                            "các vấn đề liên quan đến sản phẩm điện thoại, " +
+                            "dịch vụ và các chức năng trên website PhoneNest nhé!",
+                    List.of(),
+                    "OUT_OF_SCOPE"
             );
         }
-
+        if (ketQuaScope == ChatScopeGuard.KetQua.UNCLEAR) {
+            return new ChatDto.Response(
+                    "Mình chưa xác định được bạn đang muốn hỏi về nội dung nào. " +
+                            "Bạn có thể nói rõ hơn vấn đề liên quan đến sản phẩm " +
+                            "hoặc dịch vụ của PhoneNest không?",
+                    List.of(),
+                    "UNCLEAR"
+            );
+        }
+        // BƯỚC 3: XỬ LÝ YÊU CẦU THÊM SẢN PHẨM VÀO GIỎ HÀNG
+        if (laYeuCauThemGioHang(cauHoiGoc, history)) {
+            return themVaoGio(cauHoiGoc, history);
+        }
+        // BƯỚC 4: XỬ LÝ YÊU CẦU TÌM LỰA CHỌN KHÁC
+        boolean timLuaChonKhac = laYeuCauLuaChonKhac(chuanHoaVanBan(cauHoiGoc));
+        Set<String> loaiTru = timLuaChonKhac ? daGioiThieu : Set.of();
+        String cauHoi = timLuaChonKhac ? (cauHoiTruoc + " " + cauHoiGoc).trim() : cauHoiGoc;
+        // BƯỚC 5: TÌM SẢN PHẨM CHÍNH XÁC
+        List<SanPhamDto> sanPhamChinhXac = timSanPhamChinhXac(cauHoi);
+        if (!sanPhamChinhXac.isEmpty()
+                && sanPhamChinhXac.stream().noneMatch(this::coHang)
+                && laCauHoiTonTaiSanPham(cauHoi)) {
+            return new ChatDto.Response(
+                    "PhoneNest có sản phẩm " + sanPhamChinhXac.get(0).tenMay()
+                            + " trong danh mục, nhưng hiện tại sản phẩm đã hết hàng. "
+                            + "Bạn có muốn tham khảo mẫu điện thoại tương tự không?",
+                    List.of(),
+                    "EXACT_PRODUCT_SEARCH"
+            );
+        }
+        // BƯỚC 6: PHÂN TÍCH GIÁ VÀ THƯƠNG HIỆU
         boolean khongGioiHanGia = laGiaBaoNhieuCungDuoc(cauHoi);
-        DieuKienGia dieuKienGia = khongGioiHanGia ? new DieuKienGia(null, false, null, false, false) : phanTichDieuKienGia(cauHoi);
+        DieuKienGia dieuKienGia = khongGioiHanGia
+                ? new DieuKienGia(null, false, null, false, false)
+                : phanTichDieuKienGia(cauHoi);
         String brand = detectBrand(cauHoi.toLowerCase(Locale.ROOT));
-
-        // Check if store inventory has any in-stock products
+        // BƯỚC 7: KIỂM TRA SẢN PHẨM CÒN HÀNG
         List<SanPhamDto> tatCaKhaDung = sanPhamService.list(null, null, null, null, null, false)
-                .stream().filter(this::coHang).toList();
+                .stream()
+                .filter(this::coHang)
+                .toList();
         if (tatCaKhaDung.isEmpty()) {
             if (laCauHoiPhiShip(cauHoi)) {
                 return new ChatDto.Response(
-                        "Phí vận chuyển của PhoneNest:\n" + phiShipText() + "\nPhí được tính theo tỉnh/thành của địa chỉ nhận hàng và hiển thị rõ ở bước thanh toán.",
+                        "Phí vận chuyển của PhoneNest:\n" + phiShipText()
+                                + "\nPhí được tính theo tỉnh/thành của địa chỉ nhận hàng "
+                                + "và hiển thị rõ ở bước thanh toán.",
                         List.of(),
                         "KEYWORD_FALLBACK"
                 );
             }
             if (laCauHoiVoucher(cauHoi)) {
                 return new ChatDto.Response(
-                        "Hiện cửa hàng có các voucher:\n" + voucherText() + "\nVoucher tốt nhất sẽ được chọn sẵn ở bước thanh toán.",
+                        "Hiện cửa hàng có các voucher:\n" + voucherText()
+                                + "\nVoucher tốt nhất sẽ được chọn sẵn ở bước thanh toán.",
                         List.of(),
                         "KEYWORD_FALLBACK"
                 );
             }
             return new ChatDto.Response(
-                    "Hiện tại PhoneNest tạm hết hàng các sản phẩm điện thoại trong kho. Bạn vui lòng quay lại sau ít ngày hoặc liên hệ hotline để được hỗ trợ nhé!",
+                    "Hiện tại PhoneNest tạm hết hàng các sản phẩm điện thoại trong kho. "
+                            + "Bạn vui lòng quay lại sau ít ngày hoặc liên hệ hotline "
+                            + "để được hỗ trợ nhé!",
                     List.of(),
                     "OUT_OF_STOCK"
             );
         }
-
+        // BƯỚC 8: LẤY THÔNG TIN HÀNH VI NGƯỜI DÙNG
         TrackingService.Preferences preferences = trackingService.preferences(req.visitorId());
         List<SanPhamDto> sanPhamQuanTam = sanPhamQuanTam(preferences);
         if (brand != null) {
@@ -371,12 +405,13 @@ public class ChatService {
                     .filter(s -> s.tenThuongHieu() != null && s.tenThuongHieu().equalsIgnoreCase(brand))
                     .toList();
         }
+        // BƯỚC 9: TÌM SẢN PHẨM PHÙ HỢP
         List<SanPhamDto> ungVien = timSanPhamChoChatbot(cauHoi, sanPhamChinhXac, dieuKienGia, brand);
         if (!loaiTru.isEmpty()) {
-            ungVien = ungVien.stream().filter(s -> !loaiTru.contains(s.maSanPham())).toList();
+            ungVien = ungVien.stream()
+                    .filter(s -> !loaiTru.contains(s.maSanPham()))
+                    .toList();
         }
-
-        // When a budget constraint was specified but no products fit that range
         if (ungVien.isEmpty() && dieuKienGia.active()) {
             return new ChatDto.Response(
                     "PhoneNest chưa tìm thấy điện thoại còn hàng phù hợp với khoảng giá bạn yêu cầu.",
@@ -384,32 +419,37 @@ public class ChatService {
                     "PRICE_FILTER"
             );
         }
-
+        // BƯỚC 10: KIỂM TRA SẢN PHẨM CÓ TỒN TẠI HAY KHÔNG
         if (!ungVien.isEmpty() && laCauHoiTonTaiSanPham(cauHoi) && !coCauHoiTuVan(cauHoi)) {
             SanPhamDto sanPham = ungVien.get(0);
             return new ChatDto.Response(
-                    "Có nhé! PhoneNest hiện có " + sanPham.tenMay() + " đang kinh doanh và còn hàng. Giá tham khảo từ " + tien(sanPham.giaBan()) + ". Bạn muốn xem thêm thông tin sản phẩm không?",
-                    ungVien.stream().limit(3).toList(), "EXACT_PRODUCT_SEARCH"
+                    "Có nhé! PhoneNest hiện có " + sanPham.tenMay()
+                            + " đang kinh doanh và còn hàng. Giá tham khảo từ " + tien(sanPham.giaBan())
+                            + ". Bạn muốn xem thêm thông tin sản phẩm không?",
+                    ungVien.stream().limit(3).toList(),
+                    "EXACT_PRODUCT_SEARCH"
             );
         }
-
+        // BƯỚC 11: GỌI GEMINI AI
         if (coKhoaAi()) {
             try {
                 String systemPrompt = PROMPT;
                 String currentUserId = SecurityUtil.currentUserIdOrNull();
                 if (currentUserId != null) {
                     String userContext = userPreferenceService.buildAiPromptContext(currentUserId);
-                    if (userContext != null && !userContext.isBlank()) systemPrompt += "\n\n" + userContext;
+                    if (userContext != null && !userContext.isBlank()) {
+                        systemPrompt += "\n\n" + userContext;
+                    }
                 }
-
-                String hanhViText = sanPhamQuanTam.isEmpty() ? "Chưa có lịch sử quan tâm phù hợp." : sanPhamQuanTam.stream().map(this::sanPhamDong).collect(Collectors.joining("\n"));
+                String hanhViText = sanPhamQuanTam.isEmpty()
+                        ? "Chưa có lịch sử quan tâm phù hợp."
+                        : sanPhamQuanTam.stream().map(this::sanPhamDong).collect(Collectors.joining("\n"));
                 systemPrompt = systemPrompt
                         .replace("{sanPham}", sanPhamText(ungVien))
                         .replace("{voucher}", voucherText())
                         .replace("{phiShip}", phiShipText())
                         .replace("{hanhVi}", hanhViText)
                         .replace("{daGioiThieu}", daGioiThieuText(daGioiThieu, timLuaChonKhac));
-
                 List<Message> messages = new ArrayList<>();
                 messages.add(new SystemMessage(systemPrompt));
                 messages.addAll(history);
@@ -419,27 +459,29 @@ public class ChatService {
                 if (productTools != null) {
                     prompt = prompt.tools(productTools);
                 }
+
                 ChatDto.AiReply kq = prompt.call().entity(ChatDto.AiReply.class);
                 List<SanPhamDto> sanPhamDuocChon = List.of();
+
                 if (kq != null && kq.reply() != null && !kq.reply().isBlank()) {
                     sanPhamDuocChon = sanPhamGoiY(kq.maSanPham(), ungVien);
                     if (sanPhamDuocChon.isEmpty() && productTools != null) {
-                        // San pham AI tim qua cong cu: xac minh lai tu CSDL (gia cong bo, con hang, chua gioi thieu).
                         sanPhamDuocChon = sanPhamXacMinh(kq.maSanPham(), loaiTru);
                     }
+
                     Set<Long> duocCongBo = soTienDuocCongBo(ungVien, sanPhamQuanTam);
                     duocCongBo.addAll(soTienDuocCongBo(sanPhamDuocChon, tatCaKhaDung));
+
                     if (!ChatPriceGuard.hopLe(kq.reply(), duocCongBo, cauHoiGoc, giaNoiBoChuaDuyet())) {
-                        // 2B.7E: cau tra loi AI neu so tien KHONG thuoc du lieu duoc cong bo -> khong tra cho khach
                         log.warn("Chặn câu trả lời AI chứa số tiền ngoài dữ liệu giá được công bố. Chuyển sang chế độ dự phòng.");
                         kq = null;
                     }
                 }
+
                 if (kq != null && kq.reply() != null && !kq.reply().isBlank()) {
                     if (sanPhamDuocChon.isEmpty() && !ungVien.isEmpty()) {
                         sanPhamDuocChon = ungVien.stream().limit(3).toList();
                     }
-
                     return new ChatDto.Response(
                             anMaSanPhamNoiBo(kq.reply()),
                             sanPhamDuocChon,
@@ -453,7 +495,7 @@ public class ChatService {
         } else {
             log.warn("Chưa cấu hình GEMINI_API_KEY. Chuyển sang chế độ dự phòng.");
         }
-
+        // BƯỚC 12: TRẢ LỜI DỰ PHÒNG
         return traLoiTuDongTheoNhuCau(cauHoi, ungVien, dieuKienGia, preferences, sanPhamQuanTam, brand, loaiTru);
     }
 
@@ -813,6 +855,30 @@ public class ChatService {
     private static void them(java.util.Set<Long> s, BigDecimal v) {
         Long x = nhom10.phonenest.service.ai.ChatPriceGuard.vnd(v);
         if (x != null && x > 0) s.add(x);
+    }
+
+    /**
+     * Chuyển lịch sử hội thoại thành văn bản để ChatScopeGuard
+     * hiểu được câu hỏi tiếp nối của người dùng.
+     */
+    private String taoNoiDungLichSuChoScope(List<Message> history) {
+        if (history == null || history.isEmpty()) {
+            return "Chưa có lịch sử hội thoại.";
+        }
+        StringBuilder sb = new StringBuilder();
+        int batDau = Math.max(0, history.size() - LUOT_NHO);
+        for (int i = batDau; i < history.size(); i++) {
+            Message message = history.get(i);
+            if (message == null || message.getText() == null || message.getText().isBlank()) {
+                continue;
+            }
+            String vaiTro = message instanceof UserMessage ? "Người dùng" : "Trợ lý PhoneNest";
+            sb.append(vaiTro)
+                    .append(": ")
+                    .append(cat(message.getText()))
+                    .append("\n");
+        }
+        return sb.toString();
     }
 
     private List<Message> lichSu(List<ChatDto.Turn> history) {

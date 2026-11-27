@@ -68,4 +68,28 @@ public interface SanPhamRepository extends JpaRepository<SanPham, String> {
         LEFT JOIN FETCH s.phienBans
     """)
     List<SanPham> findAllWithPhienBans();
+
+    /**
+     * Lấy sản phẩm đang kinh doanh và có ít nhất một phiên bản
+     * đang kinh doanh, còn hàng.
+     *
+     * JOIN FETCH giúp lấy phiên bản cùng sản phẩm,
+     * tránh truy vấn riêng từng sản phẩm khi đọc tồn kho.
+     */
+    @Query("""
+    SELECT DISTINCT s
+    FROM SanPham s
+    LEFT JOIN FETCH s.phienBans
+    WHERE s.trangThai = :status
+      AND EXISTS (
+          SELECT p.maPhienBan
+          FROM PhienBanSanPham p
+          WHERE p.sanPham = s
+            AND p.trangThai = :status
+            AND p.soLuongTon > 0
+      )
+    """)
+    List<SanPham> findAllWithPhienBansCoHang(
+            @Param("status") TrangThaiSanPham status
+    );
 }
