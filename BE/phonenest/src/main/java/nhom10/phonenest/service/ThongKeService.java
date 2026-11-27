@@ -7,6 +7,7 @@ import nhom10.phonenest.dto.ThongKeDto;
 import nhom10.phonenest.entity.DonHang;
 import nhom10.phonenest.entity.LoaiSanPham;
 import nhom10.phonenest.enums.TrangThaiDonHang;
+import nhom10.phonenest.enums.TrangThaiDoiTra;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.mapper.DonHangMapper;
 import nhom10.phonenest.repository.ChiTietDonHangRepository;
@@ -142,8 +143,12 @@ public class ThongKeService {
                 .map(e -> new ThongKeDto.Hang(e.getKey(), e.getValue(), slHang.getOrDefault(e.getKey(), 0)))
                 .toList();
 
-        // 7. Yêu cầu đổi trả trong kỳ
-        int soDoiTra = (int) yeuCauDoiTraRepository.countByNgayTaoRange(start, end);
+        // 7. Yêu cầu đổi trả còn mở, được tạo trong kỳ
+        int soDoiTra = (int) yeuCauDoiTraRepository.countOpenByNgayTaoRange(
+                List.of(TrangThaiDoiTra.CHO_DUYET, TrangThaiDoiTra.DA_DUYET, TrangThaiDoiTra.DANG_XU_LY),
+                start,
+                end
+        );
 
         // 8. Tồn kho cấp biến thể (PhienBanSanPham)
         List<Object[]> invRows = phienBanSanPhamRepository.countVariantInventorySummary(KhoService.NGUONG_SAP_HET);

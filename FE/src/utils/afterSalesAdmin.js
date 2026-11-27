@@ -3,17 +3,19 @@ export const RETURN_ACTIONS = {
   DA_DUYET: [['DANG_XU_LY', 'Bắt đầu xử lý']],
   DANG_XU_LY: [['HOAN_TAT', 'Hoàn tất']],
 };
+export const STATUS_LABELS = {
+  CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DA_DUYET: 'Đã duyệt',
+  DANG_KIEM_TRA: 'Đang kiểm tra', DANG_XAC_MINH: 'Đang xác minh',
+  DANG_XU_LY: 'Đang xử lý', HOAN_TAT: 'Hoàn tất', DA_HOAN_TIEN: 'Đã hoàn tiền', TU_CHOI: 'Từ chối',
+};
 export const AFTER_ACTIONS = {
   CHO_TIEP_NHAN: [['DANG_XU_LY', 'Tiếp nhận'], ['TU_CHOI', 'Từ chối']],
   DANG_XU_LY: [['HOAN_TAT', 'Hoàn tất'], ['TU_CHOI', 'Từ chối']],
 };
-export const STATUS_LABELS = {
-  CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DA_DUYET: 'Đã duyệt',
-  DANG_XU_LY: 'Đang xử lý', HOAN_TAT: 'Hoàn tất', DA_HOAN_TIEN: 'Đã hoàn tiền', TU_CHOI: 'Từ chối',
-};
 export const GROUPS = {
   waiting: ['CHO_DUYET', 'CHO_TIEP_NHAN'],
-  processing: ['DA_DUYET', 'DANG_XU_LY'],
+  processing: ['DA_DUYET', 'DANG_KIEM_TRA', 'DANG_XAC_MINH', 'DANG_XU_LY'],
+  open: ['CHO_DUYET', 'CHO_TIEP_NHAN', 'DA_DUYET', 'DANG_KIEM_TRA', 'DANG_XAC_MINH', 'DANG_XU_LY'],
   approved: ['DA_DUYET'],
   completed: ['HOAN_TAT', 'DA_HOAN_TIEN'],
   rejected: ['TU_CHOI'],
@@ -33,6 +35,7 @@ export function filterRequests(rows, filters = {}) {
     const haystack = [r.maYeuCau, r.maDonHang, r.tenKhach, r.soDienThoai, r.tenSanPham].filter(Boolean).join(' ').toLocaleLowerCase('vi-VN');
     const day = String(r.ngayTao || '').slice(0,10);
     return (!query || haystack.includes(query)) &&
+      (!filters.source || r.source === filters.source) &&
       (!filters.status || (filters.status === 'overdue' ? isOverdue(r) : filters.status === 'today' ? completedToday(r) : GROUPS[filters.status]?.includes(r.trangThai))) &&
       (!filters.type || r.loai === filters.type) &&
       (!start || day >= start) && (!end || day <= end);

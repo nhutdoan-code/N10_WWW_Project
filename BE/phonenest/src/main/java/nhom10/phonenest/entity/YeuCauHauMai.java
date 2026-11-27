@@ -48,6 +48,9 @@ public class YeuCauHauMai {
     private String ghiChuXuLy;
 
     @Column(length = 1000)
+    private String ketQuaXuLy;
+
+    @Column(length = 1000)
     private String ghiChuNoiBo;
 
     @Column(nullable = false)

@@ -1,9 +1,9 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..24 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..25 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 (pn_migration_log có M12/M15/M16).
---     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL (khiếu nại không gắn đơn).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15-25 (pn_migration_log có M12/M15/M16).
+--     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL; M25: trạng thái kiểm tra/xác minh + ketQuaXuLy.
 --   * 42 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
@@ -1160,7 +1160,7 @@ SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 CREATE TABLE `LichSuHauMai` (
   `maLichSu` varchar(50) NOT NULL,
   `maYeuCau` varchar(50) NOT NULL,
-  `trangThai` enum('CHO_TIEP_NHAN','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL,
+  `trangThai` enum('CHO_TIEP_NHAN','DANG_KIEM_TRA','DANG_XAC_MINH','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL,
   `ghiChu` varchar(500) DEFAULT NULL,
   `thoiGian` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`maLichSu`),
@@ -5894,10 +5894,11 @@ CREATE TABLE `YeuCauHauMai` (
   `maDonHang` varchar(50) DEFAULT NULL,
   `maChiTietDonHang` varchar(50) DEFAULT NULL,
   `loai` enum('BAO_HANH','KHIEU_NAI') NOT NULL,
-  `trangThai` enum('CHO_TIEP_NHAN','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
+  `trangThai` enum('CHO_TIEP_NHAN','DANG_KIEM_TRA','DANG_XAC_MINH','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
   `lyDo` text NOT NULL,
   `hinhAnhMinhChung` varchar(500) DEFAULT NULL,
   `ghiChuXuLy` varchar(500) DEFAULT NULL,
+  `ketQuaXuLy` varchar(1000) DEFAULT NULL,
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayCapNhat` datetime NOT NULL DEFAULT current_timestamp(),
   `ghiChuNoiBo` varchar(1000) DEFAULT NULL,

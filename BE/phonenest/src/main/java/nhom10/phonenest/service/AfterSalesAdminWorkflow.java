@@ -29,7 +29,11 @@ public class AfterSalesAdminWorkflow {
     private final TaiKhoanRepository accounts;
     private final ThanhToanRepository payments;
     public static final Set<String> REJECT_REASONS = Set.of("Quá hạn chính sách", "Không đủ điều kiện", "Minh chứng không hợp lệ", "Sản phẩm không khớp", "Khác");
-    public record Action(String action, String note, String reason, String department, String status) {}
+    public record Action(String action, String note, String reason, String department, String status, String ketQuaXuLy) {
+        public Action(String action, String note, String reason, String department, String status) {
+            this(action, note, reason, department, status, null);
+        }
+    }
     public record Detail(List<NhatKyHoatDongChiTietDto> timeline, Set<String> steps, String phone,
                          LocalDateTime created, LocalDateTime delivered, LocalDateTime confirmed,
                          LocalDateTime deadline, Boolean eligibleAtSubmission, String voucher,
@@ -110,8 +114,10 @@ public class AfterSalesAdminWorkflow {
                 if (!Set.of("DA_DUYET", "DANG_XU_LY", "HOAN_TAT", "TU_CHOI").contains(next)) throw bad("Trạng thái không hợp lệ");
                 returnService.capNhat(id, TrangThaiDoiTra.valueOf(next), note);
             } else {
-                if (!Set.of("DANG_XU_LY", "HOAN_TAT", "TU_CHOI").contains(next)) throw bad("Trạng thái không hợp lệ");
-                afterService.xuLy(id, new HauMaiDto.XuLyRequest(TrangThaiHauMai.valueOf(next), note));
+                if (!Set.of("DANG_KIEM_TRA", "DANG_XAC_MINH", "DANG_XU_LY", "HOAN_TAT", "TU_CHOI").contains(next)) throw bad("Trạng thái không hợp lệ");
+                String outcome = Objects.toString(action.ketQuaXuLy(), "").trim();
+                afterService.xuLy(id, new HauMaiDto.XuLyRequest(
+                        TrangThaiHauMai.valueOf(next), note, outcome.isBlank() ? null : outcome));
             }
             if (!ret) record(id, Map.of("suKien", "STATUS", "trangThai", next, "phanHoi", note));
             return;

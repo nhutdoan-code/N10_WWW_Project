@@ -7,13 +7,14 @@ import useToast from '../hooks/useToast';
 import { customerService } from '../service/customerService';
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatDay, formatPrice } from '../utils/format';
+import { afterSalesStatusLabel } from '../utils/afterSalesWorkflow';
 import { eligible, remainingLabel, warrantyEnd, returnEnd, deadlineTone } from '../utils/warrantyPolicy';
 import { TYPES, REASONS, allowedConditions, refundOptions, FAULTS, descriptionHint, APPEARANCES, TOPICS, MAX_IMAGES, imageError, proofRequired, validateForm, deviceIdentifiers, MISMATCHES, BANKS, accountDigits, normalizeHolder, preferredCondition, refundEstimate, maskAccount, evidenceHint, clearFieldErrors, validationAfterChange, visibleValidationErrors, descriptionMin, selectedFaults, toggleFault, warrantyAppearanceWarning } from '../utils/afterSalesForm';
 
 import { downloadReceipt, printReceipt } from '../utils/afterSalesReceipt';
 
 const EMPTY = { maDonHang: '', maPhienBan: '', soLuong: 1, lyDo: '', reason: '', condition: '', fault: '', sealConfirmed: '', mismatch: '', refund: '', bank: '', account: '', holder: '', targetId: '', serial: '', serialKind: 'IMEI', appearance: '', topic: '' };
-const STATUS = { CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DANG_XU_LY: 'Đang xử lý', DA_DUYET: 'Đã duyệt', TU_CHOI: 'Từ chối', HOAN_TAT: 'Hoàn tất' };
+const STATUS = { CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DANG_KIEM_TRA: 'Đang kiểm tra', DANG_XAC_MINH: 'Đang xác minh', DANG_XU_LY: 'Đang xử lý', DA_DUYET: 'Đã duyệt', TU_CHOI: 'Từ chối', HOAN_TAT: 'Hoàn tất', DA_HOAN_TIEN: 'Đã hoàn tiền' };
 const HINTS = { TRA_HANG_HOAN_TIEN: 'Ví dụ: máy không lên nguồn khi mở hộp, đã thử sạc...', DOI_HANG: 'Nêu lý do đổi và phiên bản bạn mong muốn...', KHIEU_NAI: 'Nêu sự việc, thời điểm và cách bạn mong muốn được hỗ trợ...' };
 const policyLines = (type, p) => {
   const days = p?.returnDays ? `trong ${p.returnDays} ngày` : 'trong thời hạn quy định';
@@ -37,6 +38,9 @@ function Preview({ file, remove }) {
 }
 const requestType = r => r.loai || r.loaiYeuCau || 'TRA_HANG_HOAN_TIEN';
 const requestImages = r => r.anhMinhChung || (r.hinhAnhMinhChung ? [r.hinhAnhMinhChung] : []);
+const RequestStatus = ({ request, status = request.trangThai }) => ['BAO_HANH', 'KHIEU_NAI'].includes(requestType(request))
+  ? <span className={`badge badge-${status}`}>{afterSalesStatusLabel(status, requestType(request))}</span>
+  : <StatusBadge status={status} />;
 export default function ReturnsPage() {
   const [params] = useSearchParams();
   const requestedOrder = params.get('orderId') || params.get('maDonHang') || '';
@@ -299,11 +303,11 @@ export default function ReturnsPage() {
       <div className="row between after-sales-heading"><h3>Yêu cầu của tôi</h3><div className="as-filters"><select aria-label="Lọc loại yêu cầu" value={locLoai} onChange={e => setLocLoai(e.target.value)}><option value="">Tất cả loại</option>{Object.entries(TYPES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><select aria-label="Lọc trạng thái" value={locStatus} onChange={e => setLocStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
       {loading && <p className="muted">Đang tải yêu cầu…</p>}{error && <div className="as-error" role="alert">Không tải được yêu cầu: {error} <button className="btn" onClick={reload}>Thử lại</button></div>}
       {!loading && !error && filtered.length === 0 && <p className="muted">{allRequests.length ? 'Không có kết quả theo bộ lọc.' : 'Bạn chưa có yêu cầu nào'}</p>}
-      {filtered.map(r => <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request"><div className="row between after-sales-heading"><div><b>{TYPES[requestType(r)]}</b> · <span className="muted">{r.maYeuCau}</span></div><StatusBadge status={r.trangThai}/></div>
+      {filtered.map(r => <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request"><div className="row between after-sales-heading"><div><b>{TYPES[requestType(r)]}</b> · <span className="muted">{r.maYeuCau}</span></div><RequestStatus request={r}/></div>
         <p>Đơn hàng: {r.maDonHang ? <Link to={`/orders/${encodeURIComponent(r.maDonHang)}`}>{r.maDonHang}</Link> : 'Không gắn đơn hàng'}</p><p>Sản phẩm: {r.tenSanPham || 'Không chỉ định'}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p><p style={{whiteSpace:'pre-wrap'}}>{maskAccount(r.lyDo)}</p>
         {r.soTienHoanDuKien != null && <p><b>{r.ngayHoanTien ? 'Đã ghi nhận hoàn tiền' : 'Tiền hoàn dự kiến'}:</b> {formatPrice(r.soTienHoanDuKien)}</p>}
         <div className="as-thumbs">{requestImages(r).map((url,i) => <a key={url} href={url} target="_blank" rel="noreferrer"><img className="as-evidence" src={url} alt={`Minh chứng ${i+1}`} /></a>)}</div>
-        <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}<div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details><summary>Xem lịch sử xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><StatusBadge status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{item.ghiChu}</div>}</li>)}</ol></details>}
+        <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}{r.ketQuaXuLy && <p className="after-sales-outcome"><b>Kết quả xử lý:</b> {maskAccount(r.ketQuaXuLy)}</p>}<div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details open><summary>Tiến trình xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><RequestStatus request={r} status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{maskAccount(item.ghiChu)}</div>}</li>)}</ol></details>}
       </article>)}
     </section>
   </div>;

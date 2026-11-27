@@ -40,6 +40,7 @@ export default function AdminApprovalsPage() {
   const [trangThai, setTrangThai] = useState('');
   const [maThuongHieu, setMaThuongHieu] = useState('');
   const [chiKhongDuocBan, setChiKhongDuocBan] = useState(false);
+  const [statFilter, setStatFilter] = useState('');
   const [selected, setSelected] = useState(null);
   const debounced = useDebounce(q);
 
@@ -56,15 +57,42 @@ export default function AdminApprovalsPage() {
   );
   const { data: brands } = useFetch(productService.brands);
   const rows = useMemo(() => data || [], [data]);
+  const visibleRows = useMemo(() => {
+    if (statFilter === 'allowed') return rows.filter((v) => v.duocPhepBan);
+    if (statFilter === 'mismatch') return rows.filter((v) => v.canhBaoPheDuyetLech);
+    return rows;
+  }, [rows, statFilter]);
+
+  const filterFromStat = (key) => {
+    if (key === 'pending' || key === 'blocked') {
+      const status = key === 'pending' ? 'PENDING_REVIEW' : 'BLOCKED';
+      setStatFilter('');
+      setTrangThaiPheDuyet((current) => current === status ? '' : status);
+      setChiKhongDuocBan(false);
+      return;
+    }
+    const nextFilter = statFilter === key ? '' : key;
+    setStatFilter(nextFilter);
+    setTrangThaiPheDuyet(nextFilter ? 'APPROVED' : '');
+    setChiKhongDuocBan(false);
+  };
 
   const stats = useMemo(() => rows.reduce((s, v) => {
-    s.tong += 1;
     if (v.duocPhepBan) s.duocBan += 1;
     if (v.trangThaiPheDuyet === 'PENDING_REVIEW') s.cho += 1;
     if (v.trangThaiPheDuyet === 'BLOCKED') s.khoa += 1;
     if (v.canhBaoPheDuyetLech) s.lech += 1;
     return s;
-  }, { tong: 0, duocBan: 0, cho: 0, khoa: 0, lech: 0 }), [rows]);
+  }, { duocBan: 0, cho: 0, khoa: 0, lech: 0 }), [rows]);
+  const hasFilters = Boolean(q.trim() || trangThaiPheDuyet || trangThai || maThuongHieu || chiKhongDuocBan || statFilter);
+  const clearFilters = () => {
+    setQ('');
+    setTrangThaiPheDuyet('');
+    setTrangThai('');
+    setMaThuongHieu('');
+    setChiKhongDuocBan(false);
+    setStatFilter('');
+  };
 
   return (
     <>
@@ -76,18 +104,29 @@ export default function AdminApprovalsPage() {
         </p>
       </div>
       <div className="stats-grid" data-testid="approval-stats">
-        <div className="stat-card"><span>Biến thể (theo bộ lọc)</span><b>{stats.tong}</b></div>
-        <div className="stat-card"><span>Được phép bán</span><b>{stats.duocBan}</b></div>
-        <div className="stat-card"><span>Chờ phê duyệt</span><b>{stats.cho}</b></div>
-        <div className="stat-card"><span>Đang khóa bán</span><b>{stats.khoa}</b></div>
-        <div className="stat-card"><span>Đã duyệt nhưng dữ liệu đổi</span><b>{stats.lech}</b></div>
+        {[
+          ['allowed', 'Được phép bán', stats.duocBan, statFilter === 'allowed'],
+          ['pending', 'Chờ phê duyệt', stats.cho, trangThaiPheDuyet === 'PENDING_REVIEW'],
+          ['blocked', 'Đang khóa bán', stats.khoa, trangThaiPheDuyet === 'BLOCKED'],
+          ['mismatch', 'Đã duyệt nhưng dữ liệu đổi', stats.lech, statFilter === 'mismatch'],
+        ].map(([key, label, count, active]) => (
+          <button
+            key={key}
+            type="button"
+            className={`stat-card stat-card-button${active ? ' active' : ''}`}
+            aria-pressed={active}
+            onClick={() => filterFromStat(key)}
+          >
+            <span>{label}</span><b>{count}</b>
+          </button>
+        ))}
       </div>
 
       <div className="approval-filters">
         <input className="input" aria-label="Tìm kiếm" placeholder="Tên máy, mã sản phẩm, mã biến thể hoặc SKU"
           value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input" aria-label="Trạng thái phê duyệt" value={trangThaiPheDuyet}
-          onChange={(e) => setTrangThaiPheDuyet(e.target.value)}>
+          onChange={(e) => { setTrangThaiPheDuyet(e.target.value); setStatFilter(''); }}>
           <option value="">Mọi trạng thái phê duyệt</option>
           <option value="APPROVED">Đã phê duyệt</option>
           <option value="PENDING_REVIEW">Chờ phê duyệt</option>
@@ -103,9 +142,10 @@ export default function AdminApprovalsPage() {
           {(brands || []).map((b) => <option key={b.maThuongHieu} value={b.maThuongHieu}>{b.tenThuongHieu}</option>)}
         </select>
         <label className="approval-check">
-          <input type="checkbox" checked={chiKhongDuocBan} onChange={(e) => setChiKhongDuocBan(e.target.checked)} />
+          <input type="checkbox" checked={chiKhongDuocBan} onChange={(e) => { setChiKhongDuocBan(e.target.checked); setStatFilter(''); }} />
           Chỉ biến thể không đủ điều kiện bán
         </label>
+        {hasFilters && <button type="button" className="btn approval-clear-filters" onClick={clearFilters}>Xóa bộ lọc</button>}
       </div>
 
       <div className="table-scroll">
@@ -117,7 +157,7 @@ export default function AdminApprovalsPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((v) => (
+            {visibleRows.map((v) => (
               <tr key={v.maPhienBan} data-ma={v.maPhienBan}>
                 <td><b>{v.tenMay}</b><div className="muted">{v.tenThuongHieu}</div></td>
                 <td>{v.maPhienBan}<div className="muted">{v.sku}</div></td>
@@ -139,7 +179,7 @@ export default function AdminApprovalsPage() {
       </div>
       {loading && <p className="muted">Đang tải…</p>}
       {error && <p className="error">{error}</p>}
-      {!loading && !error && rows.length === 0 && <p className="muted">Không có biến thể phù hợp với bộ lọc.</p>}
+      {!loading && !error && visibleRows.length === 0 && <p className="muted">Không có biến thể phù hợp với bộ lọc.</p>}
 
       {selected && (
         <VariantApprovalModal

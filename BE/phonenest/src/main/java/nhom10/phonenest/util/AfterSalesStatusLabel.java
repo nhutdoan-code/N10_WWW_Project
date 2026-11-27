@@ -5,6 +5,8 @@ public final class AfterSalesStatusLabel {
         return switch (status) {
             case "CHO_DUYET", "CHO_TIEP_NHAN" -> "Chờ tiếp nhận";
             case "DA_DUYET" -> "Đã duyệt";
+            case "DANG_KIEM_TRA" -> "Đang kiểm tra";
+            case "DANG_XAC_MINH" -> "Đang xác minh";
             case "DANG_XU_LY" -> "Đang xử lý";
             case "TU_CHOI" -> "Từ chối";
             case "HOAN_TAT" -> "Hoàn tất";

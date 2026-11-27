@@ -78,7 +78,7 @@ export const adminService = {
   restockReturn: (ma) => api.post(`/admin/returns/${ma}/restock`),
   recordReturnRefund: (ma, data) => api.post(`/admin/returns/${ma}/refund`, data),
   afterSales: () => api.get('/admin/after-sales'),
-  updateAfterSale: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/after-sales/${ma}/status`, { trangThai, ghiChuXuLy }),
+  updateAfterSale: (ma, payload) => api.put(`/admin/after-sales/${ma}/status`, payload),
 
   getInternalAfterSalesNote: (source, ma) => api.get(`/admin/${source === 'return' ? 'returns' : 'after-sales'}/${encodeURIComponent(ma)}/internal-note`),
   saveInternalAfterSalesNote: (source, ma, ghiChu) => api.put(`/admin/${source === 'return' ? 'returns' : 'after-sales'}/${encodeURIComponent(ma)}/internal-note`, { ghiChu }),

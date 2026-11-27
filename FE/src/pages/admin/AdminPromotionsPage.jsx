@@ -60,13 +60,13 @@ export default function AdminPromotionsPage() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
+  const [statFilter, setStatFilter] = useState('');
   const debounced = useDebounce(q);
   const { data: result, loading, reload } = useFetch(
     () => adminService.promotionsPage({ q: debounced || undefined, page, size }),
     [debounced, page, size]
   );
   const { data: all, reload: reloadAll } = useFetch(adminService.promotions);
-  const list = result?.content || [];
   const [editing, setEditing] = useState(null);
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
@@ -82,6 +82,27 @@ export default function AdminPromotionsPage() {
     (all || []).forEach((k) => { dem[trangThaiVoucher(k, today).label] += 1; });
     return dem;
   }, [all, today]);
+
+  const statFiltered = useMemo(() => {
+    const search = (debounced || '').trim().toLocaleLowerCase('vi-VN');
+    return (all || []).filter((k) => {
+      const statusMatches = !statFilter || trangThaiVoucher(k, today).label === statFilter;
+      const text = `${k.maKm || ''} ${k.tenKm || ''}`.toLocaleLowerCase('vi-VN');
+      return statusMatches && (!search || text.includes(search));
+    });
+  }, [all, debounced, statFilter, today]);
+  const list = statFilter
+    ? statFiltered.slice(page * size, (page + 1) * size)
+    : (result?.content || []);
+  const totalPages = statFilter ? Math.ceil(statFiltered.length / size) : result?.totalPages;
+  const totalElements = statFilter ? statFiltered.length : result?.totalElements;
+
+  useEffect(() => {
+    if (statFilter && page > 0) {
+      const filteredPages = Math.ceil(statFiltered.length / size);
+      if (!filteredPages || page >= filteredPages) setPage(Math.max(0, filteredPages - 1));
+    }
+  }, [statFilter, statFiltered.length, page, size]);
 
   const run = async (action, message) => {
     try {
@@ -170,7 +191,15 @@ export default function AdminPromotionsPage() {
 
       <div className="km-stats">
         {Object.entries(thongKe).map(([label, n]) => (
-          <div key={label} className="stat-card"><span>{label}</span><b>{n}</b></div>
+          <button
+            key={label}
+            type="button"
+            className={`stat-card stat-card-button${statFilter === label ? ' active' : ''}`}
+            aria-pressed={statFilter === label}
+            onClick={() => { setStatFilter((current) => current === label ? '' : label); setPage(0); }}
+          >
+            <span>{label}</span><b>{n}</b>
+          </button>
         ))}
       </div>
 
@@ -237,8 +266,8 @@ export default function AdminPromotionsPage() {
       </div>
       <AdminPagination
         page={page}
-        totalPages={result?.totalPages}
-        totalElements={result?.totalElements}
+        totalPages={totalPages}
+        totalElements={totalElements}
         size={size}
         loading={loading}
         onPageChange={setPage}

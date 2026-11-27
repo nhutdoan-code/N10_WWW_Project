@@ -67,6 +67,8 @@ export const RETURN_STATUS = {
   DANG_XU_LY: 'Đang xử lý',
   HOAN_TAT: 'Hoàn tất',
   CHO_TIEP_NHAN: 'Chờ tiếp nhận',
+  DANG_KIEM_TRA: 'Đang kiểm tra',
+  DANG_XAC_MINH: 'Đang xác minh',
   DA_HOAN_TIEN: 'Đã hoàn tiền',
 };
 

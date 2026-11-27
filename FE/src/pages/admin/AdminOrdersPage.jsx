@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import MoneyInput from '../../components/MoneyInput';
 import StatusBadge from '../../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS } from '../../config/constants';
 import useFetch from '../../hooks/useFetch';
@@ -31,12 +33,45 @@ const empty = {
   minTotal: '',
   maxTotal: '',
   sort: 'ngay_moi',
+  ngayTheo: 'ngayMua',
   size: 20
 };
 
+const readOrderFilters = (searchParams) => {
+  const initial = { ...empty };
+  const status = searchParams.get('trangThai') || '';
+  if (Object.prototype.hasOwnProperty.call(ORDER_STATUS, status)) initial.trangThai = status;
+  initial.q = searchParams.get('q') || '';
+  initial.from = searchParams.get('from') || '';
+  initial.to = searchParams.get('to') || '';
+  initial.minTotal = searchParams.get('minTotal') || '';
+  initial.maxTotal = searchParams.get('maxTotal') || '';
+  initial.ngayTheo = searchParams.get('ngayTheo') === 'ngayGiao' ? 'ngayGiao' : 'ngayMua';
+  if (['ngay_moi', 'ngay_cu', 'tien_cao', 'tien_thap', 'ngay_giao_moi'].includes(searchParams.get('sort'))) {
+    initial.sort = searchParams.get('sort');
+  } else if (initial.ngayTheo === 'ngayGiao') {
+    initial.sort = 'ngay_giao_moi';
+  }
+  const size = Number(searchParams.get('size'));
+  if ([10, 20, 50].includes(size)) initial.size = size;
+  return initial;
+};
+
+const orderFiltersToSearchParams = (filters) => {
+  const params = new URLSearchParams();
+  ['q', 'trangThai', 'from', 'to', 'minTotal', 'maxTotal'].forEach((key) => {
+    if (filters[key]) params.set(key, String(filters[key]));
+  });
+  if (filters.ngayTheo !== 'ngayMua') params.set('ngayTheo', filters.ngayTheo);
+  if (filters.sort !== empty.sort) params.set('sort', filters.sort);
+  if (filters.size !== empty.size) params.set('size', String(filters.size));
+  return params;
+};
+
 export default function AdminOrdersPage() {
-  const [draft, setDraft] = useState({ ...empty });
-  const [filter, setFilter] = useState({ ...empty });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [draft, setDraft] = useState(() => readOrderFilters(searchParams));
+  const [filter, setFilter] = useState(() => readOrderFilters(searchParams));
   const [page, setPage] = useState(0);
 
   const [selected, setSelected] = useState(null);
@@ -59,7 +94,9 @@ export default function AdminOrdersPage() {
     () =>
       adminService.filterOrders({
         q: filter.q || undefined,
-        trangThai: filter.trangThai || undefined,
+        trangThai: filter.trangThai && filter.trangThai !== 'DANG_XU_LY' ? filter.trangThai : undefined,
+        nhomTrangThai: filter.trangThai === 'DANG_XU_LY' ? 'DANG_XU_LY' : undefined,
+        ngayTheo: filter.ngayTheo,
         from: filter.from || undefined,
         to: filter.to || undefined,
         minTotal:
@@ -102,11 +139,13 @@ export default function AdminOrdersPage() {
       return toast('Khoảng tổng tiền không hợp lệ', 'error');
     }
 
-    setPage(0);
-    setFilter({
+    const nextFilter = {
       ...draft,
       q: draft.q.trim()
-    });
+    };
+    setPage(0);
+    setFilter(nextFilter);
+    setSearchParams(orderFiltersToSearchParams(nextFilter), { replace: true });
   };
 
   // Xóa bộ lọc
@@ -114,6 +153,7 @@ export default function AdminOrdersPage() {
     setDraft({ ...empty });
     setFilter({ ...empty });
     setPage(0);
+    setSearchParams({}, { replace: true });
   };
 
   // Cập nhật đơn hàng
@@ -314,12 +354,7 @@ export default function AdminOrdersPage() {
             Tất cả trạng thái
           </option>
 
-          {Object.entries(ORDER_STATUS)
-            .filter(
-              ([value]) =>
-                value !== 'DANG_XU_LY'
-            )
-            .map(([value, label]) => (
+          {Object.entries(ORDER_STATUS).map(([value, label]) => (
               <option
                 key={value}
                 value={value}
@@ -330,7 +365,18 @@ export default function AdminOrdersPage() {
         </select>
 
         <label>
-          Từ ngày
+          Lọc ngày theo
+          <select
+            value={draft.ngayTheo}
+            onChange={(e) => update('ngayTheo', e.target.value)}
+          >
+            <option value="ngayMua">Ngày đặt</option>
+            <option value="ngayGiao">Ngày giao</option>
+          </select>
+        </label>
+
+        <label>
+          {draft.ngayTheo === 'ngayGiao' ? 'Từ ngày giao' : 'Từ ngày đặt'}
           <input
             type="date"
             value={draft.from}
@@ -344,7 +390,7 @@ export default function AdminOrdersPage() {
         </label>
 
         <label>
-          Đến ngày
+          {draft.ngayTheo === 'ngayGiao' ? 'Đến ngày giao' : 'Đến ngày đặt'}
           <input
             type="date"
             value={draft.to}
@@ -359,33 +405,19 @@ export default function AdminOrdersPage() {
 
         <label>
           Tổng tiền từ
-          <input
-            type="number"
-            min="0"
+          <MoneyInput
             value={draft.minTotal}
-            onChange={(e) =>
-              update(
-                'minTotal',
-                e.target.value
-              )
-            }
-            placeholder="VND"
+            onChange={(raw) => update('minTotal', raw)}
+            placeholder="3.000.000"
           />
         </label>
 
         <label>
           Tổng tiền đến
-          <input
-            type="number"
-            min="0"
+          <MoneyInput
             value={draft.maxTotal}
-            onChange={(e) =>
-              update(
-                'maxTotal',
-                e.target.value
-              )
-            }
-            placeholder="VND"
+            onChange={(raw) => update('maxTotal', raw)}
+            placeholder="30.000.000"
           />
         </label>
 
@@ -405,6 +437,10 @@ export default function AdminOrdersPage() {
 
           <option value="ngay_cu">
             Cũ nhất trước
+          </option>
+
+          <option value="ngay_giao_moi">
+            Ngày giao mới nhất trước
           </option>
 
           <option value="tien_cao">
@@ -472,7 +508,7 @@ export default function AdminOrdersPage() {
               <tr>
                 <th>Mã đơn</th>
                 <th>Khách hàng</th>
-                <th>Ngày mua</th>
+                <th>{filter.ngayTheo === 'ngayGiao' ? 'Ngày giao' : 'Ngày mua'}</th>
                 <th>Sản phẩm</th>
                 <th>Tổng tiền</th>
                 <th>Trạng thái</th>
@@ -490,7 +526,7 @@ export default function AdminOrdersPage() {
                   </td>
 
                   <td>
-                    {formatDate(o.ngayMua)}
+                    {formatDate(filter.ngayTheo === 'ngayGiao' ? o.ngayGiao : o.ngayMua)}
                   </td>
 
                   <td>

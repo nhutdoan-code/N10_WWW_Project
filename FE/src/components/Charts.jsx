@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { niceMax, shortMoney } from '../utils/chart';
 
-export function LineChart({ data, format, color, label }) {
+export function LineChart({ data, format, color, label, onPointClick }) {
   const [hover, setHover] = useState(null);
   const W = 720;
   const H = 260;
@@ -15,17 +15,19 @@ export function LineChart({ data, format, color, label }) {
   const ticks = [0, 1, 2, 3, 4].map((i) => (max / 4) * i);
   const step = Math.max(1, Math.ceil(data.length / 7));
 
-  const move = (e) => {
+  const indexAtPointer = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * W;
     const i = Math.round(((px - m.l) / (W - m.l - m.r)) * (data.length - 1));
-    setHover(Math.min(data.length - 1, Math.max(0, data.length === 1 ? 0 : i)));
+    return Math.min(data.length - 1, Math.max(0, data.length === 1 ? 0 : i));
   };
+  const move = (e) => setHover(indexAtPointer(e));
+  const selectPoint = (index) => onPointClick?.(data[index]);
   const h = hover == null ? null : data[hover];
 
   return (
     <div className="chart-wrap">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} onMouseMove={move} onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} role={onPointClick ? 'group' : 'img'} aria-label={label} onMouseMove={move} onMouseLeave={() => setHover(null)}>
         {ticks.map((t) => (
           <g key={t}>
             <line className="grid" x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} />
@@ -37,10 +39,30 @@ export function LineChart({ data, format, color, label }) {
         ))}
         <polygon points={area} fill={color} opacity="0.12" />
         <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" className="draw" />
+        {onPointClick && data.map((d, i) => (
+          <circle
+            key={`hit-${d.label}`}
+            className="chart-point-hit"
+            cx={x(i)} cy={y(d.value)} r="9"
+            pointerEvents="all"
+            role="button" tabIndex="0"
+            aria-label={`${d.label}: ${format === 'money' ? `${Math.round(d.value).toLocaleString('vi-VN')} đồng` : `${d.value} đơn`}. Mở danh sách đơn hàng`}
+            onFocus={() => setHover(i)}
+            onBlur={() => setHover(null)}
+            onClick={() => selectPoint(i)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPoint(i); }
+            }}
+          />
+        ))}
         {h && (
           <g>
             <line className="cross" x1={x(hover)} x2={x(hover)} y1={m.t} y2={H - m.b} />
-            <circle cx={x(hover)} cy={y(h.value)} r="5" fill={color} stroke="var(--surface)" strokeWidth="2" />
+            <circle
+              cx={x(hover)} cy={y(h.value)} r="5" fill={color} stroke="var(--surface)" strokeWidth="2"
+              style={{ cursor: onPointClick ? 'pointer' : undefined }}
+              onClick={() => selectPoint(hover)}
+            />
           </g>
         )}
       </svg>
@@ -54,7 +76,7 @@ export function LineChart({ data, format, color, label }) {
   );
 }
 
-export function Donut({ items, centerLabel }) {
+export function Donut({ items, centerLabel, onSelect }) {
   const [active, setActive] = useState(null);
   const total = items.reduce((s, i) => s + i.value, 0);
   const R = 70;
@@ -63,7 +85,7 @@ export function Donut({ items, centerLabel }) {
   const cur = active == null ? null : items[active];
   return (
     <div className="donut">
-      <svg viewBox="0 0 200 200" role="img" aria-label={centerLabel}>
+      <svg viewBox="0 0 200 200" role={onSelect ? 'group' : 'img'} aria-label={centerLabel}>
         <circle cx="100" cy="100" r={R} fill="none" stroke="var(--track)" strokeWidth="26" />
         {total > 0 && items.map((it, i) => {
           const len = (it.value / total) * C;
@@ -78,6 +100,14 @@ export function Donut({ items, centerLabel }) {
               style={{ transition: 'stroke-width .15s', opacity: active == null || active === i ? 1 : 0.35 }}
               onMouseEnter={() => setActive(i)}
               onMouseLeave={() => setActive(null)}
+              onClick={() => onSelect?.(it)}
+              role={onSelect ? 'button' : undefined}
+              tabIndex={onSelect ? 0 : undefined}
+              aria-label={onSelect ? `${it.name}: ${it.value}. Mở danh sách đơn hàng` : undefined}
+              onKeyDown={onSelect ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(it); }
+              } : undefined}
+              className={onSelect ? 'donut-segment-clickable' : undefined}
             />
           );
           offset += len;
@@ -89,9 +119,19 @@ export function Donut({ items, centerLabel }) {
       <ul className="legend">
         {items.map((it, i) => (
           <li key={it.name} onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)} className={active === i ? 'on' : ''}>
-            <i style={{ background: it.color }} />
-            <span>{it.name}</span>
-            <b>{it.value}</b>
+            {onSelect ? (
+              <button type="button" className="legend-button" onClick={() => onSelect(it)}>
+                <i style={{ background: it.color }} />
+                <span>{it.name}</span>
+                <b>{it.value}</b>
+              </button>
+            ) : (
+              <>
+                <i style={{ background: it.color }} />
+                <span>{it.name}</span>
+                <b>{it.value}</b>
+              </>
+            )}
           </li>
         ))}
       </ul>
@@ -99,7 +139,7 @@ export function Donut({ items, centerLabel }) {
   );
 }
 
-export function BarList({ items, color, format }) {
+export function BarList({ items, color, format, onSelect }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 30);
@@ -111,28 +151,56 @@ export function BarList({ items, color, format }) {
   return (
     <div className="bars">
       {items.map((it) => (
-        <div key={it.name} className="bar-item" title={`${it.name}: ${format ? format(it.value) : it.value} (${Math.round((it.value / total) * 100)}%)`}>
-          <span className="bar-name">{it.name}</span>
-          <div className="bar-track"><i style={{ width: ready ? `${(it.value / max) * 100}%` : 0, background: color }} /></div>
-          <b>{format ? format(it.value) : it.value}</b>
-        </div>
+        onSelect ? (
+          <button key={it.name} type="button" className="bar-item bar-item-button" onClick={() => onSelect(it)} title={`${it.name}: ${format ? format(it.value) : it.value} (${Math.round((it.value / total) * 100)}%). Mở danh sách sản phẩm`}>
+            <span className="bar-name">{it.name}</span>
+            <span className="bar-track"><i style={{ width: ready ? `${(it.value / max) * 100}%` : 0, background: color }} /></span>
+            <b>{format ? format(it.value) : it.value}</b>
+          </button>
+        ) : (
+          <div key={it.name} className="bar-item" title={`${it.name}: ${format ? format(it.value) : it.value} (${Math.round((it.value / total) * 100)}%)`}>
+            <span className="bar-name">{it.name}</span>
+            <div className="bar-track"><i style={{ width: ready ? `${(it.value / max) * 100}%` : 0, background: color }} /></div>
+            <b>{format ? format(it.value) : it.value}</b>
+          </div>
+        )
       ))}
     </div>
   );
 }
 
-export function StackBar({ items }) {
+export function StackBar({ items, onSelect }) {
   const total = items.reduce((s, i) => s + i.value, 0) || 1;
   return (
     <>
       <div className="stack">
         {items.filter((i) => i.value > 0).map((i) => (
-          <i key={i.name} style={{ flex: i.value, background: i.color }} title={`${i.name}: ${i.value} (${Math.round((i.value / total) * 100)}%)`} />
+          <i
+            key={i.name}
+            style={{ flex: i.value, background: i.color }}
+            title={`${i.name}: ${i.value} (${Math.round((i.value / total) * 100)}%)`}
+            className={onSelect ? 'stack-segment-clickable' : undefined}
+            role={onSelect ? 'button' : undefined}
+            tabIndex={onSelect ? 0 : undefined}
+            aria-label={onSelect ? `${i.name}: ${i.value}. Mở tồn kho đã lọc` : undefined}
+            onClick={() => onSelect?.(i)}
+            onKeyDown={onSelect ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(i); }
+            } : undefined}
+          />
         ))}
       </div>
       <ul className="legend row-legend">
         {items.map((i) => (
-          <li key={i.name}><i style={{ background: i.color }} /><span>{i.name}</span><b>{i.value}</b></li>
+          <li key={i.name}>
+            {onSelect ? (
+              <button type="button" className="legend-button" onClick={() => onSelect(i)}>
+                <i style={{ background: i.color }} /><span>{i.name}</span><b>{i.value}</b>
+              </button>
+            ) : (
+              <><i style={{ background: i.color }} /><span>{i.name}</span><b>{i.value}</b></>
+            )}
+          </li>
         ))}
       </ul>
     </>

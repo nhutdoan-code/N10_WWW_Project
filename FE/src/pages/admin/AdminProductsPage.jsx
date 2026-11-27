@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AdminPagination from '../../components/AdminPagination';
 import Modal from '../../components/Modal';
 import ProductForm from '../../components/ProductForm';
@@ -13,7 +14,9 @@ import { errorMessage, formatPrice } from '../../utils/format';
 import { productStatus } from '../../utils/stock';
 
 export default function AdminProductsPage() {
-  const [q, setQ] = useState('');
+  const [searchParams] = useSearchParams();
+  const requestedQuery = searchParams.get('q') || '';
+  const [q, setQ] = useState(requestedQuery);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
@@ -38,6 +41,11 @@ export default function AdminProductsPage() {
   const products = result?.content || [];
   const { data: categories } = useFetch(productService.categories);
   const { data: brands } = useFetch(productService.brands);
+
+  useEffect(() => {
+    setQ(requestedQuery);
+    setPage(0);
+  }, [requestedQuery]);
 
   const run = async (action, message) => {
     try {

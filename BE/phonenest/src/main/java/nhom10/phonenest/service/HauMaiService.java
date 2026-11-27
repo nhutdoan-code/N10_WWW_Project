@@ -25,7 +25,10 @@ import java.util.List;
 @Transactional
 public class HauMaiService {
     private static final List<TrangThaiHauMai> DANG_MO = List.of(
-            TrangThaiHauMai.CHO_TIEP_NHAN, TrangThaiHauMai.DANG_XU_LY);
+            TrangThaiHauMai.CHO_TIEP_NHAN,
+            TrangThaiHauMai.DANG_KIEM_TRA,
+            TrangThaiHauMai.DANG_XAC_MINH,
+            TrangThaiHauMai.DANG_XU_LY);
 
     private final YeuCauHauMaiRepository yeuCauRepo;
     private final DonHangRepository donHangRepo;
@@ -100,12 +103,16 @@ public class HauMaiService {
     public HauMaiDto xuLy(String ma, HauMaiDto.XuLyRequest req) {
         YeuCauHauMai y = yeuCauRepo.findByIdForUpdate(ma)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
-        if (!y.getTrangThai().coTheChuyenSang(req.trangThai())) {
+        if (!y.getTrangThai().coTheChuyenSang(y.getLoai(), req.trangThai())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Không thể chuyển sang trạng thái này");
         }
         String ghiChu = req.ghiChuXuLy() == null ? null : req.ghiChuXuLy().trim();
-        if (req.trangThai() == TrangThaiHauMai.TU_CHOI && (ghiChu == null || ghiChu.isEmpty())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Phải ghi rõ lý do từ chối");
+        if (ghiChu == null || ghiChu.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập nội dung cập nhật");
+        }
+        String ketQua = req.ketQuaXuLy() == null ? null : req.ketQuaXuLy().trim();
+        if (req.trangThai() == TrangThaiHauMai.HOAN_TAT && (ketQua == null || ketQua.isEmpty())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi rõ kết quả xử lý trước khi hoàn tất");
         }
         if (y.getLoai() == LoaiHauMai.BAO_HANH && req.trangThai() == TrangThaiHauMai.HOAN_TAT
                 && !nhom10.phonenest.util.WarrantyDevicePolicy.validResolution(ghiChu)) {
@@ -113,11 +120,15 @@ public class HauMaiService {
         }
         LocalDateTime now = LocalDateTime.now();
         y.setTrangThai(req.trangThai());
-        if (ghiChu != null && !ghiChu.isBlank()) y.setGhiChuXuLy(ghiChu);
+        y.setGhiChuXuLy(ghiChu);
+        if (req.trangThai() == TrangThaiHauMai.HOAN_TAT || req.trangThai() == TrangThaiHauMai.TU_CHOI) {
+            y.setKetQuaXuLy(ketQua);
+        }
         y.setNgayCapNhat(now);
         themLichSu(y, req.trangThai(), ghiChu, now);
         thongBaoService.gui(owner(y).getMaKh(),
-                "Yêu cầu " + tenLoai(y.getLoai()) + " " + y.getMaYeuCau() + ": " + nhom10.phonenest.util.AfterSalesStatusLabel.label(req.trangThai().name()),
+                "Yêu cầu " + tenLoai(y.getLoai()) + " " + y.getMaYeuCau() + ": "
+                        + tenTrangThai(y.getLoai(), req.trangThai()),
                 ThongBaoService.linkYeuCau(y.getMaYeuCau()));
         return toDto(y);
     }
@@ -151,6 +162,18 @@ public class HauMaiService {
         return loai == LoaiHauMai.BAO_HANH ? "bảo hành" : "khiếu nại";
     }
 
+    private String tenTrangThai(LoaiHauMai loai, TrangThaiHauMai trangThai) {
+        return switch (trangThai) {
+            case CHO_TIEP_NHAN -> "đang chờ tiếp nhận";
+            case DANG_KIEM_TRA -> "đang kiểm tra bảo hành";
+            case DANG_XAC_MINH -> "đang xác minh khiếu nại";
+            case DANG_XU_LY -> loai == LoaiHauMai.BAO_HANH
+                    ? "đang sửa chữa" : "đang thực hiện hướng giải quyết";
+            case HOAN_TAT -> "đã hoàn tất";
+            case TU_CHOI -> "bị từ chối";
+        };
+    }
+
     private nhom10.phonenest.entity.KhachHang owner(YeuCauHauMai y) {
         return y.getKhachHang() != null ? y.getKhachHang() : y.getDonHang().getKhachHang();
     }
@@ -164,7 +187,7 @@ public class HauMaiService {
                 dong == null ? null : dong.getPhienBan().getMaPhienBan(),
                 dong == null ? null : dong.getTenSanPham() + " - " + dong.getTenPhienBan(),
                 owner(y).getHoTen(), phone, y.getLoai(), y.getLyDo(),
-                y.getHinhAnhMinhChung(), y.getTrangThai(), y.getGhiChuXuLy(),
+                y.getHinhAnhMinhChung(), y.getTrangThai(), y.getGhiChuXuLy(), y.getKetQuaXuLy(),
                 y.getNgayTao(), y.getNgayCapNhat(),
                 y.getLichSu().stream().map(l -> new HauMaiDto.LichSu(
                         l.getTrangThai(), l.getGhiChu(), l.getThoiGian())).toList());
