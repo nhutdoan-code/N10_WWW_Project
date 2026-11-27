@@ -397,6 +397,21 @@ CREATE TABLE NhatKyHoatDong (
     INDEX IDX_NhatKyHoatDong_LoaiDoiTuong_HanhDong (loaiDoiTuong, hanhDong)
 );
 
+CREATE TABLE PhanCongHauMai (
+    maPhanCong VARCHAR(50) PRIMARY KEY,
+    nguon VARCHAR(12) NOT NULL,
+    maYeuCau VARCHAR(50) NOT NULL,
+    maNguoiPhuTrach VARCHAR(50) NOT NULL,
+    tenNguoiPhuTrach VARCHAR(150) NOT NULL,
+    hanXuLy DATETIME NOT NULL,
+    capNhatBoi VARCHAR(50) NOT NULL,
+    capNhatLuc DATETIME NOT NULL,
+    CONSTRAINT UQ_PhanCongHauMai_YeuCau UNIQUE (nguon, maYeuCau),
+    INDEX IDX_PhanCongHauMai_NguoiHan (maNguoiPhuTrach, hanXuLy),
+    CONSTRAINT FK_PhanCongHauMai_NguoiPhuTrach FOREIGN KEY (maNguoiPhuTrach) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE,
+    CONSTRAINT FK_PhanCongHauMai_CapNhatBoi FOREIGN KEY (capNhatBoi) REFERENCES TaiKhoan(maTk) ON UPDATE CASCADE
+);
+
 -- Quản lý mã OTP đặt lại mật khẩu
 CREATE TABLE IF NOT EXISTS password_reset_otp (
     id BIGINT NOT NULL AUTO_INCREMENT,

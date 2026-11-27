@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../../components/FormField';
+import AdminFetchError from '../../components/AdminFetchError';
 import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
 import { locationService } from '../../service/locationService';
@@ -24,8 +25,8 @@ const soHoacNull = (v) => (v === '' || v == null ? null : Number(v));
 const phuPhi = (v) => (Number(v) > 0 ? `+${formatPrice(v)}` : '—');
 
 export default function AdminShippingPage() {
-  const { data: list, reload } = useFetch(adminService.shippingFees);
-  const { data: provinces } = useFetch(locationService.provinces);
+  const { data: list, loading, error, reload } = useFetch(adminService.shippingFees);
+  const { data: provinces, loading: provincesLoading, error: provincesError, reload: reloadProvinces } = useFetch(locationService.provinces);
   const [editing, setEditing] = useState(null);
   const toast = useToast();
 
@@ -71,6 +72,8 @@ export default function AdminShippingPage() {
         3.000.000 ₫ và phụ phí 15.000 ₫ khi thanh toán COD cho đơn trên 10.000.000 ₫. Voucher vận chuyển chỉ giảm phí giao hàng.
         Đơn đặt sau 16:00 được tính ngày giao từ hôm sau. Tỉnh chưa có trong danh sách dùng mức mặc định.
       </p>
+      <AdminFetchError error={error} onRetry={reload} loading={loading} />
+      {loading && <p className="muted">Đang tải bảng phí vận chuyển…</p>}
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <table className="table">
           <thead>
@@ -97,12 +100,16 @@ export default function AdminShippingPage() {
                 </div></td>
               </tr>
             ))}
+            {!loading && !error && list?.length === 0 && (
+              <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: '24px' }}>Chưa có mức phí vận chuyển.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
       {editing && (
         <Modal title={editing.maPhi ? 'Sửa phí vận chuyển' : 'Thêm khu vực'} onClose={() => setEditing(null)}>
           <form className="form" onSubmit={submit}>
+            <AdminFetchError error={provincesError} onRetry={reloadProvinces} loading={provincesLoading} />
             {editing.maPhi ? (
               <FormField label="Khu vực" value={editing.tenKhuVuc} disabled />
             ) : (

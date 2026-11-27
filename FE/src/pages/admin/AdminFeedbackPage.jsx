@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AdminPagination from '../../components/AdminPagination';
+import AdminFetchError from '../../components/AdminFetchError';
 import useDebounce from '../../hooks/useDebounce';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
@@ -15,11 +16,11 @@ export default function AdminFeedbackPage() {
   const [questionSize, setQuestionSize] = useState(20);
   const reviewSearch = useDebounce(reviewQ);
   const questionSearch = useDebounce(questionQ);
-  const { data: reviewResult, loading: reviewsLoading, reload: reloadReviews } = useFetch(
+  const { data: reviewResult, loading: reviewsLoading, error: reviewsError, reload: reloadReviews } = useFetch(
     () => adminService.reviewsPage({ q: reviewSearch || undefined, page: reviewPage, size: reviewSize }),
     [reviewSearch, reviewPage, reviewSize]
   );
-  const { data: questionResult, loading: questionsLoading, reload: reloadQuestions } = useFetch(
+  const { data: questionResult, loading: questionsLoading, error: questionsError, reload: reloadQuestions } = useFetch(
     () => adminService.questionsPage({ q: questionSearch || undefined, page: questionPage, size: questionSize }),
     [questionSearch, questionPage, questionSize]
   );
@@ -62,6 +63,7 @@ export default function AdminFeedbackPage() {
           onChange={(event) => { setReviewQ(event.target.value); setReviewPage(0); }}
         />
       </div>
+      <AdminFetchError error={reviewsError} onRetry={reloadReviews} loading={reviewsLoading} />
       <table className="table">
         <thead>
           <tr><th>Sản phẩm</th><th>Khách</th><th>Sao</th><th>Nội dung</th><th>Ngày</th><th></th></tr>
@@ -77,7 +79,7 @@ export default function AdminFeedbackPage() {
               <td><button className="btn btn-danger" onClick={() => window.confirm('Xóa đánh giá này?') && run(() => adminService.deleteReview(r.maDanhGia), 'Đã xóa đánh giá', reloadReviews)}>Xóa</button></td>
             </tr>
           ))}
-          {!reviewsLoading && reviews.length === 0 && (
+          {!reviewsLoading && !reviewsError && reviews.length === 0 && (
             <tr><td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>Không tìm thấy đánh giá phù hợp.</td></tr>
           )}
         </tbody>
@@ -102,6 +104,7 @@ export default function AdminFeedbackPage() {
           onChange={(event) => { setQuestionQ(event.target.value); setQuestionPage(0); }}
         />
       </div>
+      <AdminFetchError error={questionsError} onRetry={reloadQuestions} loading={questionsLoading} />
       {questions.map((q) => (
         <div key={q.maCauHoi} className="card order">
           <div className="row between">
@@ -127,7 +130,7 @@ export default function AdminFeedbackPage() {
           </div>
         </div>
       ))}
-      {!questionsLoading && questions.length === 0 && <p className="muted">Không tìm thấy câu hỏi phù hợp.</p>}
+      {!questionsLoading && !questionsError && questions.length === 0 && <p className="muted">Không tìm thấy câu hỏi phù hợp.</p>}
       <AdminPagination
         page={questionPage}
         totalPages={questionResult?.totalPages}

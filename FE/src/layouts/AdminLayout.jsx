@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { adminService } from '../service/adminService';
-import { countPending, normalizeRequests } from '../utils/afterSalesAdmin';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import usePageTransition from '../hooks/usePageTransition';
 import Logo from '../components/Logo';
@@ -52,8 +51,8 @@ export default function AdminLayout() {
   usePageTransition(contentRef, useLocation().pathname);
   const refreshPending = useCallback(async () => {
     try {
-      const [returns, afterSales] = await Promise.all([adminService.returns(), adminService.afterSales()]);
-      setPending(countPending(normalizeRequests({ returns, afterSales })));
+      const summary = await adminService.afterSalesSummary();
+      setPending(Number(summary?.waiting || 0));
     } catch { /* Giữ menu hoạt động khi API lỗi */ }
   }, []);
   useEffect(() => {

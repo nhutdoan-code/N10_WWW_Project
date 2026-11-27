@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AdminPagination from '../../components/AdminPagination';
+import AdminFetchError from '../../components/AdminFetchError';
 import FormField from '../../components/FormField';
 import Modal from '../../components/Modal';
 import MoneyInput from '../../components/MoneyInput';
@@ -62,14 +63,20 @@ export default function AdminPromotionsPage() {
   const [size, setSize] = useState(20);
   const [statFilter, setStatFilter] = useState('');
   const debounced = useDebounce(q);
-  const { data: result, loading, reload } = useFetch(
+  const { data: result, loading, error, reload } = useFetch(
     () => adminService.promotionsPage({ q: debounced || undefined, page, size }),
     [debounced, page, size]
   );
-  const { data: all, reload: reloadAll } = useFetch(adminService.promotions);
+  const { data: all, loading: allLoading, error: allError, reload: reloadAll } = useFetch(adminService.promotions);
   const [editing, setEditing] = useState(null);
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (() => {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  })();
 
   useEffect(() => {
     if (result && page > 0 && (result.totalElements === 0 || page >= result.totalPages)) {
@@ -202,6 +209,7 @@ export default function AdminPromotionsPage() {
           </button>
         ))}
       </div>
+      <AdminFetchError error={allError} onRetry={reloadAll} loading={allLoading} />
 
       <div className="row" style={{ gap: '12px', margin: '16px 0' }}>
         <input
@@ -212,6 +220,7 @@ export default function AdminPromotionsPage() {
           onChange={(event) => { setQ(event.target.value); setPage(0); }}
         />
       </div>
+      <AdminFetchError error={error} onRetry={reload} loading={loading} />
       <div style={{ overflowX: 'auto' }}>
         <table className="table km-table">
           <thead>
@@ -258,7 +267,7 @@ export default function AdminPromotionsPage() {
                 </tr>
               );
             })}
-            {!loading && list.length === 0 && (
+            {!loading && !error && list.length === 0 && (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>Không tìm thấy khuyến mãi phù hợp.</td></tr>
             )}
           </tbody>

@@ -1,10 +1,10 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..25 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..26 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15-25 (pn_migration_log có M12/M15/M16).
---     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL; M25: trạng thái kiểm tra/xác minh + ketQuaXuLy.
---   * 42 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15-26 (pn_migration_log có M12/M15/M16).
+--     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL; M25: trạng thái kiểm tra/xác minh + ketQuaXuLy. M26 adds after-sales assignment storage.
+--   * 43 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
 --       - 249 ảnh chụp sản phẩm thật theo màu (không ảnh quảng cáo / logo AI): đường dẫn /catalog/<maSanPham>/<mau>.webp, file nằm trong
@@ -5919,6 +5919,23 @@ SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 /*!40000 ALTER TABLE `YeuCauHauMai` ENABLE KEYS */;
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
+
+-- M26: người phụ trách và hạn xử lý yêu cầu hậu mãi; không có dữ liệu phân công mẫu.
+CREATE TABLE `PhanCongHauMai` (
+  `maPhanCong` varchar(50) NOT NULL,
+  `nguon` varchar(12) NOT NULL,
+  `maYeuCau` varchar(50) NOT NULL,
+  `maNguoiPhuTrach` varchar(50) NOT NULL,
+  `tenNguoiPhuTrach` varchar(150) NOT NULL,
+  `hanXuLy` datetime NOT NULL,
+  `capNhatBoi` varchar(50) NOT NULL,
+  `capNhatLuc` datetime NOT NULL,
+  PRIMARY KEY (`maPhanCong`),
+  UNIQUE KEY `UQ_PhanCongHauMai_YeuCau` (`nguon`,`maYeuCau`),
+  KEY `IDX_PhanCongHauMai_NguoiHan` (`maNguoiPhuTrach`,`hanXuLy`),
+  CONSTRAINT `FK_PhanCongHauMai_NguoiPhuTrach` FOREIGN KEY (`maNguoiPhuTrach`) REFERENCES `TaiKhoan` (`maTk`) ON UPDATE CASCADE,
+  CONSTRAINT `FK_PhanCongHauMai_CapNhatBoi` FOREIGN KEY (`capNhatBoi`) REFERENCES `TaiKhoan` (`maTk`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================================================================
 -- MIGRATION 21: lich su ChatBox + vector store MariaDB (xem DB/migrations/21_chat_history_vector_store.sql)
