@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../../components/FormField';
+import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
 import { locationService } from '../../service/locationService';
 import useFetch from '../../hooks/useFetch';
@@ -121,12 +122,24 @@ export default function AdminShippingPage() {
               </select>
             </label>
             <div className="grid-2">
-              <FormField label="Phí giao đến phường (₫)" type="number" min="0" value={editing.phiCoBan} onChange={set('phiCoBan')} required />
-              <FormField label="Miễn phí cho đơn từ (₫)" type="number" min="0" value={editing.mienPhiTu ?? ''} onChange={set('mienPhiTu')} />
+              <label className="field">
+                <span>Phí giao đến phường (₫)</span>
+                <MoneyInput value={editing.phiCoBan} onChange={(raw) => setEditing({ ...editing, phiCoBan: raw })} placeholder="25.000" required />
+              </label>
+              <label className="field">
+                <span>Miễn phí cho đơn từ (₫)</span>
+                <MoneyInput value={editing.mienPhiTu ?? ''} onChange={(raw) => setEditing({ ...editing, mienPhiTu: raw })} placeholder="3.000.000" />
+              </label>
             </div>
             <div className="grid-2">
-              <FormField label="Phụ phí xã ngoại thành (₫)" type="number" min="0" value={editing.phuPhiXa ?? ''} onChange={set('phuPhiXa')} />
-              <FormField label="Phụ phí đặc khu / đảo (₫)" type="number" min="0" value={editing.phuPhiDacKhu ?? ''} onChange={set('phuPhiDacKhu')} />
+              <label className="field">
+                <span>Phụ phí xã ngoại thành (₫)</span>
+                <MoneyInput value={editing.phuPhiXa ?? ''} onChange={(raw) => setEditing({ ...editing, phuPhiXa: raw })} placeholder="0" />
+              </label>
+              <label className="field">
+                <span>Phụ phí đặc khu / đảo (₫)</span>
+                <MoneyInput value={editing.phuPhiDacKhu ?? ''} onChange={(raw) => setEditing({ ...editing, phuPhiDacKhu: raw })} placeholder="15.000" />
+              </label>
             </div>
             <div className="grid-2">
               <FormField label="Giao nhanh nhất (ngày, 0 = trong ngày)" type="number" min="0" max="30" value={editing.soNgayGiaoToiThieu ?? ''} onChange={set('soNgayGiaoToiThieu')} required />

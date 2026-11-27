@@ -525,8 +525,8 @@ table { color: var(--text); }
 .badge-HET_HANG, .badge-DA_HUY, .badge-NGUNG_KINH_DOANH, .badge-TU_CHOI, .badge-BLOCKED, .badge-audit-delete { --dot: var(--danger); }
 .badge-CHO_XAC_NHAN, .badge-CHO_DUYET, .badge-CAN_HOAN_TIEN, .badge-PENDING_REVIEW, .badge-SAP_HET, .badge-CHO_TIEP_NHAN,
 .badge-audit-warn, .badge-CHO_KHACH_XAC_NHAN { --dot: var(--accent); }
-.badge-DANG_XU_LY, .badge-DANG_GIAO, .badge-DA_XAC_NHAN, .badge-DANG_CHUAN_BI, .badge-audit-update, .badge-audit-stock { --dot: var(--brand); }
-.badge-DANG_GIAO::before, .badge-DANG_CHUAN_BI::before, .badge-DA_XAC_NHAN::before, .badge-DANG_XU_LY::before { background: transparent; border: 1.5px solid var(--dot); width: 7px; height: 7px; }
+.badge-DANG_KIEM_TRA, .badge-DANG_XAC_MINH, .badge-DANG_XU_LY, .badge-DANG_GIAO, .badge-DA_XAC_NHAN, .badge-DANG_CHUAN_BI, .badge-audit-update, .badge-audit-stock { --dot: var(--brand); }
+.badge-DANG_KIEM_TRA::before, .badge-DANG_XAC_MINH::before, .badge-DANG_GIAO::before, .badge-DANG_CHUAN_BI::before, .badge-DA_XAC_NHAN::before, .badge-DANG_XU_LY::before { background: transparent; border: 1.5px solid var(--dot); width: 7px; height: 7px; }
 .badge-PENDING_REVIEW, .badge-BLOCKED, .badge-HET_HANG, .badge-NGUNG_KINH_DOANH { background: var(--surface); }
 .badge-KHACH_MOI { --dot: var(--accent); margin-left: 6px; font-size: 0.72rem; }
 .new-customer-note { margin: 4px 0 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text); border: 1px solid var(--warn-line); }
@@ -1079,7 +1079,7 @@ td.row > .btn + .btn { margin-left: 8px; }
 .as-status { --dot: var(--faint); display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 100px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 0.76rem; font-weight: 600; white-space: nowrap; }
 .as-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 .as-CHO_DUYET, .as-CHO_TIEP_NHAN { --dot: var(--accent); }
-.as-DA_DUYET, .as-DANG_XU_LY { --dot: var(--brand); }
+.as-DA_DUYET, .as-DANG_KIEM_TRA, .as-DANG_XAC_MINH, .as-DANG_XU_LY { --dot: var(--brand); }
 .as-HOAN_TAT, .as-DA_HOAN_TIEN { --dot: var(--ok); }
 .as-TU_CHOI { --dot: var(--danger); }
 .as-empty { text-align: center; padding: 32px !important; color: var(--muted); }

@@ -100,9 +100,25 @@ class HauMaiServiceTest {
 
     @Test
     void trangThaiKhongDuocNhayHoanTatNgay() {
-        assertFalse(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(TrangThaiHauMai.HOAN_TAT));
-        assertTrue(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(TrangThaiHauMai.DANG_XU_LY));
-        assertTrue(TrangThaiHauMai.DANG_XU_LY.coTheChuyenSang(TrangThaiHauMai.HOAN_TAT));
-        assertFalse(TrangThaiHauMai.HOAN_TAT.coTheChuyenSang(TrangThaiHauMai.DANG_XU_LY));
+        assertFalse(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.HOAN_TAT));
+        assertFalse(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.DANG_XU_LY));
+        assertTrue(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.DANG_KIEM_TRA));
+        assertFalse(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.DANG_XAC_MINH));
+        assertTrue(TrangThaiHauMai.DANG_KIEM_TRA.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.DANG_XU_LY));
+        assertTrue(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.KHIEU_NAI, TrangThaiHauMai.DANG_XAC_MINH));
+        assertFalse(TrangThaiHauMai.CHO_TIEP_NHAN.coTheChuyenSang(
+                LoaiHauMai.KHIEU_NAI, TrangThaiHauMai.DANG_KIEM_TRA));
+        assertTrue(TrangThaiHauMai.DANG_XAC_MINH.coTheChuyenSang(
+                LoaiHauMai.KHIEU_NAI, TrangThaiHauMai.DANG_XU_LY));
+        assertTrue(TrangThaiHauMai.DANG_XU_LY.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.HOAN_TAT));
+        assertFalse(TrangThaiHauMai.HOAN_TAT.coTheChuyenSang(
+                LoaiHauMai.BAO_HANH, TrangThaiHauMai.DANG_XU_LY));
     }
 }

@@ -3,17 +3,14 @@ export const RETURN_ACTIONS = {
   DA_DUYET: [['DANG_XU_LY', 'Bắt đầu xử lý'], ['HOAN_TAT', 'Hoàn tất']],
   DANG_XU_LY: [['HOAN_TAT', 'Hoàn tất']],
 };
-export const AFTER_ACTIONS = {
-  CHO_TIEP_NHAN: [['DANG_XU_LY', 'Tiếp nhận'], ['TU_CHOI', 'Từ chối']],
-  DANG_XU_LY: [['HOAN_TAT', 'Hoàn tất'], ['TU_CHOI', 'Từ chối']],
-};
 export const STATUS_LABELS = {
   CHO_DUYET: 'Chờ duyệt', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DA_DUYET: 'Đã duyệt',
+  DANG_KIEM_TRA: 'Đang kiểm tra', DANG_XAC_MINH: 'Đang xác minh',
   DANG_XU_LY: 'Đang xử lý', HOAN_TAT: 'Hoàn tất', DA_HOAN_TIEN: 'Đã hoàn tiền', TU_CHOI: 'Từ chối',
 };
 export const GROUPS = {
   waiting: ['CHO_DUYET', 'CHO_TIEP_NHAN'],
-  processing: ['DA_DUYET', 'DANG_XU_LY'],
+  processing: ['DA_DUYET', 'DANG_KIEM_TRA', 'DANG_XAC_MINH', 'DANG_XU_LY'],
   completed: ['HOAN_TAT', 'DA_HOAN_TIEN'],
   rejected: ['TU_CHOI'],
 };

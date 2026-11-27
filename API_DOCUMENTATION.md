@@ -50,11 +50,11 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 | Customer | Giỏ hàng: thêm, tăng/giảm, xóa, xóa hết, kiểm tra tồn kho & trạng thái kinh doanh | `/api/customer/cart` |
 | Customer | Đặt hàng: chọn địa chỉ, mã khuyến mãi, COD/chuyển khoản/ví; email xác nhận | `POST /api/customer/orders` | (trừ kho ngay khi đặt)
 | Customer | Lịch sử, chi tiết, theo dõi trạng thái, hủy (khi chờ xác nhận), mua lại, hóa đơn in/PDF | `/api/customer/orders`, trang `/orders/:ma/invoice` |
-| Customer | Đổi trả/hoàn tiền, đánh giá (chỉ khi đã nhận hàng), hỏi đáp, wishlist, so sánh, thông báo | `/api/customer/returns`, `/reviews`, `/questions`, `/wishlist`, `/api/notifications` |
+| Customer | Đổi trả/hoàn tiền; theo dõi tiến trình bảo hành/khiếu nại; đánh giá (chỉ khi đã nhận hàng), hỏi đáp, wishlist, so sánh, thông báo | `/api/customer/returns`, `/after-sales`, `/reviews`, `/questions`, `/wishlist`, `/api/notifications` |
 | Admin | Tìm kiếm tổng hợp, thống kê & báo cáo (xuất CSV) | `/api/admin/search`, `/api/admin/stats` |
 | Admin | Loại sản phẩm (cây), sản phẩm, tồn kho (nhập kho/điều chỉnh/sắp hết) | `/api/admin/categories`, `/products`, `/inventory` |
 | Admin | Đơn hàng (mới nhất trước, cập nhật trạng thái, sửa số lượng), tài khoản (khóa/xóa có điều kiện) | `/api/admin/orders`, `/accounts` |
-| Admin | Khuyến mãi, xử lý đổi trả, kiểm duyệt đánh giá, trả lời hỏi đáp | `/api/admin/promotions`, `/returns`, `/reviews`, `/questions` |
+| Admin | Khuyến mãi, xử lý đổi trả/bảo hành/khiếu nại, kiểm duyệt đánh giá, trả lời hỏi đáp | `/api/admin/promotions`, `/returns`, `/after-sales`, `/reviews`, `/questions` |
 
 ## Endpoint chi tiết
 
@@ -66,13 +66,15 @@ Vai trò suy ra từ bảng: có trong `QuanTriVien` → `ADMIN`, ngược lại
 - `POST /api/chat` nhận thêm `visitorId` tùy chọn. Trợ lý dùng lượt xem/thêm giỏ và tìm kiếm gần đây (30 ngày, tối đa 100 sự kiện) để ưu tiên sản phẩm liên quan; lịch sử hội thoại không được ghi vào bảng tracking. Khách chưa có lịch sử vẫn nhận gợi ý hiện tại như cũ.
 - Với CSDL đang chạy, chỉ cần thực thi `DB/04_user_tracking.sql`; không cần xóa hoặc tạo lại dữ liệu.
 
-**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`, `POST /{ma}/momo`, `GET /{ma}/payment-status`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications` (mỗi thông báo có `duongDan`: trang FE cần mở khi bấm, vd `/orders/{maDonHang}`, `/returns#{maYeuCau}`, `/products/{maSanPham}#hoi-dap`; null = không có trang chi tiết), `PUT /api/notifications/{ma}/read | read-all`
+**Customer** (`/api/customer`): `cart` (GET, POST, PUT, DELETE, `/sync`, `/{ma}`) · `orders` (POST, GET, `/{ma}`, `PUT /{ma}/cancel`, `POST /{ma}/reorder`, `POST /{ma}/momo`, `GET /{ma}/payment-status`) · `checkout/preview` · `addresses` (CRUD, `PUT /{ma}/default`) · `profile` (GET, PUT, `PUT /password`) · `returns` (POST, GET) · `after-sales` (POST, GET, `GET /{ma}`) · `reviews` (POST, `/mine`, `/order/{maDonHang}`) · `questions` (POST, GET) · `wishlist` (GET, `POST|DELETE /{ma}`) · `GET /api/notifications` (mỗi thông báo có `duongDan`: trang FE cần mở khi bấm, vd `/orders/{maDonHang}`, `/returns#{maYeuCau}`, `/products/{maSanPham}#hoi-dap`; null = không có trang chi tiết), `PUT /api/notifications/{ma}/read | read-all`
 
 **Admin** (`/api/admin`): `products`, `categories` (CRUD) · `inventory` (GET `?q=&loc=&page=0&size=10`, trả về `content`, `totalElements`, `totalPages`; `GET /stats`, `GET /history`, `GET /{ma}/history`, `POST /{ma}/import`, `POST /batch-import` nhận `{ items: [{ sku, soLuong }], ghiChu }`, `PUT /{ma}/adjust`) · `orders` (GET, `/{ma}`, `PUT /{ma}/status`, `PUT /{ma}/items/{maSanPham}`) · `accounts` (GET, `/{ma}`, PUT, DELETE, `PUT /{ma}/toggle-lock`) · `promotions` (CRUD) · `returns` (GET, `PUT /{ma}/status`) · `reviews` (GET, DELETE) · `questions` (GET, `PUT /{ma}/answer`, DELETE) · `stats`, `stats/export`, `search`
 
 **Admin analytics:** `/admin/analytics/behavior` lọc theo `tuNgay`, `denNgay`, `loaiHanhVi`, `maKh`; `/admin/analytics/preferences/{maKh}` xem sở thích tổng hợp; `DELETE /admin/analytics/cleanup?soNgayLuuTru=90` xóa sự kiện cũ sau khi admin xác nhận. Giao diện tại `/admin/analytics`.
 
 **Xử lý hoàn tiền hậu mãi:** sau khi nhận hàng trả, `POST /admin/returns/{ma}/restock` cộng lại đúng số lượng SKU, liên kết biến động kho với yêu cầu và ghi người thao tác. Với yêu cầu trả hàng/hoàn tiền, cửa hàng chuyển tiền ngoài ứng dụng rồi gọi `POST /admin/returns/{ma}/refund` với `{ "hinhThuc": "MOMO|CHUYEN_KHOAN|TIEN_MAT|KHAC", "maGiaoDich": "..." }` để lưu đối soát. Backend không tự chuyển tiền; yêu cầu không thể hoàn tất nếu chưa ghi nhận nhập kho và giao dịch hoàn tiền.
+
+**Quy trình bảo hành / khiếu nại** (`PUT /api/admin/after-sales/{ma}/status`): bảo hành chuyển `CHO_TIEP_NHAN → DANG_KIEM_TRA → DANG_XU_LY → HOAN_TAT|TU_CHOI`; khiếu nại chuyển `CHO_TIEP_NHAN → DANG_XAC_MINH → DANG_XU_LY → HOAN_TAT|TU_CHOI`. Mỗi lần chuyển bước cần `ghiChuXuLy` để ghi lịch sử và cập nhật cho khách; hoàn tất cần thêm `ketQuaXuLy`. Customer API trả tiến trình, nội dung cập nhật và kết quả xử lý. Migration: `DB/migrations/24_after_sales_workflow.sql`.
 
 ## Hủy đơn hàng (UC013)
 `PUT /api/customer/orders/{ma}/cancel` body `{ "lyDo": "...", "ghiChu": "..." }` (`lyDo` chọn từ danh sách 7 lý do phổ biến; `ghiChu` bắt buộc khi chọn "Lý do khác"). Chỉ hủy được khi đơn **Chờ xác nhận** hoặc **Đang xử lý**; đơn Đang giao / Đã giao bị từ chối với thông báo "Đơn hàng đã được bàn giao cho đơn vị vận chuyển, bạn không thể hủy." Hệ thống kiểm tra lại trạng thái trong CSDL, đổi sang Đã hủy, lưu vào bảng `HuyDonHang` (lý do, ghi chú, ngày hủy), cộng lại tồn kho và gửi thông báo. Kho được trừ lúc đặt hàng nên hủy (khách hoặc admin) đều hoàn kho.

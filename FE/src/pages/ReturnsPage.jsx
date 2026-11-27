@@ -9,6 +9,7 @@ import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatDay, formatPrice } from '../utils/format';
 import { ORDER_STATUS } from '../config/constants';
 import { getOrderActions } from '../utils/orderActions';
+import { afterSalesStatusLabel } from '../utils/afterSalesWorkflow';
 
 const LOAI = {
   TRA_HANG_HOAN_TIEN: 'Trả hàng / đề nghị hoàn tiền',
@@ -223,7 +224,9 @@ export default function ReturnsPage() {
           <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request">
             <div className="row between">
               <div><b>{LOAI[r.loai] || r.loai}</b> · <span className="muted">{r.maYeuCau}</span></div>
-              <StatusBadge status={r.trangThai} />
+              {['BAO_HANH', 'KHIEU_NAI'].includes(r.loai)
+                ? <span className={`badge badge-${r.trangThai}`}>{afterSalesStatusLabel(r.trangThai, r.loai)}</span>
+                : <StatusBadge status={r.trangThai} />}
             </div>
             <p>Đơn hàng: <Link to={`/orders/${r.maDonHang}`}>{r.maDonHang}</Link></p>
             {r.tenSanPham && <p>Sản phẩm: {r.tenSanPham}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p>}
@@ -231,13 +234,16 @@ export default function ReturnsPage() {
             {r.hinhAnhMinhChung && <a href={r.hinhAnhMinhChung} rel="noreferrer" target="_blank">Xem ảnh minh chứng</a>}
             <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>
             {r.ghiChuXuLy && <p><b>Phản hồi:</b> {r.ghiChuXuLy}</p>}
+            {r.ketQuaXuLy && <p className="after-sales-outcome"><b>Kết quả xử lý:</b> {r.ketQuaXuLy}</p>}
             {r.lichSu?.length > 0 && (
-              <details>
+              <details open>
                 <summary>Xem lịch sử xử lý ({r.lichSu.length})</summary>
                 <ol className="after-sales-timeline">
                   {r.lichSu.map((item, index) => (
                     <li key={`${r.maYeuCau}-${index}`}>
-                      <StatusBadge status={item.trangThai} /> <span className="muted">{formatDate(item.thoiGian)}</span>
+                      {['BAO_HANH', 'KHIEU_NAI'].includes(r.loai)
+                        ? <span className={`badge badge-${item.trangThai}`}>{afterSalesStatusLabel(item.trangThai, r.loai)}</span>
+                        : <StatusBadge status={item.trangThai} />} <span className="muted">{formatDate(item.thoiGian)}</span>
                       {item.ghiChu && <div>{item.ghiChu}</div>}
                     </li>
                   ))}

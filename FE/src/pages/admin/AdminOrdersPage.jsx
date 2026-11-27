@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from '../../components/Modal';
+import MoneyInput from '../../components/MoneyInput';
 import StatusBadge from '../../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS } from '../../config/constants';
 import useFetch from '../../hooks/useFetch';
@@ -359,33 +360,19 @@ export default function AdminOrdersPage() {
 
         <label>
           Tổng tiền từ
-          <input
-            type="number"
-            min="0"
+          <MoneyInput
             value={draft.minTotal}
-            onChange={(e) =>
-              update(
-                'minTotal',
-                e.target.value
-              )
-            }
-            placeholder="VND"
+            onChange={(raw) => update('minTotal', raw)}
+            placeholder="3.000.000"
           />
         </label>
 
         <label>
           Tổng tiền đến
-          <input
-            type="number"
-            min="0"
+          <MoneyInput
             value={draft.maxTotal}
-            onChange={(e) =>
-              update(
-                'maxTotal',
-                e.target.value
-              )
-            }
-            placeholder="VND"
+            onChange={(raw) => update('maxTotal', raw)}
+            placeholder="30.000.000"
           />
         </label>
 

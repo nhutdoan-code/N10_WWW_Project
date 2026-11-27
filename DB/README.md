@@ -28,7 +28,8 @@ DB/
 │   ├── 20_return_refund_restock_admin.sql  # Đối soát hoàn tiền và nhập lại kho khi đổi trả (+ _rollback)
 │   ├── 21_chat_history_vector_store.sql    # Lịch sử ChatBox + vector store MariaDB (+ _rollback)
 │   ├── 22_shipping_zone_eta_notification_link.sql # Phí ship theo vùng, ngày giao dự kiến, link thông báo (+ _rollback)
-│   └── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
+│   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
+│   └── 24_after_sales_workflow.sql        # Quy trình bảo hành/khiếu nại và kết quả xử lý (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -39,7 +40,7 @@ DB/
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 38 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15, 16, 17, 18, 19, 20; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 55 khóa ngoại, và dữ liệu demo:
+File `DB/phonenest_full.sql` (cập nhật 27/11/2026, đã gồm cấu trúc workflow hậu mãi ở migration 24) là **file duy nhất cần import** cho máy mới. Bản kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema mới cần được áp dụng bằng migration 24 cho database hiện có.
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -103,6 +104,7 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 14. *(sau 20)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/21_chat_history_vector_store.sql` — bảng lịch sử ChatBox (`CuocHoiThoaiChat`, `TinNhanChat`) và vector store sản phẩm trong MariaDB (`phonenest_vector_store`, `product_embedding_sync`). Cần MariaDB ≥ 11.7 (kiểu `VECTOR`). Bắt buộc để dùng ChatBox khi đã đăng nhập; vector store tự quay về bộ nhớ nếu thiếu bảng. Rollback: `21_chat_history_vector_store_rollback.sql`.
 15. *(sau 21)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/22_shipping_zone_eta_notification_link.sql` — phí vận chuyển theo 4 vùng từ kho TP.HCM cho đủ 34 tỉnh/thành (phụ phí xã ngoại thành / đặc khu, phí khai giá 0,5% tối đa 50.000đ cho đơn từ 3 triệu, phụ phí COD 15.000đ cho đơn trên 10 triệu, freeship 3–5 triệu), số ngày giao + ngày giao dự kiến lưu trên đơn, voucher `FREESHIP`/`SHIP50` chỉ giảm phí vùng, cột `ThongBao.duongDan` để bấm thông báo mở đúng trang. **Bắt buộc** với backend hiện tại. Rollback: `22_shipping_zone_eta_notification_link_rollback.sql`.
 16. *(sau 22)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/23_voucher_discount_type.sql` — thêm `KhuyenMai.kieuGiam` (`PHAN_TRAM` bắt buộc có `soTienGiamToiDa` / `SO_TIEN` dùng `soTienGiamCoDinh`), tắt mã cũ NEST10/SALE10TR/KHACHMOI10/WELCOME5 (giữ lịch sử) và thêm bộ voucher mới. **Bắt buộc** với backend hiện tại. Rollback: `23_voucher_discount_type_rollback.sql`.
+17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_after_sales_workflow.sql` — thêm bước kiểm tra/xác minh riêng cho bảo hành và khiếu nại, cùng cột kết quả xử lý. **Bắt buộc** với backend hiện tại. Rollback: `24_after_sales_workflow_rollback.sql`.
 
 ---
 

@@ -21,6 +21,7 @@ public record HauMaiDto(
         String hinhAnhMinhChung,
         TrangThaiHauMai trangThai,
         String ghiChuXuLy,
+        String ketQuaXuLy,
         LocalDateTime ngayTao,
         LocalDateTime ngayCapNhat,
         List<LichSu> lichSu) {
@@ -37,5 +38,7 @@ public record HauMaiDto(
 
     public record XuLyRequest(
             @NotNull(message = "Vui lòng chọn trạng thái") TrangThaiHauMai trangThai,
-            @Size(max = 500, message = "Ghi chú tối đa 500 ký tự") String ghiChuXuLy) {}
+            @NotBlank(message = "Vui lòng nhập nội dung cập nhật")
+            @Size(max = 500, message = "Ghi chú tối đa 500 ký tự") String ghiChuXuLy,
+            @Size(max = 1000, message = "Kết quả xử lý tối đa 1000 ký tự") String ketQuaXuLy) {}
 }
