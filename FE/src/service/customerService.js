@@ -19,9 +19,11 @@ export const customerService = {
   },
   ask: (maSanPham, noiDung) => api.post('/customer/questions', { maSanPham, noiDung }),
 
+  exchangeOptions: () => api.get('/customer/returns/exchange-options'),
   returns: () => api.get('/customer/returns'),
   requestReturn: (data) => api.post('/customer/returns', data),
   afterSales: () => api.get('/customer/after-sales'),
+  afterSalesPolicy: () => api.get('/customer/after-sales/policy'),
   createAfterSale: (data) => api.post('/customer/after-sales', data),
   uploadAfterSaleImage: (file) => {
     const form = new FormData();

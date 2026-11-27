@@ -270,7 +270,7 @@ export default function OrdersPage() {
               </p>
 
               <p className="muted">
-                Sau khi xác nhận, đơn hàng sẽ được hoàn tất.
+                Chỉ xác nhận khi bạn đã thực sự nhận đủ hàng. Sau khi xác nhận, đơn hàng sẽ hoàn tất và bắt đầu tính thời hạn đổi trả, bảo hành.
               </p>
 
               <div className="row end">

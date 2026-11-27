@@ -18,9 +18,13 @@ public class YeuCauHauMai {
     @Column(length = 50)
     private String maYeuCau;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "maDonHang", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "maDonHang")
     private DonHang donHang;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "maKh")
+    private KhachHang khachHang;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "maChiTietDonHang")

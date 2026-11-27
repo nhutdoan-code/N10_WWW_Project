@@ -1,8 +1,9 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..23 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..24 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 (pn_migration_log có M12/M15/M16).
+--     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL (khiếu nại không gắn đơn).
 --   * 42 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
@@ -5890,7 +5891,7 @@ SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `YeuCauHauMai` (
   `maYeuCau` varchar(50) NOT NULL,
-  `maDonHang` varchar(50) NOT NULL,
+  `maDonHang` varchar(50) DEFAULT NULL,
   `maChiTietDonHang` varchar(50) DEFAULT NULL,
   `loai` enum('BAO_HANH','KHIEU_NAI') NOT NULL,
   `trangThai` enum('CHO_TIEP_NHAN','DANG_XU_LY','HOAN_TAT','TU_CHOI') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
@@ -5900,12 +5901,15 @@ CREATE TABLE `YeuCauHauMai` (
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayCapNhat` datetime NOT NULL DEFAULT current_timestamp(),
   `ghiChuNoiBo` varchar(1000) DEFAULT NULL,
+  `maKh` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`maYeuCau`),
   KEY `FK_YeuCauHauMai_ChiTiet` (`maChiTietDonHang`),
   KEY `IDX_HauMai_DonHang` (`maDonHang`,`ngayTao`),
   KEY `IDX_HauMai_TrangThai` (`trangThai`),
+  KEY `IDX_HauMai_Khach` (`maKh`,`ngayTao`),
   CONSTRAINT `FK_YeuCauHauMai_ChiTiet` FOREIGN KEY (`maChiTietDonHang`) REFERENCES `ChiTietDonHang` (`maChiTiet`),
-  CONSTRAINT `FK_YeuCauHauMai_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`)
+  CONSTRAINT `FK_YeuCauHauMai_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`),
+  CONSTRAINT `FK_HauMai_Khach` FOREIGN KEY (`maKh`) REFERENCES `KhachHang` (`maKh`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
