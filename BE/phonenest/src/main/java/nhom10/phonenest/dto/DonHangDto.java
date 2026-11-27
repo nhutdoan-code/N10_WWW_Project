@@ -10,6 +10,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// hanDoiTra/hanBaoHanh la truong tinh toan (chi xuat ra JSON): bo qua khi doc lai, vi du
+// CheckoutIdempotencyService doc lai response da luu de tra cho request lap lai.
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(value = {"hanDoiTra", "hanBaoHanh"}, allowGetters = true)
 public record DonHangDto(
         String maDonHang,
         String maKh,

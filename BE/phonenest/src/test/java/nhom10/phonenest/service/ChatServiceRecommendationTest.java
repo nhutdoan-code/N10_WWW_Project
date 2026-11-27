@@ -60,8 +60,16 @@ class ChatServiceRecommendationTest {
     @Mock
     private UserPreferenceAggregationService userPreferenceService;
 
+    @Mock
+    private ChatScopeGuard chatScopeGuard;
+
     @InjectMocks
     private ChatService chatService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void cauHinhPhamViChat() {
+        lenient().when(chatScopeGuard.kiemTraPhamVi(any(), any())).thenReturn(ChatScopeGuard.KetQua.IN_SCOPE);
+    }
 
     private SanPhamDto iphone15ProMax;
     private SanPhamDto samsungS24Ultra;

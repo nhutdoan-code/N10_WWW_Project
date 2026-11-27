@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -80,6 +81,13 @@ class SemanticSearchServiceTest {
 
         List<SanPham> all = List.of(s24Ultra, iphone15ProMax, galaxyA55, pocoX6Pro, redmi13C, oppoA3);
         lenient().when(sanPhamRepository.findAll()).thenReturn(all);
+        lenient().when(sanPhamRepository.findAllWithPhienBans()).thenReturn(all);
+        lenient().when(sanPhamRepository.findAllWithPhienBansCoHang(any())).thenReturn(all);
+        lenient().when(sanPhamRepository.findAllById(any())).thenAnswer(inv -> {
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            ((Iterable<String>) inv.getArgument(0)).forEach(ids::add);
+            return all.stream().filter(s -> ids.contains(s.getMaSanPham())).toList();
+        });
         for (SanPham s : all) {
             lenient().when(sanPhamRepository.findById(s.getMaSanPham())).thenReturn(Optional.of(s));
         }
