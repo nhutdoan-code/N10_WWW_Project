@@ -30,7 +30,8 @@ DB/
 │   ├── 22_shipping_zone_eta_notification_link.sql # Phí ship theo vùng, ngày giao dự kiến, link thông báo (+ _rollback)
 │   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
 │   ├── 24_after_sales_optional_order.sql   # Hậu mãi V2: maKh, khiếu nại không gắn đơn (+ _rollback)
-│   └── 25_after_sales_workflow.sql         # Bước kiểm tra/xác minh và kết quả xử lý (+ _rollback)
+│   ├── 25_after_sales_workflow.sql         # Bước kiểm tra/xác minh và kết quả xử lý (+ _rollback)
+│   └── 26_after_sales_assignment.sql       # Người phụ trách và hạn xử lý hậu mãi
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -39,13 +40,13 @@ DB/
 
 ## 2. Cách khởi tạo Database
 
-### Migration 24–25 — Hậu mãi V2
+### Migration 24–26 — Hậu mãi V2
 
-Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_optional_order.sql` và `25_after_sales_workflow.sql` trên database đang sử dụng trước khi chạy backend V2. Không xóa hoặc import đè database. M24 thêm `YeuCauHauMai.maKh`, điền chủ sở hữu từ đơn cũ và cho phép khiếu nại không gắn đơn. M25 thêm các trạng thái kiểm tra/xác minh và kết quả xử lý. Nếu trước đó đã áp dụng migration workflow số 24 trên nhánh cũ, M25 dùng `ADD COLUMN IF NOT EXISTS` nên vẫn áp dụng được. Không rollback M24 nếu đã có khiếu nại độc lập. Nếu cài mới, chỉ cần import `phonenest_full.sql`, không chạy lại migration.
+Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_optional_order.sql` và `25_after_sales_workflow.sql` trên database đang sử dụng trước khi chạy backend V2. Không xóa hoặc import đè database. M24 thêm `YeuCauHauMai.maKh`, điền chủ sở hữu từ đơn cũ và cho phép khiếu nại không gắn đơn. M25 thêm các trạng thái kiểm tra/xác minh và kết quả xử lý. Nếu trước đó đã áp dụng migration workflow số 24 trên nhánh cũ, M25 dùng `ADD COLUMN IF NOT EXISTS` nên vẫn áp dụng được. Không rollback M24 nếu đã có khiếu nại độc lập. Nếu cài mới, chỉ cần import `phonenest_full.sql`, không chạy lại migration. Sau M25, chạy thêm `26_after_sales_assignment.sql` để tạo bảng phân công; dữ liệu yêu cầu hiện có không bị thay đổi.
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (schema đã gồm M24 và M25; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 đã được bổ sung vào dump này.
+File `DB/phonenest_full.sql` (schema đã gồm M24, M25 và M26; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 đã được bổ sung vào dump này.
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -111,6 +112,7 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 16. *(sau 22)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/23_voucher_discount_type.sql` — thêm `KhuyenMai.kieuGiam` (`PHAN_TRAM` bắt buộc có `soTienGiamToiDa` / `SO_TIEN` dùng `soTienGiamCoDinh`), tắt mã cũ NEST10/SALE10TR/KHACHMOI10/WELCOME5 (giữ lịch sử) và thêm bộ voucher mới. **Bắt buộc** với backend hiện tại. Rollback: `23_voucher_discount_type_rollback.sql`.
 17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_after_sales_optional_order.sql` — thêm `YeuCauHauMai.maKh` (điền từ đơn cũ), cho phép `maDonHang` NULL để khiếu nại không gắn đơn. Rollback: `24_after_sales_optional_order_rollback.sql` (dừng nếu đã có yêu cầu không gắn đơn).
 18. *(sau 24)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/25_after_sales_workflow.sql` — thêm bước kiểm tra/xác minh riêng cho bảo hành và khiếu nại, cùng cột kết quả xử lý. **Bắt buộc** với backend hiện tại. Rollback: `25_after_sales_workflow_rollback.sql`.
+19. *(sau 25)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/26_after_sales_assignment.sql` — tạo bảng phân công và hạn xử lý, không thay đổi các yêu cầu đã có. Bắt buộc với backend hiện tại.
 
 ---
 

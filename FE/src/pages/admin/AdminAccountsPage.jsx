@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AdminPagination from '../../components/AdminPagination';
+import AdminFetchError from '../../components/AdminFetchError';
 import FormField from '../../components/FormField';
 import Modal from '../../components/Modal';
 import useDebounce from '../../hooks/useDebounce';
@@ -13,7 +14,7 @@ export default function AdminAccountsPage() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const debounced = useDebounce(q);
-  const { data: result, loading, reload } = useFetch(
+  const { data: result, loading, error, reload } = useFetch(
     () => adminService.accountsPage({ q: debounced || undefined, page, size }),
     [debounced, page, size]
   );
@@ -76,6 +77,7 @@ export default function AdminAccountsPage() {
           onChange={(event) => { setQ(event.target.value); setPage(0); }}
         />
       </div>
+      <AdminFetchError error={error} onRetry={reload} loading={loading} />
       <table className="table">
         <thead>
           <tr><th>Mã</th><th>Họ tên</th><th>Email</th><th>Số điện thoại</th><th>Vai trò</th><th>Ngày tạo</th><th>Trạng thái</th><th></th></tr>
@@ -101,7 +103,7 @@ export default function AdminAccountsPage() {
               </td>
             </tr>
           ))}
-          {!loading && accounts.length === 0 && (
+          {!loading && !error && accounts.length === 0 && (
             <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px' }}>Không tìm thấy tài khoản phù hợp.</td></tr>
           )}
         </tbody>

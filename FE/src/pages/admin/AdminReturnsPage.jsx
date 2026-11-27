@@ -2,17 +2,20 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import useFetch from '../../hooks/useFetch';
+import useDebounce from '../../hooks/useDebounce';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
 import { errorMessage } from '../../utils/format';
 import { WARRANTY_OPTIONS } from '../../utils/warrantyPolicy';
+import MoneyInput from '../../components/MoneyInput';
 import {
-  RETURN_ACTIONS, GROUPS, STATUS_LABELS, TYPE_LABELS,
-  countPending, filterRequests, formatAdminDate, normalizeRequests, isOverdue, completedToday, parseRequestText, canComplete, REJECT_REASONS, money, SLA_HOURS,
+  RETURN_ACTIONS, STATUS_LABELS, TYPE_LABELS,
+  formatAdminDate, isOverdue, parseRequestText, canComplete, REJECT_REASONS, money, SLA_HOURS,
 } from '../../utils/afterSalesAdmin';
 import { afterSalesActions, afterSalesStatusLabel } from '../../utils/afterSalesWorkflow';
 
-const initial = { query: '', status: '', source: '', type: '', from: '', to: '', sort: 'priority' };
+const initial = { query: '', status: '', source: '', type: '', from: '', to: '', sort: 'priority', mine: false, deadlineOverdue: false };
+const toLocalMinute = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 const readFilters = (params) => ({
   ...initial,
   query: params.get('query') || '',
@@ -22,6 +25,8 @@ const readFilters = (params) => ({
   from: params.get('from') || '',
   to: params.get('to') || '',
   sort: ['priority', 'dateDesc', 'dateAsc', 'statusAsc', 'statusDesc'].includes(params.get('sort')) ? params.get('sort') : 'priority',
+  mine: params.get('mine') === 'true',
+  deadlineOverdue: params.get('deadlineOverdue') === 'true',
 });
 const filtersToParams = (filters) => {
   const params = new URLSearchParams();
@@ -40,10 +45,6 @@ const statusLabel = (request, status = request?.trangThai) => request?.source ==
 export default function AdminReturnsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const {user} = useContext(AuthContext) || {};
-  const { data, loading, error, reload } = useFetch(async () => {
-    const [returns, afterSales] = await Promise.all([adminService.returns(), adminService.afterSales()]);
-    return { returns: returns || [], afterSales: afterSales || [] };
-  });
   const [filters, setFilters] = useState(() => readFilters(searchParams));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -68,14 +69,29 @@ export default function AdminReturnsPage() {
   const [department, setDepartment] = useState('');
   const [photo, setPhoto] = useState(null);
   const [warrantyOutcome, setWarrantyOutcome] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  const [assignmentNote, setAssignmentNote] = useState('');
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const debouncedQuery = useDebounce(filters.query);
+  const pageParams = useMemo(() => ({
+    q: debouncedQuery || undefined, status: filters.status || undefined, source: filters.source || undefined,
+    type: filters.type || undefined, from: filters.from || undefined, to: filters.to || undefined,
+    sort: filters.sort, page: Math.max(0, page - 1), size: pageSize,
+    mine: filters.mine || undefined, deadlineOverdue: filters.deadlineOverdue || undefined,
+  }), [debouncedQuery, filters.status, filters.source, filters.type, filters.from, filters.to, filters.sort, filters.mine, filters.deadlineOverdue, page, pageSize]);
+  const { data, loading, error, reload } = useFetch(() => adminService.afterSalesPage(pageParams), [pageParams]);
+  const { data: summary, loading: summaryLoading, error: summaryError, reload: reloadSummary } = useFetch(() => adminService.afterSalesSummary(), []);
+  const { data: assignees, loading: assigneesLoading, error: assigneesError, reload: reloadAssignees } = useFetch(() => adminService.afterSalesAssignees(), []);
+  const [requestDetail, setRequestDetail] = useState(null);
   const toast = useToast();
-  const rows = useMemo(() => normalizeRequests(data), [data]);
-  const results = useMemo(() => filterRequests(rows, filters), [rows, filters]);
-  const pageCount = Math.max(1, Math.ceil(results.length / pageSize));
+  const rows = data?.content || [];
+  const pageCount = Math.max(1, Number(data?.totalPages || 1));
   const currentPage = Math.min(page, pageCount);
-  const visible = results.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const detail = selected ? rows.find(r => r.source === selected.source && r.maYeuCau === selected.maYeuCau) : null;
-  useEffect(() => { setPage(1); }, [filters, pageSize]);
+  const visible = rows;
+  const detail = selected ? (requestDetail?.source === selected.source && requestDetail?.maYeuCau === selected.maYeuCau
+    ? requestDetail : rows.find(r => r.source === selected.source && r.maYeuCau === selected.maYeuCau)) : null;
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
   useEffect(() => {
     setNote('');
     setInternalNote('');
@@ -84,6 +100,7 @@ export default function AdminReturnsPage() {
     setRefundAmount(''); setAdjustment(''); setRefundDate(''); setDecision(null); setPhoto(null); setActionNote(''); setRejectReason(''); setDepartment('');
     setResultNote('');
     setWarrantyOutcome('');
+    setAssigneeId(''); setDueAt(''); setAssignmentNote(''); setRequestDetail(null);
     if (!selected) return;
     setNote(draftRead(selected));
     let alive = true;
@@ -92,6 +109,9 @@ export default function AdminReturnsPage() {
       .then(payload => { if (alive) setInternalNote(payload?.ghiChu || ''); })
       .catch(() => { if (alive) toast('Không tải được ghi chú nội bộ', 'error'); })
       .finally(() => { if (alive) setLoadingInternal(false); });
+    adminService.afterSalesRequest(selected.source, selected.maYeuCau)
+      .then(row => { if (alive) setRequestDetail({ ...row, source: selected.source }); })
+      .catch(e => { if (alive) toast(errorMessage(e), 'error'); });
     return () => { alive = false; };
   }, [selected]);
   useEffect(() => {
@@ -103,7 +123,13 @@ export default function AdminReturnsPage() {
       .catch(e => { if(active) setWorkflowError(errorMessage(e)); });
     return () => { active = false; };
   }, [selected, revision]);
-  const refresh = () => { reload(); setRevision(v => v+1); };
+  useEffect(() => {
+    const assignment = workflow?.assignment;
+    if (!assignment) return;
+    setAssigneeId(assignment.maNguoiPhuTrach || '');
+    setDueAt(assignment.hanXuLy ? String(assignment.hanXuLy).slice(0, 16) : '');
+  }, [workflow]);
+  const refresh = () => { reload(); reloadSummary(); setRevision(v => v+1); };
   const draftKey = r => `phonenest:after-sales-draft:${user?.maTk}:${r.source}:${r.maYeuCau}`;
   const draftRead = r => { try { return sessionStorage.getItem(draftKey(r)) || ''; } catch { return ''; } };
   const saveDraft = () => { try { sessionStorage.setItem(draftKey(detail),note); toast('Đã lưu nháp trong tab này, chưa gửi khách'); } catch { toast('Không lưu được nháp','error'); } };
@@ -119,21 +145,23 @@ export default function AdminReturnsPage() {
   };
   const setFilter = (key, value) => {
     const next = { ...filters, [key]: value };
+    setPage(1);
     setFilters(next);
     setSearchParams(filtersToParams(next), { replace: true });
   };
   const selectStat = (status) => {
     const next = { ...initial, status };
+    setPage(1);
     setFilters(next);
     setSearchParams(filtersToParams(next), { replace: true });
   };
   const clearFilters = () => {
+    setPage(1);
     setFilters(initial);
     setSearchParams({}, { replace: true });
   };
   const statusSort = () => setFilter('sort', filters.sort === 'statusAsc' ? 'statusDesc' : 'statusAsc');
   const dateSort = () => setFilter('sort', filters.sort === 'dateDesc' ? 'dateAsc' : 'dateDesc');
-  const doneToday = rows.filter(r => completedToday(r)).length;
   const steps = workflow?.steps || [];
   const parsed = parseRequestText(detail?.lyDo);
   const {fields,description} = parsed;
@@ -193,10 +221,27 @@ export default function AdminReturnsPage() {
     } catch(e) { toast(errorMessage(e),'error'); }
     finally { setBusy(false); }
   };
+  const saveAssignment = async () => {
+    if (!detail || savingAssignment || !assigneeId || !dueAt || !assignmentNote.trim()) return;
+    if (new Date(dueAt).getTime() <= Date.now()) { toast('Hạn xử lý phải nằm trong tương lai', 'error'); return; }
+    setSavingAssignment(true);
+    try {
+      await adminService.assignAfterSales(detail.source, detail.maYeuCau, {
+        maNguoiPhuTrach: assigneeId,
+        hanXuLy: dueAt,
+        ghiChu: assignmentNote.trim(),
+      });
+      toast('Đã giao người phụ trách và hạn xử lý');
+      setAssignmentNote('');
+      refresh();
+      window.dispatchEvent(new Event('phonenest:after-sales-updated'));
+    } catch (e) { toast(errorMessage(e), 'error'); }
+    finally { setSavingAssignment(false); }
+  };
   const refundBase = Number(detail?.soTienHoanDuKien || 0);
 
   const actionNames = {TRIAGE:'Tiếp nhận để thẩm định',REPLY:'Gửi phản hồi',REQUEST_INFO:'Yêu cầu bổ sung thông tin/ảnh',TRANSFER:'Chuyển bộ phận',RECEIVE_CHECK:'Xác nhận nhận máy và kiểm tra',EXCHANGE_HANDOVER:'Xác nhận đã giao máy đổi',WARRANTY_RECEIVE:'Nhận máy bảo hành',WARRANTY_REPAIR:'Ghi nhận đã xử lý kỹ thuật',WARRANTY_HANDOVER:'Xác nhận trả máy cho khách',RESTOCK:'Nhập kho',REFUND:'Ghi nhận hoàn tiền',INTERNAL_NOTE:'Lưu ghi chú nội bộ',STATUS:'Cập nhật trạng thái'};
-  const statCards = [['waiting','Chờ tiếp nhận',countPending(rows)],['processing','Đang xử lý',rows.filter(r=>GROUPS.processing.includes(r.trangThai)).length],['open','Cần duyệt / xử lý',rows.filter(r=>GROUPS.open.includes(r.trangThai)).length],['overdue','Quá hạn phản hồi',rows.filter(r=>isOverdue(r)).length],['today','Hoàn tất hôm nay',doneToday],['','Tổng yêu cầu',rows.length]];
+  const statCards = [['waiting','Chờ tiếp nhận',summary?.waiting ?? '—'],['processing','Đang xử lý',summary?.processing ?? '—'],['open','Cần duyệt / xử lý',summary?.open ?? '—'],['overdue','Quá hạn phản hồi',summary?.overdue ?? '—'],['today','Hoàn tất hôm nay',summary?.completedToday ?? '—'],['','Tổng yêu cầu',summary?.total ?? '—']];
   return <div className="after-sales-admin">
     <h2>Quản lý hậu mãi</h2>
     <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tất không đồng nghĩa đã chuyển tiền hoàn thực tế.</p>
@@ -206,6 +251,8 @@ export default function AdminReturnsPage() {
       <div className="as-stats">
         {statCards.map(([status,label,count])=><button type="button" key={label} className={`as-stat-card ${filters.status===status?'active':''}`} onClick={()=>selectStat(status)}><span>{label}</span><strong>{count}</strong></button>)}
       </div>
+      {summaryLoading && <p className="muted">Đang tải số liệu tổng hợp…</p>}
+      {summaryError && <p className="error">Không tải được số liệu tổng hợp: {summaryError} <button className="btn" onClick={reloadSummary}>Tải lại số liệu</button></p>}
       <p className="muted">HM: bảo hành/khiếu nại · YC: đổi trả. Hai trạng thái chờ được hiển thị chung là Chờ tiếp nhận. SLA phản hồi dự kiến: {SLA_HOURS} giờ lịch.</p>
       <div className="as-filters">
         <label className="as-search">Tìm mã yêu cầu, mã đơn, tên khách, SĐT
@@ -225,19 +272,21 @@ export default function AdminReturnsPage() {
         <label>Sắp xếp<select value={filters.sort} onChange={e=>setFilter('sort',e.target.value)}>
           <option value="priority">Ưu tiên xử lý</option><option value="dateDesc">Ngày mới nhất</option><option value="dateAsc">Ngày cũ nhất</option><option value="statusAsc">Chờ xử lý trước</option><option value="statusDesc">Hoàn tất trước</option>
         </select></label>
+        <label className="as-check-filter"><input type="checkbox" checked={filters.mine} onChange={e=>setFilter('mine',e.target.checked)} /> Việc của tôi</label>
+        <label className="as-check-filter"><input type="checkbox" checked={filters.deadlineOverdue} onChange={e=>setFilter('deadlineOverdue',e.target.checked)} /> Quá hạn xử lý</label>
         <button className="btn" onClick={clearFilters}>Xóa bộ lọc</button>
       </div>
-      <div className="as-list-top"><h3>Danh sách yêu cầu ({results.length})</h3><label>Hiển thị <select value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}><option value={10}>10</option><option value={20}>20</option></select> dòng / trang</label></div>
+      <div className="as-list-top"><h3>Danh sách yêu cầu ({data?.totalElements || 0})</h3><label>Hiển thị <select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1);}}><option value={10}>10</option><option value={20}>20</option></select> dòng / trang</label></div>
       <div className="after-sales-table-wrap"><table className="table as-table">
         <thead><tr><th>Mã yêu cầu</th><th>Đơn hàng</th><th>Khách hàng</th><th>Loại / sản phẩm</th><th><button className="as-sort" onClick={dateSort}>Ngày ↕</button></th><th><button className="as-sort" onClick={statusSort}>Trạng thái ↕</button></th><th>Xử lý</th></tr></thead>
         <tbody>{visible.length===0 && <tr><td colSpan="7" className="as-empty">Không có yêu cầu phù hợp bộ lọc.</td></tr>}
           {visible.map(r => <tr key={`${r.source}-${r.maYeuCau}`} className="as-clickable" onClick={()=>setSelected({source:r.source,maYeuCau:r.maYeuCau})}>
             <td><strong>{r.maYeuCau}</strong><button type="button" className="as-copy-small" aria-label="Sao chép mã yêu cầu" onClick={e=>copy(e,r.maYeuCau)}>⧉</button></td><td>{r.maDonHang || "Không gắn đơn"}{r.maDonHang && <button type="button" className="as-copy-small" aria-label="Sao chép mã đơn" onClick={e=>copy(e,r.maDonHang)}>⧉</button>}</td><td>{r.tenKhach}<div className="muted">{r.soDienThoai || 'SĐT: —'}</div></td>
             <td>{TYPE_LABELS[r.loai] || r.loai}<div className="muted">{r.tenSanPham || (r.loai==='KHIEU_NAI' ? parseRequestText(r.lyDo).fields['Chủ đề'] || 'Khiếu nại chung' : 'Toàn đơn')}{r.soLuong ? ` · ×${r.soLuong}` : ''}</div></td>
-            <td>{formatAdminDate(r.ngayTao)}</td><td><span className={`as-status as-${r.trangThai}`}>{statusLabel(r)}</span>{isOverdue(r)&&<div className="as-late">Quá SLA</div>}</td>
+            <td>{formatAdminDate(r.ngayTao)}</td><td><span className={`as-status as-${r.trangThai}`}>{statusLabel(r)}</span>{isOverdue(r)&&<div className="as-late">Quá SLA</div>}{r.assigneeName&&<div className="muted">Phụ trách: {r.assigneeName}</div>}{r.dueAt&&<div className={new Date(r.dueAt).getTime()<Date.now()?'as-late':'muted'}>Hạn: {formatAdminDate(r.dueAt)}</div>}</td>
             <td><button className="btn" onClick={e=>{e.stopPropagation();setSelected({source:r.source,maYeuCau:r.maYeuCau});}}>{actionsFor(r).length ? 'Xử lý' : 'Xem chi tiết'}</button></td>
           </tr>)}</tbody></table></div>
-      <div className="as-pagination"><span>Trang {currentPage}/{pageCount} · {results.length} yêu cầu</span><button className="btn" disabled={currentPage===1} onClick={()=>setPage(1)}>Đầu</button><button className="btn" disabled={currentPage===1} onClick={()=>setPage(p=>p-1)}>Trước</button><button className="btn" disabled={currentPage===pageCount} onClick={()=>setPage(p=>p+1)}>Sau</button><button className="btn" disabled={currentPage===pageCount} onClick={()=>setPage(pageCount)}>Cuối</button></div>
+      <div className="as-pagination"><span>Trang {currentPage}/{pageCount} · {data?.totalElements || 0} yêu cầu</span><button className="btn" disabled={currentPage===1} onClick={()=>setPage(1)}>Đầu</button><button className="btn" disabled={currentPage===1} onClick={()=>setPage(p=>p-1)}>Trước</button><button className="btn" disabled={currentPage===pageCount} onClick={()=>setPage(p=>p+1)}>Sau</button><button className="btn" disabled={currentPage===pageCount} onClick={()=>setPage(pageCount)}>Cuối</button></div>
     </>}
     {detail && <div className="as-overlay" onMouseDown={e=>{if(!busy&&e.target===e.currentTarget)setSelected(null)}}>
       <section className="as-modal" role="dialog" aria-modal="true" aria-label={`Chi tiết yêu cầu ${detail.maYeuCau}`}>
@@ -245,6 +294,20 @@ export default function AdminReturnsPage() {
         <div className="as-detail-grid"><div><b>Đơn hàng</b><p>{detail.maDonHang || "Không gắn đơn hàng"}</p></div><div><b>Khách hàng</b><p>{detail.tenKhach}</p></div>
           <div><b>Số điện thoại</b><p>{detail.soDienThoai || workflow?.phone || 'Chưa có'}</p></div><div><b>Ngày yêu cầu</b><p>{formatAdminDate(detail.ngayTao)}</p></div>
           <div><b>Loại yêu cầu</b><p>{TYPE_LABELS[detail.loai] || detail.loai}</p></div><div><b>Trạng thái</b><p><span className={`as-status as-${detail.trangThai}`}>{statusLabel(detail)}</span></p></div></div>
+        <section className="as-work-block"><h4>Người phụ trách và hạn xử lý</h4>
+          {workflow?.assignment && <p>Hiện giao cho <b>{workflow.assignment.tenNguoiPhuTrach}</b>, hạn {formatAdminDate(workflow.assignment.hanXuLy)}.</p>}
+          {!isOpen && <p className="muted">Yêu cầu đã đóng, không thể giao thêm việc.</p>}
+          {isOpen && <>
+            {assigneesLoading && <p className="muted">Đang tải danh sách quản trị viên…</p>}
+            {assigneesError && <p className="error">Không tải được danh sách quản trị viên: {assigneesError} <button className="btn" onClick={reloadAssignees}>Tải lại</button></p>}
+            <label>Người phụ trách<select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} disabled={savingAssignment || !assignees?.length}>
+              <option value="">Chọn quản trị viên</option>{(assignees || []).map(a=><option key={a.maTk} value={a.maTk}>{a.hoTen}</option>)}
+            </select></label>
+            <label>Hạn xử lý<input type="datetime-local" min={toLocalMinute(new Date(Date.now() + 60000))} value={dueAt} onChange={e=>setDueAt(e.target.value)} disabled={savingAssignment} /></label>
+            <label>Lý do giao việc / nội dung cập nhật<textarea rows="2" maxLength={500} value={assignmentNote} onChange={e=>setAssignmentNote(e.target.value)} placeholder="Ví dụ: kiểm tra tình trạng máy và cập nhật kết quả" disabled={savingAssignment} /></label>
+            <button className="btn btn-primary" disabled={savingAssignment || !assigneeId || !dueAt || !assignmentNote.trim()} onClick={saveAssignment}>{savingAssignment ? 'Đang giao việc…' : workflow?.assignment ? 'Cập nhật phân công' : 'Giao người phụ trách'}</button>
+          </>}
+        </section>
         <p><b>Sản phẩm:</b> {detail.tenSanPham || (detail.maDonHang ? 'Toàn đơn' : 'Không chỉ định')} {detail.soLuong ? `· Số lượng ${detail.soLuong}` : ''}</p>
         {detail.chiTiet?.length > 0 && <div className="as-request-items"><b>Các dòng hàng</b>{detail.chiTiet.map((item) => <p key={item.maPhienBan}>{item.tenSanPham} · SL {item.soLuong} · {item.daNhapKho ? `Đã nhập kho ${formatAdminDate(item.ngayNhapKho)}` : 'Chưa nhập kho'}</p>)}</div>}
         <section className="as-work-block"><h4>Kiểm tra điều kiện</h4>
@@ -270,7 +333,7 @@ export default function AdminReturnsPage() {
           {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='DANG_XU_LY'&&detail.daNhapKho&&!steps.includes('EXCHANGE_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('EXCHANGE_HANDOVER')}>Ghi nhận đã giao máy đổi</button>}
         </section>}
         {detail.loai==='BAO_HANH'&&<section className="as-work-block"><h4>Quy trình bảo hành</h4><ol className="as-steps">{[['Tiếp nhận yêu cầu',detail.trangThai!=='CHO_TIEP_NHAN'&&detail.trangThai!=='TU_CHOI'],['Nhận máy',steps.includes('WARRANTY_RECEIVE')],['Kiểm tra / sửa chữa',steps.includes('WARRANTY_REPAIR')],['Trả máy',steps.includes('WARRANTY_HANDOVER')],['Hoàn tất',detail.trangThai==='HOAN_TAT']].map(([label,done])=><li key={label} className={done?'done':''}>{done?'✓':'○'} {label}</li>)}</ol>{isOpen&&detail.trangThai==='DANG_XU_LY'&&!steps.includes('WARRANTY_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction(!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER')}>{actionNames[!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER']}</button>}</section>}
-        {detail.source==='return'&&detail.loai==='TRA_HANG_HOAN_TIEN'&&(detail.trangThai==='DANG_XU_LY'||detail.ngayHoanTien)&&<section className="as-work-block"><h4>Đối soát hoàn tiền</h4>{detail.ngayHoanTien?<p>Đã ghi nhận {money(refundBase)} qua {detail.hinhThucHoanTien} · Mã: {detail.maGiaoDichHoanTien} · {formatAdminDate(detail.ngayHoanTien)}</p>:<><p className="muted">Chuyển tiền bên ngoài hệ thống trước khi ghi nhận. Không tự động chuyển tiền.</p><label>Giá trị đủ điều kiện: {money(refundBase)}</label><label>Số tiền thực hoàn (VNĐ)<input type="number" min="1" max={refundBase} step="1" value={refundAmount} placeholder={String(refundBase)} onChange={e=>setRefundAmount(e.target.value)}/></label><p>Giá trị sau ưu đãi {money(refundBase)} − phí/điều chỉnh {money(Math.max(0,refundBase-Number(refundAmount||refundBase)))} = {money(refundAmount||refundBase)}</p>{Number(refundAmount||refundBase)<refundBase&&<label>Lý do điều chỉnh *<textarea maxLength={500} value={adjustment} onChange={e=>setAdjustment(e.target.value)}/></label>}{workflow?.payment==='COD'||fields['Hoàn tiền đề nghị']==='Chuyển khoản'?<p><b>Hình thức:</b> Chuyển khoản</p>:<label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo</option><option value="CHUYEN_KHOAN">Chuyển khoản</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>}<label>Mã giao dịch *<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)}/></label><label>Thời điểm hoàn thực tế (để trống = hiện tại)<input type="datetime-local" value={refundDate} onChange={e=>setRefundDate(e.target.value)}/></label><button className="btn btn-primary" disabled={busy||!workflow||!detail.daNhapKho||!refundReference.trim()} onClick={recordRefund}>Ghi nhận đã hoàn tiền</button>{!detail.daNhapKho&&<p className="muted">Cần nhập kho trước khi hoàn tiền.</p>}</>}</section>}
+        {detail.source==='return'&&detail.loai==='TRA_HANG_HOAN_TIEN'&&(detail.trangThai==='DANG_XU_LY'||detail.ngayHoanTien)&&<section className="as-work-block"><h4>Đối soát hoàn tiền</h4>{detail.ngayHoanTien?<p>Đã ghi nhận {money(refundBase)} qua {detail.hinhThucHoanTien} · Mã: {detail.maGiaoDichHoanTien} · {formatAdminDate(detail.ngayHoanTien)}</p>:<><p className="muted">Chuyển tiền bên ngoài hệ thống trước khi ghi nhận. Không tự động chuyển tiền.</p><label>Giá trị đủ điều kiện: {money(refundBase)}</label><label>Số tiền thực hoàn (VNĐ)<MoneyInput value={refundAmount} placeholder={refundBase.toLocaleString('vi-VN')} onChange={setRefundAmount} aria-label="Số tiền thực hoàn" /></label><p>Giá trị sau ưu đãi {money(refundBase)} − phí/điều chỉnh {money(Math.max(0,refundBase-Number(refundAmount||refundBase)))} = {money(refundAmount||refundBase)}</p>{Number(refundAmount||refundBase)<refundBase&&<label>Lý do điều chỉnh *<textarea maxLength={500} value={adjustment} onChange={e=>setAdjustment(e.target.value)}/></label>}{workflow?.payment==='COD'||fields['Hoàn tiền đề nghị']==='Chuyển khoản'?<p><b>Hình thức:</b> Chuyển khoản</p>:<label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo</option><option value="CHUYEN_KHOAN">Chuyển khoản</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>}<label>Mã giao dịch *<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)}/></label><label>Thời điểm hoàn thực tế (để trống = hiện tại)<input type="datetime-local" value={refundDate} onChange={e=>setRefundDate(e.target.value)}/></label><button className="btn btn-primary" disabled={busy||!workflow||!detail.daNhapKho||!refundReference.trim()} onClick={recordRefund}>Ghi nhận đã hoàn tiền</button>{!detail.daNhapKho&&<p className="muted">Cần nhập kho trước khi hoàn tiền.</p>}</>}</section>}
         {isOpen&&<section className="as-work-block"><h4>Phản hồi gửi khách hàng</h4>{detail.loai==='BAO_HANH'&&detail.trangThai==='DANG_XU_LY'&&<label>Kết quả bảo hành<select value={warrantyOutcome} onChange={e=>setWarrantyOutcome(e.target.value)}><option value="">Chọn kết quả thực tế</option>{WARRANTY_OPTIONS.map(x=><option key={x} value={x}>{x}</option>)}</select></label>}
           <textarea rows="3" maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="Nội dung khách hàng sẽ nhìn thấy"/>
           <div className="after-sales-actions"><button className="btn" disabled={busy} onClick={saveDraft}>Lưu nháp</button><button className="btn" disabled={busy||!note.trim()} onClick={()=>beginAction('REPLY')}>Gửi phản hồi</button><button className="btn" disabled={busy} onClick={()=>beginAction('REQUEST_INFO')}>Yêu cầu bổ sung</button><button className="btn" disabled={busy} onClick={()=>beginAction('TRANSFER')}>Chuyển bộ phận</button></div>

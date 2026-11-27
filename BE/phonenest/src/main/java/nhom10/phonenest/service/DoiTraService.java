@@ -146,6 +146,11 @@ public class DoiTraService {
                 .map(this::dto).toList();
     }
 
+    @Transactional(readOnly = true)
+    public DoiTraDto chiTietAdmin(String ma) {
+        return dto(repo.findById(ma).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu")));
+    }
+
     public DoiTraDto capNhat(String ma, TrangThaiDoiTra moi) {
         return capNhat(ma, moi, null);
     }

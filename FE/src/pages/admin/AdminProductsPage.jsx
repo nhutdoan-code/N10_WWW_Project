@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminPagination from '../../components/AdminPagination';
+import AdminFetchError from '../../components/AdminFetchError';
 import Modal from '../../components/Modal';
 import ProductForm from '../../components/ProductForm';
 import ProductImage from '../../components/ProductImage';
@@ -34,7 +35,7 @@ export default function AdminProductsPage() {
   const status = statusFilter === 'ACTIVE'
     ? 'DANG_KINH_DOANH'
     : statusFilter === 'INACTIVE' ? 'NGUNG_KINH_DOANH' : undefined;
-  const { data: result, loading, reload } = useFetch(
+  const { data: result, loading, error, reload } = useFetch(
     () => adminService.productsPage({ q: debounced || undefined, status, page, size }),
     [debounced, status, page, size]
   );
@@ -161,6 +162,8 @@ export default function AdminProductsPage() {
         </select>
       </div>
 
+      <AdminFetchError error={error} onRetry={reload} loading={loading} />
+
       <table className="table">
         <thead>
           <tr>
@@ -209,7 +212,7 @@ export default function AdminProductsPage() {
               </tr>
             );
           })}
-          {!loading && products.length === 0 && (
+          {!loading && !error && products.length === 0 && (
             <tr>
               <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
                 Không tìm thấy sản phẩm nào phù hợp.

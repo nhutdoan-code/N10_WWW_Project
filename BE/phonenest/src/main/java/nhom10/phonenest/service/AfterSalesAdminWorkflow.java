@@ -9,6 +9,7 @@ import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.*;
 import nhom10.phonenest.util.AfterSalesPolicy;
 import nhom10.phonenest.util.IdGenerator;
+import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,8 @@ public class AfterSalesAdminWorkflow {
     private final HauMaiService afterService;
     private final ThongBaoService notifications;
     private final TaiKhoanRepository accounts;
+    private final QuanTriVienRepository admins;
+    private final PhanCongHauMaiRepository assignments;
     private final ThanhToanRepository payments;
     public static final Set<String> REJECT_REASONS = Set.of("Quá hạn chính sách", "Không đủ điều kiện", "Minh chứng không hợp lệ", "Sản phẩm không khớp", "Khác");
     public record Action(String action, String note, String reason, String department, String status, String ketQuaXuLy) {
@@ -34,10 +37,13 @@ public class AfterSalesAdminWorkflow {
             this(action, note, reason, department, status, null);
         }
     }
+    public record AssignmentRequest(String maNguoiPhuTrach, LocalDateTime hanXuLy, String ghiChu) {}
+    public record Assignment(String maNguoiPhuTrach, String tenNguoiPhuTrach, LocalDateTime hanXuLy) {}
     public record Detail(List<NhatKyHoatDongChiTietDto> timeline, Set<String> steps, String phone,
                          LocalDateTime created, LocalDateTime delivered, LocalDateTime confirmed,
                          LocalDateTime deadline, Boolean eligibleAtSubmission, String voucher,
-                         java.math.BigDecimal discount, String orderStatus, String payment, java.math.BigDecimal gross, java.math.BigDecimal allocatedDiscount) {}
+                         java.math.BigDecimal discount, String orderStatus, String payment, java.math.BigDecimal gross, java.math.BigDecimal allocatedDiscount,
+                         Assignment assignment) {}
     private AppException bad(String message) { return new AppException(HttpStatus.BAD_REQUEST, message); }
     private AppException missing() { return new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"); }
     private boolean isReturn(String source) {
@@ -55,6 +61,71 @@ public class AfterSalesAdminWorkflow {
             if (n != null && n.has("suKien")) result.add(n.path("suKien").asText());
         }
         return result;
+    }
+    @Transactional(readOnly = true)
+    public List<AdminAfterSalesAssigneeDto> assignees() {
+        var allAdmins = admins.findAll();
+        var activeIds = java.util.stream.StreamSupport.stream(
+                        accounts.findAllById(allAdmins.stream().map(QuanTriVien::getMaQtv).toList()).spliterator(), false)
+                .filter(TaiKhoan::isTrangThaiHoatDong).map(TaiKhoan::getMaTk).collect(java.util.stream.Collectors.toSet());
+        return allAdmins.stream().filter(a -> activeIds.contains(a.getMaQtv()))
+                .map(a -> new AdminAfterSalesAssigneeDto(a.getMaQtv(), a.getHoTen()))
+                .sorted(Comparator.comparing(AdminAfterSalesAssigneeDto::hoTen,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))).toList();
+    }
+    @Transactional(readOnly = true)
+    public Assignment assignment(String source, String id) {
+        isReturn(source);
+        return assignments.findByNguonAndMaYeuCau(source, id)
+                .map(a -> new Assignment(a.getMaNguoiPhuTrach(), a.getTenNguoiPhuTrach(), a.getHanXuLy()))
+                .orElse(null);
+    }
+    public Assignment assign(String source, String id, AssignmentRequest request) {
+        boolean ret = isReturn(source);
+        if (request == null || request.maNguoiPhuTrach() == null || request.maNguoiPhuTrach().isBlank()) throw bad("Ch\u1ecdn ng\u01b0\u1eddi ph\u1ee5 tr\u00e1ch");
+        if (request.hanXuLy() == null || !request.hanXuLy().isAfter(LocalDateTime.now())) throw bad("H\u1ea1n x\u1eed l\u00fd ph\u1ea3i n\u1eb1m trong t\u01b0\u01a1ng lai");
+        String note = Objects.toString(request.ghiChu(), "").trim();
+        if (note.isBlank() || note.length() > 500) throw bad("Nh\u1eadp l\u00fd do giao vi\u1ec7c (t\u1ed1i \u0111a 500 k\u00fd t\u1ef1)");
+        if (ret) {
+            var row = returns.findByIdForUpdate(id).orElseThrow(this::missing);
+            if (Set.of(TrangThaiDoiTra.HOAN_TAT, TrangThaiDoiTra.TU_CHOI).contains(row.getTrangThai())) throw bad("Kh\u00f4ng th\u1ec3 giao vi\u1ec7c cho y\u00eau c\u1ea7u \u0111\u00e3 \u0111\u00f3ng");
+        } else {
+            var row = after.findByIdForUpdate(id).orElseThrow(this::missing);
+            if (Set.of(TrangThaiHauMai.HOAN_TAT, TrangThaiHauMai.TU_CHOI).contains(row.getTrangThai())) throw bad("Kh\u00f4ng th\u1ec3 giao vi\u1ec7c cho y\u00eau c\u1ea7u \u0111\u00e3 \u0111\u00f3ng");
+        }
+        var admin = admins.findById(request.maNguoiPhuTrach().trim()).orElseThrow(() -> bad("T\u00e0i kho\u1ea3n kh\u00f4ng ph\u1ea3i qu\u1ea3n tr\u1ecb vi\u00ean"));
+        if (!accounts.findById(admin.getMaQtv()).map(TaiKhoan::isTrangThaiHoatDong).orElse(false)) throw bad("T\u00e0i kho\u1ea3n qu\u1ea3n tr\u1ecb vi\u00ean \u0111\u00e3 b\u1ecb kh\u00f3a");
+        var current = assignments.findByNguonAndMaYeuCau(source, id).orElseGet(() -> {
+            var created = new PhanCongHauMai();
+            created.setMaPhanCong(IdGenerator.next("PC"));
+            created.setNguon(source);
+            created.setMaYeuCau(id);
+            return created;
+        });
+        Map<String, Object> before = new LinkedHashMap<>();
+        if (current.getMaNguoiPhuTrach() != null) {
+            before.put("maNguoiPhuTrach", current.getMaNguoiPhuTrach());
+            before.put("tenNguoiPhuTrach", current.getTenNguoiPhuTrach());
+            before.put("hanXuLy", current.getHanXuLy());
+        }
+        current.setMaNguoiPhuTrach(admin.getMaQtv());
+        current.setTenNguoiPhuTrach(admin.getHoTen());
+        current.setHanXuLy(request.hanXuLy());
+        current.setCapNhatBoi(SecurityUtil.currentUserId());
+        current.setCapNhatLuc(LocalDateTime.now());
+        assignments.save(current);
+        Map<String, Object> afterData = new LinkedHashMap<>();
+        afterData.put("suKien", "ASSIGNMENT");
+        afterData.put("maNguoiPhuTrach", admin.getMaQtv());
+        afterData.put("tenNguoiPhuTrach", admin.getHoTen());
+        afterData.put("hanXuLy", request.hanXuLy());
+        afterData.put("ghiNhan", note);
+        record(id, before, afterData);
+        return new Assignment(current.getMaNguoiPhuTrach(), current.getTenNguoiPhuTrach(), current.getHanXuLy());
+    }
+    @Transactional(readOnly = true)
+    public Object requestDetail(String source, String id) {
+        return isReturn(source) ? returnService.chiTietAdmin(id) : afterService.chiTietAdmin(id);
     }
     @Transactional(readOnly = true)
     public Detail detail(String source, String id) {
@@ -87,7 +158,8 @@ public class AfterSalesAdminWorkflow {
         return new Detail(timeline, steps(timeline), phone, created, delivered, confirmed, deadline, eligible,
                 order == null || order.getKhuyenMai() == null ? null : order.getKhuyenMai().getMaKm(),
                 order == null ? null : order.getGiamGia(), order == null ? null : order.getTrangThai().name(),
-                order == null ? null : payments.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()).stream().map(ThanhToan::getPhuongThuc).filter(Objects::nonNull).findFirst().map(Enum::name).orElse(null), gross, allocated);
+                order == null ? null : payments.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()).stream().map(ThanhToan::getPhuongThuc).filter(Objects::nonNull).findFirst().map(Enum::name).orElse(null), gross, allocated,
+                assignment(source, id));
     }
     public void execute(String source, String id, Action action) {
         if (action == null || action.action() == null) throw bad("Chọn thao tác");
@@ -170,6 +242,9 @@ public class AfterSalesAdminWorkflow {
         }
     }
     private void record(String id, Map<String, ?> data) {
-        audit.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, id, Map.of(), data);
+        record(id, Map.of(), data);
+    }
+    private void record(String id, Map<String, ?> before, Map<String, ?> data) {
+        audit.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, id, before, data);
     }
 }

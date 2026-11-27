@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../../components/FormField';
+import AdminFetchError from '../../components/AdminFetchError';
 import Modal from '../../components/Modal';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
@@ -19,8 +20,8 @@ export default function AdminCategoriesPage() {
   const [impactBrandLoading, setImpactBrandLoading] = useState(false);
 
   const toast = useToast();
-  const { data: categories, reload: reloadCategories } = useFetch(productService.categories);
-  const { data: brands, reload: reloadBrands } = useFetch(adminService.brands);
+  const { data: categories, loading: categoriesLoading, error: categoriesError, reload: reloadCategories } = useFetch(productService.categories);
+  const { data: brands, loading: brandsLoading, error: brandsError, reload: reloadBrands } = useFetch(adminService.brands);
 
   const run = async (action, message) => {
     try {
@@ -102,6 +103,9 @@ export default function AdminCategoriesPage() {
       </div>
 
       {tab === 'categories' && (
+        <>
+        <AdminFetchError error={categoriesError} onRetry={reloadCategories} loading={categoriesLoading} />
+        {categoriesLoading && <p className="muted">Đang tải danh mục…</p>}
         <table className="table">
           <thead>
             <tr>
@@ -135,11 +139,18 @@ export default function AdminCategoriesPage() {
                 </td>
               </tr>
             ))}
+            {!categoriesLoading && !categoriesError && flattenTree(categories || []).length === 0 && (
+              <tr><td colSpan={4} className="muted" style={{ textAlign: 'center', padding: '24px' }}>Chưa có danh mục.</td></tr>
+            )}
           </tbody>
         </table>
+        </>
       )}
 
       {tab === 'brands' && (
+        <>
+        <AdminFetchError error={brandsError} onRetry={reloadBrands} loading={brandsLoading} />
+        {brandsLoading && <p className="muted">Đang tải thương hiệu…</p>}
         <table className="table">
           <thead>
             <tr>
@@ -190,7 +201,7 @@ export default function AdminCategoriesPage() {
                 </tr>
               );
             })}
-            {(!brands || brands.length === 0) && (
+            {!brandsLoading && !brandsError && (!brands || brands.length === 0) && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
                   Không có thương hiệu nào.
@@ -199,6 +210,7 @@ export default function AdminCategoriesPage() {
             )}
           </tbody>
         </table>
+        </>
       )}
 
       {/* Category Edit / Create Modal */}

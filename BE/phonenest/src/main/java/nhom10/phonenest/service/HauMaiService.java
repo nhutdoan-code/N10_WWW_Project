@@ -100,6 +100,13 @@ public class HauMaiService {
         return yeuCauRepo.findAllByOrderByNgayTaoDesc().stream().map(y -> toDto(y, true)).toList();
     }
 
+    @Transactional(readOnly = true)
+    public HauMaiDto chiTietAdmin(String ma) {
+        YeuCauHauMai y = yeuCauRepo.findById(ma)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        return toDto(y, true);
+    }
+
     public HauMaiDto xuLy(String ma, HauMaiDto.XuLyRequest req) {
         YeuCauHauMai y = yeuCauRepo.findByIdForUpdate(ma)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
