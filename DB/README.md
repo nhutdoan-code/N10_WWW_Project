@@ -45,7 +45,7 @@ Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_op
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (schema đã gồm M24 và M25; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 đã được bổ sung vào dump này.
+File `DB/phonenest_full.sql` (dữ liệu demo cập nhật 15/11/2026, schema cập nhật tới M25) là **file duy nhất cần import** cho máy mới: 42 bảng (schema đã gồm migration 03, 05–09, 11, 12, 15–25; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 58 khóa ngoại, và dữ liệu demo:
 
 | Dữ liệu | Số lượng |
 |---|---|
