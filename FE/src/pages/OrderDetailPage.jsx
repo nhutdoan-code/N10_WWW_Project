@@ -141,7 +141,7 @@ export default function OrderDetailPage() {
   const actions = getOrderActions(o.trangThai);
   const hasAfterSalesRequest = Boolean(o.trangThaiDoiTra) ||
     (existingRequests || []).some((req) => req.maDonHang === o.maDonHang);
-  const openWarranty = (existingRequests || []).some(r => r.maDonHang === o.maDonHang && r.loai === 'BAO_HANH' && ['CHO_TIEP_NHAN','DANG_XU_LY','DA_DUYET'].includes(r.trangThai));
+  const openWarranty = (existingRequests || []).some(r => r.maDonHang === o.maDonHang && r.loai === 'BAO_HANH' && ['CHO_TIEP_NHAN','DANG_KIEM_TRA','DANG_XAC_MINH','DANG_XU_LY','DA_DUYET'].includes(r.trangThai));
   const huy = o.trangThai === 'DA_HUY';
   const ngayGiaoDuKien = formatKhoangNgayGiao(o.ngayGiaoDuKienTu, o.ngayGiaoDuKienDen);
   const dangChoGiao = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'].includes(o.trangThai);
