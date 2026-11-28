@@ -15,6 +15,7 @@ import {
 import { afterSalesActions, afterSalesStatusLabel } from '../../utils/afterSalesWorkflow';
 
 const initial = { query: '', status: '', source: '', type: '', from: '', to: '', sort: 'priority', mine: false, deadlineOverdue: false };
+const SHOW_AFTER_SALES_ASSIGNMENT = false;
 const toLocalMinute = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 const readFilters = (params) => ({
   ...initial,
@@ -391,7 +392,7 @@ export default function AdminReturnsPage() {
         <div className="as-detail-grid"><div><b>Đơn hàng</b><p>{detail.maDonHang || "Không gắn đơn hàng"}</p></div><div><b>Khách hàng</b><p>{detail.tenKhach}</p></div>
           <div><b>Số điện thoại</b><p>{detail.soDienThoai || workflow?.phone || 'Chưa có'}</p></div><div><b>Ngày yêu cầu</b><p>{formatAdminDate(detail.ngayTao)}</p></div>
           <div><b>Loại yêu cầu</b><p>{TYPE_LABELS[detail.loai] || detail.loai}</p></div><div><b>Trạng thái</b><p><span className={`as-status as-${detail.trangThai}`}>{statusLabel(detail)}</span></p></div></div>
-        <section className="as-work-block"><h4>Người phụ trách và hạn xử lý</h4>
+        {SHOW_AFTER_SALES_ASSIGNMENT && <section className="as-work-block"><h4>Người phụ trách và hạn xử lý</h4>
           {workflow?.assignment && <p>Hiện giao cho <b>{workflow.assignment.tenNguoiPhuTrach}</b>, hạn {formatAdminDate(workflow.assignment.hanXuLy)}.</p>}
           {!isOpen && <p className="muted">Yêu cầu đã đóng, không thể giao thêm việc.</p>}
           {isOpen && <>
@@ -404,7 +405,7 @@ export default function AdminReturnsPage() {
             <label>Lý do giao việc / nội dung cập nhật<textarea rows="2" maxLength={500} value={assignmentNote} onChange={e=>setAssignmentNote(e.target.value)} placeholder="Ví dụ: kiểm tra tình trạng máy và cập nhật kết quả" disabled={savingAssignment} /></label>
             <button className="btn btn-primary" disabled={savingAssignment || !assigneeId || !dueAt || !assignmentNote.trim()} onClick={saveAssignment}>{savingAssignment ? 'Đang giao việc…' : workflow?.assignment ? 'Cập nhật phân công' : 'Giao người phụ trách'}</button>
           </>}
-        </section>
+        </section>}
         <p><b>Sản phẩm:</b> {detail.tenSanPham || (detail.maDonHang ? 'Toàn đơn' : 'Không chỉ định')} {detail.soLuong ? `· Số lượng ${detail.soLuong}` : ''}</p>
         {detail.chiTiet?.length > 0 && <div className="as-request-items"><b>Các dòng hàng</b>{detail.chiTiet.map((item) => <p key={item.maPhienBan}>{item.tenSanPham} · SL {item.soLuong} · {item.daNhapKho ? `Đã nhập kho ${formatAdminDate(item.ngayNhapKho)}` : 'Chưa nhập kho'}</p>)}</div>}
         <section className="as-work-block"><h4>Kiểm tra điều kiện</h4>
