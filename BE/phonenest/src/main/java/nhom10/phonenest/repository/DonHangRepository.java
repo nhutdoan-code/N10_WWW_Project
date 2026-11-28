@@ -21,6 +21,22 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>, JpaSp
     List<DonHang> findByKhachHangMaKhOrderByNgayMuaDesc(String maKh);
 
     List<DonHang> findAllByOrderByNgayMuaDesc();
+
+    @Query("SELECT DISTINCT d FROM DonHang d WHERE EXISTS (" +
+           "SELECT t FROM ThanhToan t WHERE t.donHang = d AND (" +
+           "t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.COD OR " +
+           "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.CHUYEN_KHOAN " +
+           "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)) OR " +
+           "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.VI_DIEN_TU " +
+           "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)))) " +
+           "ORDER BY d.ngayMua DESC")
+    List<DonHang> findAllVisibleToAdmin();
     // Khóa dòng đơn hàng khi đổi trạng thái để hai request đồng thời không cùng thành công
     // 2B.7D: findByIdForUpdate nam o KhoaDonHangRepository (khoa + nap lai trang thai moi nhat).
 
@@ -109,11 +125,23 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>, JpaSp
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
-    @Query("SELECT d FROM DonHang d LEFT JOIN d.khachHang kh " +
-           "WHERE LOWER(d.maDonHang) LIKE LOWER(:pattern) ESCAPE '\\' " +
+    @Query("SELECT DISTINCT d FROM DonHang d LEFT JOIN d.khachHang kh " +
+           "WHERE (LOWER(d.maDonHang) LIKE LOWER(:pattern) ESCAPE '\\' " +
            "   OR LOWER(kh.maKh) LIKE LOWER(:pattern) ESCAPE '\\' " +
            "   OR LOWER(kh.hoTen) LIKE LOWER(:pattern) ESCAPE '\\' " +
-           "   OR LOWER(d.tenNguoiNhan) LIKE LOWER(:pattern) ESCAPE '\\' " +
+           "   OR LOWER(d.tenNguoiNhan) LIKE LOWER(:pattern) ESCAPE '\\') " +
+           "AND EXISTS (SELECT t FROM ThanhToan t WHERE t.donHang = d AND (" +
+           "t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.COD OR " +
+           "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.CHUYEN_KHOAN " +
+           "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)) OR " +
+           "(t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.VI_DIEN_TU " +
+           "AND t.trangThai IN (nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.CAN_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DANG_HOAN_TIEN, " +
+           "nhom10.phonenest.enums.TrangThaiThanhToan.DA_HOAN_TIEN)))) " +
            "ORDER BY d.ngayMua DESC")
     List<DonHang> searchAdmin(@Param("pattern") String pattern, Pageable pageable);
 

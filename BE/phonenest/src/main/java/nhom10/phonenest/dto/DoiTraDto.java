@@ -3,6 +3,7 @@ package nhom10.phonenest.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import nhom10.phonenest.enums.LoaiYeuCauDoiTra;
+import nhom10.phonenest.enums.PhuongThucTt;
 import nhom10.phonenest.enums.TrangThaiDoiTra;
 
 import java.time.LocalDate;
@@ -29,7 +30,12 @@ public record DoiTraDto(
         String hinhThucHoanTien,
         String maGiaoDichHoanTien,
         LocalDateTime ngayHoanTien,
-        boolean daNhapKho, LocalDateTime ngayTaoChinhXac) {
+        boolean daNhapKho,
+        LocalDateTime ngayTaoChinhXac,
+        PhuongThucTt phuongThucTt,
+        String trangThaiHoanVnPay,
+        String maYeuCauHoanVnPay,
+        String thongBaoHoanVnPay) {
 
     @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
     public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }
@@ -40,7 +46,8 @@ public record DoiTraDto(
     public DoiTraDto customerView() {
         return new DoiTraDto(maYeuCau, maDonHang, tenKhach, soDienThoai, maskAccount(lyDo), hinhAnhMinhChung,
                 ngayTao, ngayCapNhat, trangThai, loaiYeuCau, tenSanPham, soLuong, maskAccount(ghiChuXuLy), chiTiet,
-                soTienHoanDuKien, hinhThucHoanTien, maGiaoDichHoanTien, ngayHoanTien, daNhapKho, ngayTaoChinhXac);
+                soTienHoanDuKien, hinhThucHoanTien, maGiaoDichHoanTien, ngayHoanTien, daNhapKho, ngayTaoChinhXac,
+                phuongThucTt, trangThaiHoanVnPay, maYeuCauHoanVnPay, thongBaoHoanVnPay);
     }
 
     static String maskAccount(String text) {
@@ -55,7 +62,8 @@ public record DoiTraDto(
 
     public record XacNhanHoanTienRequest(
             @NotBlank(message = "Vui lòng chọn hình thức hoàn tiền") @Size(max = 60) String hinhThuc,
-            @NotBlank(message = "Vui lòng nhập mã giao dịch/đối soát") @Size(max = 150) String maGiaoDich,
+            // Bắt buộc với hình thức thủ công; MOMO/VNPAY tự sinh mã giao dịch từ cổng thanh toán.
+            @Size(max = 150) String maGiaoDich,
             @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) Integer phanTram, BigDecimal soTien, @Size(max = 500) String lyDoDieuChinh, LocalDateTime thoiDiemHoan) {
         public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich, Integer phanTram) { this(hinhThuc, maGiaoDich, phanTram, null, null, null); }
         public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich) { this(hinhThuc, maGiaoDich, 100, null, null, null); }

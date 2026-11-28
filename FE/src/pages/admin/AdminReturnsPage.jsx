@@ -129,6 +129,9 @@ export default function AdminReturnsPage() {
     setAssigneeId(assignment.maNguoiPhuTrach || '');
     setDueAt(assignment.hanXuLy ? String(assignment.hanXuLy).slice(0, 16) : '');
   }, [workflow]);
+  // Đơn thanh toán qua VNPay (CHUYEN_KHOAN) mặc định hoàn qua VNPay, còn lại mặc định MoMo.
+  const paymentMethod = workflow?.payment || detail?.phuongThucTt;
+  useEffect(() => { setRefundMethod(paymentMethod === 'CHUYEN_KHOAN' ? 'VNPAY' : 'MOMO'); }, [selected, paymentMethod]);
   const refresh = () => { reload(); reloadSummary(); setRevision(v => v+1); };
   const draftKey = r => `phonenest:after-sales-draft:${user?.maTk}:${r.source}:${r.maYeuCau}`;
   const draftRead = r => { try { return sessionStorage.getItem(draftKey(r)) || ''; } catch { return ''; } };
@@ -208,16 +211,39 @@ export default function AdminReturnsPage() {
   };
 
   const recordRefund = async () => {
-    if (!detail || busy || !refundReference.trim()) return;
-    const ceiling = Number(detail.soTienHoanDuKien || 0);
-    const amount = Number(refundAmount || ceiling);
-    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > ceiling || (amount < ceiling && !adjustment.trim())) { toast('Kiểm tra số tiền và lý do điều chỉnh','error'); return; }
+    if (!detail || busy) return;
     const method = workflow?.payment === 'COD' || fields['Hoàn tiền đề nghị'] === 'Chuyển khoản' ? 'CHUYEN_KHOAN' : refundMethod;
-    if (!window.confirm(`Xác nhận đã chuyển thực tế ${money(amount)} qua ${method}?`)) return;
+    const automatic = ['MOMO', 'VNPAY'].includes(method);
+    if (!automatic && !refundReference.trim()) return;
+    const retryingVnPay = method === 'VNPAY' && detail.trangThaiHoanVnPay === 'DANG_HOAN_TIEN';
+    const ceiling = Number(detail.soTienHoanDuKien || 0);
+    const amount = retryingVnPay ? ceiling : Number(refundAmount || ceiling);
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > ceiling || (amount < ceiling && !adjustment.trim())) { toast('Kiểm tra số tiền và lý do điều chỉnh','error'); return; }
+    const confirmMessage = method === 'MOMO'
+      ? `Yêu cầu MoMo hoàn ${money(amount)} về giao dịch gốc? Chỉ ghi nhận thành công khi MoMo xác nhận.`
+      : method === 'VNPAY'
+        ? retryingVnPay
+          ? `VNPay chưa trả kết quả cuối cho ${money(amount)}. Gửi lại cùng mã yêu cầu để kiểm tra trạng thái?`
+          : `Gửi VNPay yêu cầu hoàn ${money(amount)} cho giao dịch gốc?`
+        : `Xác nhận đã chuyển thực tế ${money(amount)} qua ${method}?`;
+    if (!window.confirm(confirmMessage)) return;
     setBusy(true);
     try {
-      await adminService.recordReturnRefund(detail.maYeuCau, { hinhThuc:method, maGiaoDich:refundReference.trim(), soTien:amount, lyDoDieuChinh:adjustment.trim(), thoiDiemHoan:refundDate || null });
-      toast('Đã ghi nhận thông tin hoàn tiền'); setRefundReference(''); refresh();
+      const result = await adminService.recordReturnRefund(detail.maYeuCau, {
+        hinhThuc: method,
+        maGiaoDich: automatic ? null : refundReference.trim(),
+        soTien: amount,
+        lyDoDieuChinh: adjustment.trim(),
+        thoiDiemHoan: automatic ? null : (refundDate || null),
+      });
+      if (method === 'VNPAY' && result?.trangThaiHoanVnPay === 'DANG_HOAN_TIEN') {
+        toast(result.thongBaoHoanVnPay || 'VNPay đang xử lý yêu cầu hoàn tiền', 'warning');
+      } else if (method === 'VNPAY' && result?.trangThaiHoanVnPay === 'CAN_HOAN_TIEN') {
+        toast(result.thongBaoHoanVnPay || 'VNPay chưa xác nhận hoàn tiền', 'error');
+      } else {
+        toast('Đã ghi nhận thông tin hoàn tiền');
+      }
+      setRefundReference(''); refresh();
     } catch(e) { toast(errorMessage(e),'error'); }
     finally { setBusy(false); }
   };
@@ -244,7 +270,7 @@ export default function AdminReturnsPage() {
   const statCards = [['waiting','Chờ tiếp nhận',summary?.waiting ?? '—'],['processing','Đang xử lý',summary?.processing ?? '—'],['open','Cần duyệt / xử lý',summary?.open ?? '—'],['overdue','Quá hạn phản hồi',summary?.overdue ?? '—'],['today','Hoàn tất hôm nay',summary?.completedToday ?? '—'],['','Tổng yêu cầu',summary?.total ?? '—']];
   return <div className="after-sales-admin">
     <h2>Quản lý hậu mãi</h2>
-    <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tất không đồng nghĩa đã chuyển tiền hoàn thực tế.</p>
+    <p className="muted">Quản lý yêu cầu đổi/trả, bảo hành và khiếu nại. Hoàn tiền MoMo và VNPay được gửi qua API; chuyển khoản/nghiệp vụ khác cần xác nhận đối soát thủ công.</p>
     {loading && <p className="muted">Đang tải dữ liệu...</p>}
     {error && <p className="error">{error} <button className="btn" onClick={reload}>Tải lại</button></p>}
     {!loading && !error && data && <>
@@ -333,7 +359,20 @@ export default function AdminReturnsPage() {
           {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='DANG_XU_LY'&&detail.daNhapKho&&!steps.includes('EXCHANGE_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('EXCHANGE_HANDOVER')}>Ghi nhận đã giao máy đổi</button>}
         </section>}
         {detail.loai==='BAO_HANH'&&<section className="as-work-block"><h4>Quy trình bảo hành</h4><ol className="as-steps">{[['Tiếp nhận yêu cầu',detail.trangThai!=='CHO_TIEP_NHAN'&&detail.trangThai!=='TU_CHOI'],['Nhận máy',steps.includes('WARRANTY_RECEIVE')],['Kiểm tra / sửa chữa',steps.includes('WARRANTY_REPAIR')],['Trả máy',steps.includes('WARRANTY_HANDOVER')],['Hoàn tất',detail.trangThai==='HOAN_TAT']].map(([label,done])=><li key={label} className={done?'done':''}>{done?'✓':'○'} {label}</li>)}</ol>{isOpen&&detail.trangThai==='DANG_XU_LY'&&!steps.includes('WARRANTY_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction(!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER')}>{actionNames[!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER']}</button>}</section>}
-        {detail.source==='return'&&detail.loai==='TRA_HANG_HOAN_TIEN'&&(detail.trangThai==='DANG_XU_LY'||detail.ngayHoanTien)&&<section className="as-work-block"><h4>Đối soát hoàn tiền</h4>{detail.ngayHoanTien?<p>Đã ghi nhận {money(refundBase)} qua {detail.hinhThucHoanTien} · Mã: {detail.maGiaoDichHoanTien} · {formatAdminDate(detail.ngayHoanTien)}</p>:<><p className="muted">Chuyển tiền bên ngoài hệ thống trước khi ghi nhận. Không tự động chuyển tiền.</p><label>Giá trị đủ điều kiện: {money(refundBase)}</label><label>Số tiền thực hoàn (VNĐ)<MoneyInput value={refundAmount} placeholder={refundBase.toLocaleString('vi-VN')} onChange={setRefundAmount} aria-label="Số tiền thực hoàn" /></label><p>Giá trị sau ưu đãi {money(refundBase)} − phí/điều chỉnh {money(Math.max(0,refundBase-Number(refundAmount||refundBase)))} = {money(refundAmount||refundBase)}</p>{Number(refundAmount||refundBase)<refundBase&&<label>Lý do điều chỉnh *<textarea maxLength={500} value={adjustment} onChange={e=>setAdjustment(e.target.value)}/></label>}{workflow?.payment==='COD'||fields['Hoàn tiền đề nghị']==='Chuyển khoản'?<p><b>Hình thức:</b> Chuyển khoản</p>:<label>Hình thức<select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo</option><option value="CHUYEN_KHOAN">Chuyển khoản</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>}<label>Mã giao dịch *<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)}/></label><label>Thời điểm hoàn thực tế (để trống = hiện tại)<input type="datetime-local" value={refundDate} onChange={e=>setRefundDate(e.target.value)}/></label><button className="btn btn-primary" disabled={busy||!workflow||!detail.daNhapKho||!refundReference.trim()} onClick={recordRefund}>Ghi nhận đã hoàn tiền</button>{!detail.daNhapKho&&<p className="muted">Cần nhập kho trước khi hoàn tiền.</p>}</>}</section>}
+        {detail.source==='return'&&detail.loai==='TRA_HANG_HOAN_TIEN'&&(detail.trangThai==='DANG_XU_LY'||detail.ngayHoanTien)&&(()=>{
+          const forcedBank = workflow?.payment==='COD'||fields['Hoàn tiền đề nghị']==='Chuyển khoản';
+          const method = forcedBank ? 'CHUYEN_KHOAN' : refundMethod;
+          const automatic = ['MOMO','VNPAY'].includes(method);
+          const retryingVnPay = method==='VNPAY'&&detail.trangThaiHoanVnPay==='DANG_HOAN_TIEN';
+          return <section className="as-work-block"><h4>Đối soát hoàn tiền</h4>{detail.ngayHoanTien?<p>Đã ghi nhận {money(refundBase)} qua {detail.hinhThucHoanTien} · Mã: {detail.maGiaoDichHoanTien} · {formatAdminDate(detail.ngayHoanTien)}</p>:<>
+            <p className="muted">{method==='MOMO'?'Hệ thống gọi API MoMo để hoàn tiền về giao dịch đã thanh toán.':method==='VNPAY'?'Hệ thống gửi yêu cầu hoàn (toàn phần hoặc một phần) tới VNPay. Chỉ ghi nhận hoàn tất khi VNPay xác nhận.':'Chuyển tiền bên ngoài hệ thống trước, sau đó nhập mã giao dịch để lưu đối soát.'}</p>
+            {detail.trangThaiHoanVnPay&&<p>VNPay: <strong>{detail.trangThaiHoanVnPay==='DANG_HOAN_TIEN'?'Đang xử lý':'Cần thử lại / đối soát'}</strong>{detail.maYeuCauHoanVnPay&&<> · Mã yêu cầu: <code>{detail.maYeuCauHoanVnPay}</code></>}{detail.thongBaoHoanVnPay?` · ${detail.thongBaoHoanVnPay}`:''}</p>}
+            <label>{retryingVnPay?'Số tiền đã gửi VNPay':'Giá trị đủ điều kiện'}: {money(refundBase)}</label>
+            {!retryingVnPay&&<><label>Số tiền thực hoàn (VNĐ)<MoneyInput value={refundAmount} placeholder={refundBase.toLocaleString('vi-VN')} onChange={setRefundAmount} aria-label="Số tiền thực hoàn" /></label><p>Giá trị sau ưu đãi {money(refundBase)} − phí/điều chỉnh {money(Math.max(0,refundBase-Number(refundAmount||refundBase)))} = {money(refundAmount||refundBase)}</p>{Number(refundAmount||refundBase)<refundBase&&<label>Lý do điều chỉnh *<textarea maxLength={500} value={adjustment} onChange={e=>setAdjustment(e.target.value)}/></label>}</>}
+            {forcedBank?<p><b>Hình thức:</b> Chuyển khoản</p>:<label>Hình thức<select value={refundMethod} disabled={retryingVnPay} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo (tự động)</option>{paymentMethod==='CHUYEN_KHOAN'&&<option value="VNPAY">VNPay (tự động)</option>}<option value="CHUYEN_KHOAN">Chuyển khoản (thủ công)</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>}
+            {!automatic&&<><label>Mã giao dịch *<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)}/></label><label>Thời điểm hoàn thực tế (để trống = hiện tại)<input type="datetime-local" value={refundDate} onChange={e=>setRefundDate(e.target.value)}/></label></>}
+            <button className="btn btn-primary" disabled={busy||!workflow||!detail.daNhapKho||(!automatic&&!refundReference.trim())} onClick={recordRefund}>{busy?'Đang xử lý...':method==='MOMO'?'Hoàn tiền qua MoMo':method==='VNPAY'?(retryingVnPay?'Kiểm tra lại cùng yêu cầu VNPay':'Hoàn tiền qua VNPay'):'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho&&<p className="muted">Cần nhập kho trước khi hoàn tiền.</p>}</>}</section>;
+        })()}
         {isOpen&&<section className="as-work-block"><h4>Phản hồi gửi khách hàng</h4>{detail.loai==='BAO_HANH'&&detail.trangThai==='DANG_XU_LY'&&<label>Kết quả bảo hành<select value={warrantyOutcome} onChange={e=>setWarrantyOutcome(e.target.value)}><option value="">Chọn kết quả thực tế</option>{WARRANTY_OPTIONS.map(x=><option key={x} value={x}>{x}</option>)}</select></label>}
           <textarea rows="3" maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="Nội dung khách hàng sẽ nhìn thấy"/>
           <div className="after-sales-actions"><button className="btn" disabled={busy} onClick={saveDraft}>Lưu nháp</button><button className="btn" disabled={busy||!note.trim()} onClick={()=>beginAction('REPLY')}>Gửi phản hồi</button><button className="btn" disabled={busy} onClick={()=>beginAction('REQUEST_INFO')}>Yêu cầu bổ sung</button><button className="btn" disabled={busy} onClick={()=>beginAction('TRANSFER')}>Chuyển bộ phận</button></div>

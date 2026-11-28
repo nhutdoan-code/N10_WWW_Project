@@ -17,5 +17,6 @@ public enum LoaiDoiTuongAudit {
     SHIPPING_FEE,
     QUESTION,
     REVIEW,
-    RETURN
+    RETURN,
+    PAYMENT
 }

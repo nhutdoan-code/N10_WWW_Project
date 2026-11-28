@@ -34,6 +34,22 @@ public class ThanhToan {
     @Column(length = 100)
     private String maGiaoDichMoMo;
 
+    @Column(length = 100, unique = true)
+    private String maGiaoDichNganHang;
+
+    private LocalDateTime ngayTaoGiaoDichVnPay;
+
+    @Column(length = 32)
+    private String maYeuCauHoanVnPay;
+
+    @Column(length = 100)
+    private String maGiaoDichHoanVnPay;
+
+    private LocalDateTime ngayYeuCauHoanVnPay;
+
+    @Column(length = 245)
+    private String nguoiYeuCauHoanVnPay;
+
     private LocalDateTime ngayTao;
     private LocalDateTime ngayThanhToan;
 }

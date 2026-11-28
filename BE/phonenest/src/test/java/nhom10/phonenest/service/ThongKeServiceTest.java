@@ -85,6 +85,7 @@ class ThongKeServiceTest {
 
         when(donHangRepository.countOrdersByStatus(start, end)).thenReturn(List.<Object[]>of(
                 new Object[]{TrangThaiDonHang.DA_GIAO, 1L},
+                new Object[]{TrangThaiDonHang.CHO_THANH_TOAN, 1L},
                 new Object[]{TrangThaiDonHang.CHO_XAC_NHAN, 2L},
                 new Object[]{TrangThaiDonHang.DANG_GIAO, 2L},
                 new Object[]{TrangThaiDonHang.DA_HUY, 1L}
@@ -100,14 +101,16 @@ class ThongKeServiceTest {
         assertThat(stats.giaTriDangXuLy()).isEqualByComparingTo(new BigDecimal("20000000"));
         assertThat(stats.soDonDangXuLy()).isEqualTo(4);
 
-        // Created orders: sum of status rows (1 + 2 + 2 + 1 = 6)
-        assertThat(stats.soDon()).isEqualTo(6);
+        // Created orders include orders waiting for online payment.
+        assertThat(stats.soDon()).isEqualTo(7);
         assertThat(stats.soDonHuy()).isEqualTo(1);
 
-        // Status map has all 6 keys
+        // Status map includes each order lifecycle state.
         assertThat(stats.donTheoTrangThai()).containsKeys(
-                "CHO_XAC_NHAN", "DA_XAC_NHAN", "DANG_CHUAN_BI", "DANG_GIAO", "DA_GIAO", "DA_HUY"
+                "CHO_THANH_TOAN", "CHO_XAC_NHAN", "DA_XAC_NHAN", "DANG_CHUAN_BI",
+                "DANG_GIAO", "DA_GIAO", "DA_HUY"
         );
+        assertThat(stats.donTheoTrangThai().get("CHO_THANH_TOAN")).isEqualTo(1);
         assertThat(stats.donTheoTrangThai().get("DA_XAC_NHAN")).isEqualTo(0);
         assertThat(stats.donTheoTrangThai().get("CHO_XAC_NHAN")).isEqualTo(2);
 

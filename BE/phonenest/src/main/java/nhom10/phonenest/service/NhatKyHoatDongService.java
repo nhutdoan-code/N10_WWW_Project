@@ -167,6 +167,7 @@ public class NhatKyHoatDongService {
             case DELETE_REVIEW -> "Xóa đánh giá";
 
             case CHANGE_RETURN_STATUS -> "Cập nhật trạng thái yêu cầu đổi trả";
+            case REFUND_PAYMENT -> "Hoàn tiền thanh toán";
         };
         if (maDoiTuong != null && !maDoiTuong.isBlank()) {
             moTa = moTa + " " + maDoiTuong.trim();

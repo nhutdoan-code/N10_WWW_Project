@@ -1,10 +1,12 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..26 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..31 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15-26 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15-31 (pn_migration_log có M12/M15/M16).
 --     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL; M25: trạng thái kiểm tra/xác minh + ketQuaXuLy. M26 adds after-sales assignment storage.
---   * 43 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
+--     M27-M31 (thanh toán VNPay): ThanhToan.maGiaoDichNganHang + cột hoàn VNPay, trạng thái đơn CHO_THANH_TOAN,
+--     bảng PhienThanhToan (checkout trả trước), trạng thái DANG_HOAN_TIEN, cột hoàn VNPay trên YeuCauDoiTra.
+--   * 44 bảng (M21 cần MariaDB >= 11.7 vì kiểu VECTOR). Dữ liệu demo (cập nhật 15/11/2026):
 --       - 75 sản phẩm đang bán, 433 phiên bản (RAM/ROM/màu) có giá tham khảo từ nhà bán lẻ chính hãng
 --         (CellphoneS / Thế Giới Di Động, nguồn ghi ở PhienBanSanPham.nguonXacMinh), đã phê duyệt bán (APPROVED).
 --       - 249 ảnh chụp sản phẩm thật theo màu (không ảnh quảng cáo / logo AI): đường dẫn /catalog/<maSanPham>/<mau>.webp, file nằm trong
@@ -703,7 +705,7 @@ CREATE TABLE `DonHang` (
   `ngayGiaoDuKienDen` date DEFAULT NULL,
   `ngayKhachXacNhan` datetime DEFAULT NULL,
   `nguoiXacNhan` varchar(50) DEFAULT NULL,
-  `trangThai` enum('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
+  `trangThai` enum('CHO_THANH_TOAN','CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL DEFAULT 'CHO_XAC_NHAN',
   `ghiChu` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`maDonHang`),
   KEY `FK_DonHang_KhuyenMai` (`maKm`),
@@ -1179,7 +1181,7 @@ SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 CREATE TABLE `LichSuTrangThaiDonHang` (
   `maLichSu` varchar(50) NOT NULL,
   `maDonHang` varchar(50) NOT NULL,
-  `trangThai` enum('CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL,
+  `trangThai` enum('CHO_THANH_TOAN','CHO_XAC_NHAN','DA_XAC_NHAN','DANG_CHUAN_BI','DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO','DA_HUY') NOT NULL,
   `thoiGian` datetime NOT NULL DEFAULT current_timestamp(),
   `ghiChu` varchar(500) DEFAULT NULL,
   `nguoiCapNhat` varchar(50) DEFAULT NULL,
@@ -5691,13 +5693,20 @@ CREATE TABLE `ThanhToan` (
   `maDonHang` varchar(50) NOT NULL,
   `phuongThuc` enum('COD','CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
   `soTien` decimal(15,2) NOT NULL,
-  `trangThai` enum('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
+  `trangThai` enum('CHO_THANH_TOAN','DA_THANH_TOAN','THAT_BAI','DANG_HOAN_TIEN','DA_HOAN_TIEN','DA_HUY','CAN_HOAN_TIEN') NOT NULL DEFAULT 'CHO_THANH_TOAN',
   `maGiaoDich` varchar(150) DEFAULT NULL,
   `maGiaoDichMoMo` varchar(100) DEFAULT NULL,
+  `maGiaoDichNganHang` varchar(100) DEFAULT NULL,
+  `ngayTaoGiaoDichVnPay` datetime DEFAULT NULL,
+  `maYeuCauHoanVnPay` varchar(32) DEFAULT NULL,
+  `maGiaoDichHoanVnPay` varchar(100) DEFAULT NULL,
+  `ngayYeuCauHoanVnPay` datetime DEFAULT NULL,
+  `nguoiYeuCauHoanVnPay` varchar(245) DEFAULT NULL,
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayThanhToan` datetime DEFAULT NULL,
   PRIMARY KEY (`maThanhToan`),
   UNIQUE KEY `maGiaoDich` (`maGiaoDich`),
+  UNIQUE KEY `uq_ThanhToan_maGiaoDichNganHang` (`maGiaoDichNganHang`),
   KEY `IDX_ThanhToan_maDonHang` (`maDonHang`),
   CONSTRAINT `FK_ThanhToan_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -5710,6 +5719,36 @@ COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `PhienThanhToan` (
+  `maPhienThanhToan` varchar(50) NOT NULL,
+  `maKh` varchar(50) NOT NULL,
+  `idempotencyKey` varchar(36) NOT NULL,
+  `requestHash` varchar(64) NOT NULL,
+  `phuongThuc` enum('CHUYEN_KHOAN','VI_DIEN_TU') NOT NULL,
+  `soTien` decimal(15,2) NOT NULL,
+  `duLieuCheckout` longtext NOT NULL,
+  `trangThai` enum('CHO_THANH_TOAN','DA_TAO_DON','THAT_BAI','CAN_HOAN_TIEN','DA_HOAN_TIEN') NOT NULL,
+  `payUrl` varchar(3000) DEFAULT NULL,
+  `maDonHang` varchar(50) DEFAULT NULL,
+  `maGiaoDichNhaCungCap` varchar(100) DEFAULT NULL,
+  `ngayTaoGiaoDichVnPay` datetime DEFAULT NULL,
+  `maGiaoDichHoanTien` varchar(100) DEFAULT NULL,
+  `lyDoHoanTien` varchar(500) DEFAULT NULL,
+  `ngayTao` datetime NOT NULL,
+  `ngayCapNhat` datetime NOT NULL,
+  PRIMARY KEY (`maPhienThanhToan`),
+  UNIQUE KEY `uq_PhienThanhToan_maKh_idempotencyKey` (`maKh`,`idempotencyKey`),
+  CONSTRAINT `FK_PhienThanhToan_KhachHang` FOREIGN KEY (`maKh`) REFERENCES `KhachHang` (`maKh`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
+/*!40000 ALTER TABLE `PhienThanhToan` DISABLE KEYS */;
+/*!40000 ALTER TABLE `PhienThanhToan` ENABLE KEYS */;
+COMMIT;
+SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+SET character_set_client = utf8mb4;
 CREATE TABLE `ThongBao` (
   `maThongBao` varchar(50) NOT NULL,
   `maTk` varchar(50) NOT NULL,
@@ -5876,6 +5915,11 @@ CREATE TABLE `YeuCauDoiTra` (
   `hinhThucHoanTien` varchar(60) DEFAULT NULL,
   `maGiaoDichHoanTien` varchar(150) DEFAULT NULL,
   `ngayHoanTien` datetime DEFAULT NULL,
+  `trangThaiHoanVnPay` varchar(20) DEFAULT NULL,
+  `maYeuCauHoanVnPay` varchar(32) DEFAULT NULL,
+  `ngayYeuCauHoanVnPay` datetime DEFAULT NULL,
+  `nguoiYeuCauHoanVnPay` varchar(245) DEFAULT NULL,
+  `thongBaoHoanVnPay` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`maYeuCau`),
   KEY `FK_YeuCauDoiTra_DonHang` (`maDonHang`),
   CONSTRAINT `FK_YeuCauDoiTra_DonHang` FOREIGN KEY (`maDonHang`) REFERENCES `DonHang` (`maDonHang`) ON UPDATE CASCADE

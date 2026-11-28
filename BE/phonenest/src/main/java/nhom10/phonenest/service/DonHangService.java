@@ -31,6 +31,13 @@ public class DonHangService {
 
     private static final int DIEM_MOI_VND = 10000;
     private static final String LY_DO_KHAC = "Lý do khác";
+    private record PaymentConfirmation(
+            BigDecimal amount,
+            String paymentReference,
+            String providerTransactionId,
+            LocalDateTime vnPayCreateDate) {
+    }
+
     private static final List<String> LY_DO_HUY = List.of(
             "Muốn thay đổi địa chỉ giao hàng",
             "Muốn nhập / thay đổi mã khuyến mãi",
@@ -76,9 +83,61 @@ public class DonHangService {
     }
 
     public DonHangDto datHang(String maKh, DonHangDto.Checkout req, Long idempotencyRecordId) {
+        if (req.phuongThucTt() != PhuongThucTt.COD) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Thanh toán online phải thành công trước khi tạo đơn hàng");
+        }
+        return datHangInternal(maKh, req, idempotencyRecordId, null, null);
+    }
+
+    public DonHangDto datHangDaThanhToan(
+            String maKh,
+            DonHangDto.Checkout req,
+            Map<String, Integer> items,
+            BigDecimal paidAmount,
+            String paymentReference,
+            String providerTransactionId,
+            PhuongThucTt paymentMethod) {
+        return datHangDaThanhToan(
+                maKh, req, items, paidAmount, paymentReference, providerTransactionId, paymentMethod, null);
+    }
+
+    public DonHangDto datHangDaThanhToan(
+            String maKh,
+            DonHangDto.Checkout req,
+            Map<String, Integer> items,
+            BigDecimal paidAmount,
+            String paymentReference,
+            String providerTransactionId,
+            PhuongThucTt paymentMethod,
+            LocalDateTime vnPayCreateDate) {
+        if (req.phuongThucTt() != paymentMethod
+                || (paymentMethod != PhuongThucTt.VI_DIEN_TU
+                && paymentMethod != PhuongThucTt.CHUYEN_KHOAN)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Phương thức thanh toán phiên không hợp lệ");
+        }
+        return datHangInternal(
+                maKh,
+                req,
+                null,
+                items,
+                new PaymentConfirmation(paidAmount, paymentReference, providerTransactionId, vnPayCreateDate));
+    }
+
+    private DonHangDto datHangInternal(
+            String maKh,
+            DonHangDto.Checkout req,
+            Long idempotencyRecordId,
+            Map<String, Integer> fixedItems,
+            PaymentConfirmation paymentConfirmation) {
         KhachHang kh = khachHangRepository.findById(maKh).orElseThrow();
         boolean muaNgay = req.maSanPham() != null && !req.maSanPham().isBlank();
-        Map<String, Integer> muc = thanhToanService.mucMua(maKh, req.maSanPham(), req.soLuong());
+        Map<String, Integer> muc = fixedItems != null
+                ? new LinkedHashMap<>(fixedItems)
+                : thanhToanService.mucMua(maKh, req.maSanPham(), req.soLuong());
+        if (muc.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không có sản phẩm để tạo đơn hàng");
+        }
         DiaChi dc = diaChiRepository.findById(req.maDiaChi()).filter(x -> x.getMaKh().equals(maKh))
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Địa chỉ giao hàng không hợp lệ"));
 
@@ -184,6 +243,10 @@ public class DonHangService {
             tongThanhToan = BigDecimal.ZERO;
         }
         d.setTongThanhToan(tongThanhToan);
+        if (paymentConfirmation != null && tongThanhToan.compareTo(paymentConfirmation.amount()) != 0) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Giá hoặc ưu đãi đã thay đổi sau khi thanh toán; giao dịch cần được hoàn tiền");
+        }
 
         DonHang luu = donHangRepository.save(d);
 
@@ -204,15 +267,21 @@ public class DonHangService {
         }
 
         doiTon(luu, -1, LoaiBienDongKho.BAN_HANG, lockedVariants);
-        taoThanhToan(luu, req.phuongThucTt());
+        taoThanhToan(luu, req.phuongThucTt(), paymentConfirmation);
         ghiTrangThai(
                 luu,
-                TrangThaiDonHang.CHO_XAC_NHAN,
-                "Khách hàng đặt đơn"
+                luu.getTrangThai(),
+                paymentConfirmation != null
+                        ? "Thanh toán thành công, đơn hàng chờ xác nhận"
+                        : "Khách hàng đặt đơn"
         );
 
         if (!muaNgay) {
-            gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(g -> g.getChiTiet().clear());
+            if (paymentConfirmation == null) {
+                gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(g -> g.getChiTiet().clear());
+            } else {
+                xoaDaMuaKhoiGio(maKh, muc);
+            }
         }
 
         ghiNhanHanhViMuaHang(luu);
@@ -237,7 +306,8 @@ public class DonHangService {
                     IdempotencyStatus.IN_PROGRESS
             );
         }
-        guiThongBaoSauCommit(maKh, luu.getMaDonHang(), dto.tongTien());
+        guiThongBaoSauCommit(
+                maKh, luu.getMaDonHang(), dto.tongTien(), req.phuongThucTt(), paymentConfirmation != null);
         return dto;
     }
 
@@ -250,11 +320,21 @@ public class DonHangService {
     }
 
     public List<DonHangDto> tatCa() {
-        return donHangRepository.findAllByOrderByNgayMuaDesc().stream().map(mapper::toDto).toList();
+        return donHangRepository.findAllVisibleToAdmin().stream().map(mapper::toDto).toList();
     }
 
     public DonHangDto chiTietQuanTri(String ma) {
         return mapper.toDto(tim(ma));
+    }
+
+    public void xacNhanSauThanhToan(DonHang donHang) {
+        if (donHang.getTrangThai() != TrangThaiDonHang.CHO_THANH_TOAN) {
+            return;
+        }
+        donHang.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
+        donHang.setNgayCapNhat(LocalDateTime.now());
+        donHangRepository.save(donHang);
+        ghiTrangThai(donHang, TrangThaiDonHang.CHO_XAC_NHAN, "Thanh toán thành công, chờ xác nhận");
     }
 
     /**
@@ -281,7 +361,8 @@ public class DonHangService {
         if (d.getTrangThai() == TrangThaiDonHang.DA_HUY) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã được hủy trước đó");
         }
-        if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN
+        if (d.getTrangThai() != TrangThaiDonHang.CHO_THANH_TOAN
+                && d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN
                 && d.getTrangThai() != TrangThaiDonHang.DA_XAC_NHAN
                 && d.getTrangThai() != TrangThaiDonHang.DANG_CHUAN_BI) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Đơn hàng đã bàn giao vận chuyển, không thể hủy");
@@ -639,15 +720,46 @@ public class DonHangService {
         d.setNgayCapNhat(LocalDateTime.now());
     }
 
-    private void taoThanhToan(DonHang d, PhuongThucTt pt) {
+    private void taoThanhToan(DonHang d, PhuongThucTt pt, PaymentConfirmation paymentConfirmation) {
         ThanhToan t = new ThanhToan();
         t.setMaThanhToan(IdGenerator.next("TT"));
         t.setDonHang(d);
         t.setPhuongThuc(pt);
         t.setSoTien(d.getTongThanhToan());
-        t.setTrangThai(TrangThaiThanhToan.CHO_THANH_TOAN);
+        t.setTrangThai(paymentConfirmation == null
+                ? TrangThaiThanhToan.CHO_THANH_TOAN
+                : TrangThaiThanhToan.DA_THANH_TOAN);
         t.setNgayTao(LocalDateTime.now());
+        if (paymentConfirmation != null) {
+            t.setMaGiaoDich(paymentConfirmation.paymentReference());
+            t.setNgayThanhToan(LocalDateTime.now());
+            if (pt == PhuongThucTt.VI_DIEN_TU) {
+                t.setMaGiaoDichMoMo(paymentConfirmation.providerTransactionId());
+            } else {
+                t.setMaGiaoDichNganHang(paymentConfirmation.providerTransactionId());
+                t.setNgayTaoGiaoDichVnPay(paymentConfirmation.vnPayCreateDate());
+            }
+        }
         thanhToanRepository.save(t);
+    }
+
+    private void xoaDaMuaKhoiGio(String maKh, Map<String, Integer> items) {
+        gioHangRepository.findByKhachHangMaKh(maKh).ifPresent(gioHang -> {
+            Iterator<ChiTietGioHang> iterator = gioHang.getChiTiet().iterator();
+            while (iterator.hasNext()) {
+                ChiTietGioHang line = iterator.next();
+                int purchased = items.getOrDefault(line.getPhienBan().getMaPhienBan(), 0);
+                if (purchased <= 0) {
+                    continue;
+                }
+                if (line.getSoLuong() <= purchased) {
+                    iterator.remove();
+                } else {
+                    line.setSoLuong(line.getSoLuong() - purchased);
+                }
+            }
+            gioHang.setNgayCapNhat(LocalDateTime.now());
+        });
     }
 
     private void doiTon(DonHang d, int dau, LoaiBienDongKho loai) {
@@ -694,14 +806,31 @@ public class DonHangService {
         bienDongRepository.save(b);
     }
 
-    private void guiThongBaoSauCommit(String maKh, String maDonHang, BigDecimal tongTien) {
+    private void guiThongBaoSauCommit(
+            String maKh, String maDonHang, BigDecimal tongTien,
+            PhuongThucTt phuongThuc, boolean paymentConfirmed) {
+        boolean choThanhToan = !paymentConfirmed
+                && (phuongThuc == PhuongThucTt.VI_DIEN_TU || phuongThuc == PhuongThucTt.CHUYEN_KHOAN);
+        String notification = paymentConfirmed
+                ? "Thanh toán thành công, đơn hàng " + maDonHang + " đang chờ xác nhận"
+                : choThanhToan
+                ? "Đơn hàng " + maDonHang + " đang chờ thanh toán. Đơn sẽ được tiếp nhận sau khi thanh toán thành công."
+                : "Đặt hàng thành công, đơn " + maDonHang + " đang chờ xác nhận";
+        String emailSubject = paymentConfirmed || choThanhToan
+                ? "Thanh toán đơn hàng " + maDonHang
+                : "Xác nhận đơn hàng " + maDonHang;
+        String emailBody = paymentConfirmed
+                ? "PhoneNest đã nhận thanh toán thành công cho đơn hàng. Tổng thanh toán: "
+                : choThanhToan
+                ? "Vui lòng thanh toán đơn hàng tại PhoneNest. Đơn hàng chỉ được tạo sau khi cổng thanh toán xác nhận thành công. Tổng thanh toán: "
+                : "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: ";
         Runnable notificationTask = () -> {
-            thongBaoService.gui(maKh, "Đặt hàng thành công, đơn " + maDonHang + " đang chờ xác nhận",
+            thongBaoService.gui(maKh, notification,
                     ThongBaoService.linkDonHang(maDonHang));
             taiKhoanRepository.findById(maKh).ifPresent(tk -> emailService.gui(
                     tk.getEmail(),
-                    "Xác nhận đơn hàng " + maDonHang,
-                    "Cảm ơn bạn đã đặt hàng tại PhoneNest. Tổng thanh toán: " + (tongTien != null ? tongTien.toBigInteger() : "0") + " VND."
+                    emailSubject,
+                    emailBody + (tongTien != null ? tongTien.toBigInteger() : "0") + " VND."
             ));
         };
 

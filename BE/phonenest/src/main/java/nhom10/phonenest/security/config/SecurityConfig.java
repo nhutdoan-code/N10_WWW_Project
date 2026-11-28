@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/tracking/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payment/momo/ipn").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payment/vnpay/ipn", "/api/payment/vnpay/return").permitAll()
                         // Public catalogue: read-only.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products", "/api/products/**",

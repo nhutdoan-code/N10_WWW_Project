@@ -25,7 +25,9 @@ export default function OrderDetailPage() {
     error: paymentStatusError,
     reload: reloadPaymentStatus,
   } = useFetch(
-    () => (o?.phuongThucTt === 'VI_DIEN_TU' ? orderService.paymentStatus(ma) : Promise.resolve(null)),
+    () => (['VI_DIEN_TU', 'CHUYEN_KHOAN'].includes(o?.phuongThucTt)
+      ? orderService.paymentStatus(ma)
+      : Promise.resolve(null)),
     [ma, o?.phuongThucTt]
   );
   const [cancelForm, setCancelForm] = useState(null);
@@ -57,17 +59,11 @@ export default function OrderDetailPage() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const payWithMomo = async () => {
-    setPaying(true);
-    try {
-      const payment = await orderService.createMomoPayment(ma);
-      window.location.assign(payment.payUrl);
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    } finally {
-      setPaying(false);
-    }
-  };
+  useEffect(() => {
+    if (!searchParams.has('vnpayReturn')) return;
+    toast('VNPay đã chuyển kết quả về; trạng thái đơn sẽ cập nhật sau khi backend nhận IPN.');
+    reload();
+  }, [searchParams]);
 
   useEffect(() => {
     const resultCode = searchParams.get('resultCode');
@@ -82,8 +78,8 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     const finalPaymentStatuses = ['DA_THANH_TOAN', 'THAT_BAI', 'CAN_HOAN_TIEN', 'DA_HOAN_TIEN', 'DA_HUY'];
-    if (o?.phuongThucTt !== 'VI_DIEN_TU'
-      || !searchParams.has('resultCode')
+    if (!['VI_DIEN_TU', 'CHUYEN_KHOAN'].includes(o?.phuongThucTt)
+      || !(searchParams.has('resultCode') || searchParams.has('vnpayReturn'))
       || finalPaymentStatuses.includes(paymentStatus?.status)) {
       return undefined;
     }
@@ -144,6 +140,7 @@ export default function OrderDetailPage() {
   const openWarranty = (existingRequests || []).some(r => r.maDonHang === o.maDonHang && r.loai === 'BAO_HANH' && ['CHO_TIEP_NHAN','DANG_KIEM_TRA','DANG_XAC_MINH','DANG_XU_LY','DA_DUYET'].includes(r.trangThai));
   const huy = o.trangThai === 'DA_HUY';
   const ngayGiaoDuKien = formatKhoangNgayGiao(o.ngayGiaoDuKienTu, o.ngayGiaoDuKienDen);
+  const choThanhToan = o.trangThai === 'CHO_THANH_TOAN';
   const dangChoGiao = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'].includes(o.trangThai);
   const muaLaiMotSanPham = (dong) => {
     if (!dong?.maPhienBan) {
@@ -170,6 +167,8 @@ export default function OrderDetailPage() {
             <h3>Theo dõi vận chuyển</h3>
             {huy ? (
               <p className="error">Đơn hàng đã bị hủy (cập nhật {formatDate(o.ngayCapNhat)}){o.lyDoHuy && ` · Lý do: ${o.lyDoHuy}`}</p>
+            ) : choThanhToan ? (
+              <p className="muted">Đơn hàng chỉ chuyển sang Chờ xác nhận sau khi cổng thanh toán xác nhận thanh toán thành công.</p>
             ) : (
               <>
                 <OrderSteps trangThai={o.trangThai} />
@@ -185,19 +184,19 @@ export default function OrderDetailPage() {
             )}
           </div>
 
-          {o.phuongThucTt === 'VI_DIEN_TU' && o.trangThai !== 'DA_HUY' && (
+          {['VI_DIEN_TU', 'CHUYEN_KHOAN'].includes(o.phuongThucTt) && o.trangThai !== 'DA_HUY' && (
             <div className="section">
-              <h3>Thanh toán MoMo</h3>
+              <h3>{o.phuongThucTt === 'VI_DIEN_TU' ? 'Thanh toán MoMo' : 'Thanh toán ngân hàng qua VNPay'}</h3>
               {paymentStatus?.status === 'DA_THANH_TOAN' ? (
-                <p style={{ color: 'var(--ok)', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công qua ví MoMo</p>
+                <p style={{ color: 'var(--ok)', fontWeight: 500, margin: 0 }}>✓ Đã thanh toán thành công</p>
               ) : paymentStatus?.status === 'CAN_HOAN_TIEN' ? (
-                <p className="muted">MoMo đã nhận thanh toán; cửa hàng đang đối soát hoàn tiền.</p>
+                <p className="muted">Cổng thanh toán đã nhận tiền; cửa hàng đang đối soát hoàn tiền.</p>
               ) : paymentStatus?.status === 'DA_HOAN_TIEN' ? (
-                <p className="muted">Giao dịch MoMo đã được hoàn tiền.</p>
+                <p className="muted">Giao dịch đã được ghi nhận hoàn tiền.</p>
               ) : paymentStatus?.status === 'THAT_BAI' ? (
                 <p className="muted">Thanh toán chưa thành công.</p>
               ) : (
-                <p className="muted">Đang chờ MoMo xác nhận thanh toán.</p>
+                <p className="muted">Đang chờ cổng thanh toán xác nhận.</p>
               )}
               {paymentStatusError && (
                 <p className="error" role="alert">
@@ -208,8 +207,22 @@ export default function OrderDetailPage() {
                 && paymentStatus?.status !== 'CAN_HOAN_TIEN'
                 && paymentStatus?.status !== 'DA_HOAN_TIEN'
                 && (!paymentStatus?.transactionId || paymentStatus?.status === 'THAT_BAI') && (
-                  <button type="button" className="btn btn-primary" onClick={payWithMomo} disabled={paying}>
-                    {paying ? 'Đang chuyển đến MoMo...' : 'Thanh toán với MoMo'}
+                  <button type="button" className="btn btn-primary" onClick={async () => {
+                    setPaying(true);
+                    try {
+                      const payment = o.phuongThucTt === 'VI_DIEN_TU'
+                        ? await orderService.createMomoPayment(ma)
+                        : await orderService.createVnPayPayment(ma);
+                      window.location.assign(payment.payUrl);
+                    } catch (e) {
+                      toast(errorMessage(e), 'error');
+                    } finally {
+                      setPaying(false);
+                    }
+                  }} disabled={paying}>
+                    {paying
+                      ? 'Đang chuyển đến cổng thanh toán...'
+                      : o.phuongThucTt === 'VI_DIEN_TU' ? 'Thanh toán với MoMo' : 'Thanh toán qua VNPay'}
                   </button>
               )}
               {paymentStatus?.status === 'CHO_THANH_TOAN' && paymentStatus?.transactionId && (
@@ -222,9 +235,9 @@ export default function OrderDetailPage() {
 
           {o.trangThai === 'DA_HUY' && paymentStatus?.status === 'CAN_HOAN_TIEN' && (
             <div className="section" style={{ borderLeft: '4px solid #f59e0b', background: 'var(--warn-soft)', padding: '1rem', borderRadius: 8 }}>
-              <h3 style={{ color: 'var(--warn)', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán MoMo</h3>
+              <h3 style={{ color: 'var(--warn)', margin: '0 0 0.5rem 0' }}>Lưu ý về thanh toán</h3>
               <p style={{ margin: 0, color: 'var(--warn)' }}>
-                Đơn hàng đã hủy nhưng MoMo ghi nhận thanh toán thành công. Cửa hàng đang tiếp nhận để xử lý hoàn tiền hoặc đối soát cho bạn.
+                Đơn hàng đã hủy nhưng cổng thanh toán ghi nhận giao dịch thành công. Cửa hàng đang tiếp nhận để xử lý hoàn tiền hoặc đối soát cho bạn.
               </p>
             </div>
           )}

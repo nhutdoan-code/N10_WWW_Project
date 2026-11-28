@@ -1,6 +1,6 @@
 
-import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import ProductImage from '../components/ProductImage';
 import StatusBadge from '../components/StatusBadge';
@@ -10,6 +10,7 @@ import { ORDER_STATUS, PAYMENT_METHODS } from '../config/constants';
 
 import useFetch from '../hooks/useFetch';
 import useToast from '../hooks/useToast';
+import useCart from '../hooks/useCart';
 
 import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatPrice } from '../utils/format';
@@ -25,6 +26,8 @@ export default function OrdersPage() {
   } = useFetch(orderService.list);
 
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { refresh: refreshCart } = useCart();
   const [q, setQ] = useState('');
   const [oldest, setOldest] = useState(false);
 
@@ -35,6 +38,78 @@ export default function OrdersPage() {
   const toast = useToast();
 
   const tt = params.get('tt') || '';
+  const checkoutPaymentId = params.get('checkoutPayment');
+
+  useEffect(() => {
+    if (!checkoutPaymentId) return undefined;
+
+    let active = true;
+    let timeout;
+    let attempts = 0;
+    let refundNoticeShown = false;
+    const finish = (message, type = 'info') => {
+      if (!active) return;
+      toast(message, type);
+      try {
+        sessionStorage.removeItem('phonenest_checkout_key');
+        sessionStorage.removeItem('phonenest_checkout_sig');
+      } catch {
+        // ignore
+      }
+      const next = new URLSearchParams(window.location.search);
+      next.delete('checkoutPayment');
+      setParams(next, { replace: true });
+    };
+    const poll = async () => {
+      try {
+        const result = await orderService.checkoutPaymentStatus(checkoutPaymentId);
+        if (!active) return;
+        if (result.status === 'DA_TAO_DON' && result.orderId) {
+          try {
+            sessionStorage.removeItem('phonenest_checkout_key');
+            sessionStorage.removeItem('phonenest_checkout_sig');
+          } catch {
+            // ignore
+          }
+          try {
+            await refreshCart();
+          } catch {
+            toast('Đơn đã tạo, nhưng giỏ hàng chưa tải lại được.', 'warning');
+          }
+          navigate(`/orders/${result.orderId}`, { replace: true });
+          return;
+        }
+        if (result.status === 'THAT_BAI') {
+          finish('Thanh toán chưa thành công. Giỏ hàng vẫn được giữ để bạn thử lại.', 'warning');
+          return;
+        }
+        if (result.status === 'CAN_HOAN_TIEN') {
+          if (!refundNoticeShown) {
+            toast('Đã nhận thanh toán nhưng chưa thể tạo đơn. PhoneNest đang xử lý hoàn tiền.', 'warning');
+            refundNoticeShown = true;
+          }
+        } else if (result.status === 'DA_HOAN_TIEN') {
+          finish('Giao dịch đã được hoàn tiền. Giỏ hàng vẫn được giữ.', 'info');
+          return;
+        }
+      } catch {
+        // A provider return can arrive before its asynchronous IPN reaches the backend.
+      }
+
+      attempts += 1;
+      if (attempts >= 120) {
+        toast('Đang chờ cổng thanh toán xác nhận. Giỏ hàng được giữ; hãy tải lại trang sau ít phút.', 'info');
+        return;
+      }
+      timeout = window.setTimeout(poll, 2000);
+    };
+
+    poll();
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [checkoutPaymentId, navigate, setParams, toast]);
 
   // Đếm số lượng đơn theo trạng thái
   const counts = useMemo(() => {

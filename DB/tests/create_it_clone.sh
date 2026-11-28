@@ -28,6 +28,11 @@ DB="${PN_IT_DB_NAME:-phonenest_it_$(date +%Y%m%d%H%M%S)}"
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/23_voucher_discount_type.sql"
 # M24: don hang tuy chon cho khieu nai
 "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/24_after_sales_optional_order.sql"
+# M25-M26: quy trinh + phan cong hau mai; M27-M31: thanh toan / hoan tien VNPay, checkout tra truoc
+for m in 25_after_sales_workflow 26_after_sales_assignment 27_vnpay_payment_transaction 28_order_payment_first_state \
+         29_prepaid_checkout_sessions 30_vnpay_refund_api 31_vnpay_return_refund; do
+  "$MDB" -h "$HOST" -P "$PORT" -u "$USER_" --default-character-set=utf8mb4 -D "$DB" < "$HERE/../migrations/$m.sql"
+done
 echo
 echo "Clone san sang. Chay test:"
 echo "  export PHONENEST_IT_DB_URL=jdbc:mariadb://$HOST:$PORT/$DB"

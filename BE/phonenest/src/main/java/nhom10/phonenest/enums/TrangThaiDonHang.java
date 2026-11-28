@@ -1,6 +1,7 @@
 package nhom10.phonenest.enums;
 
 public enum TrangThaiDonHang {
+    CHO_THANH_TOAN,
     CHO_XAC_NHAN,
     DA_XAC_NHAN,
     DANG_CHUAN_BI,
@@ -11,6 +12,9 @@ public enum TrangThaiDonHang {
 
     /**
      * State transition matrix:
+     *
+     * CHO_THANH_TOAN
+     * -> DA_HUY (or CHO_XAC_NHAN after verified payment)
      *
      * CHO_XAC_NHAN
      * -> DA_XAC_NHAN, DA_HUY
@@ -36,6 +40,9 @@ public enum TrangThaiDonHang {
         }
 
         return switch (this) {
+            case CHO_THANH_TOAN ->
+                    moi == DA_HUY;
+
             case CHO_XAC_NHAN ->
                     moi == DA_XAC_NHAN || moi == DA_HUY;
 

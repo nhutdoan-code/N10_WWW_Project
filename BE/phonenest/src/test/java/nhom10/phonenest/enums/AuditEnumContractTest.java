@@ -12,8 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditEnumContractTest {
 
     @Test
-    @DisplayName("shouldContainExact29HanhDongAuditEnums")
-    void shouldContainExact24HanhDongAuditEnums() {
+    @DisplayName("shouldContainExact33HanhDongAuditEnums")
+    void shouldContainExact33HanhDongAuditEnums() {
         Set<String> actualNames = Arrays.stream(HanhDongAudit.values())
                 .map(Enum::name)
                 .collect(Collectors.toSet());
@@ -63,18 +63,19 @@ class AuditEnumContractTest {
 
                 "DELETE_REVIEW",
 
-                "CHANGE_RETURN_STATUS"
+                "CHANGE_RETURN_STATUS",
+                "REFUND_PAYMENT"
         );
 
         assertThat(actualNames)
-                .as("HanhDongAudit must match exactly the 32 planned actions")
+                .as("HanhDongAudit must match exactly the 33 planned actions")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(HanhDongAudit.values()).hasSize(32);
+        assertThat(HanhDongAudit.values()).hasSize(33);
     }
 
     @Test
-    @DisplayName("shouldContainExact11LoaiDoiTuongAuditEnums")
-    void shouldContainExact10LoaiDoiTuongAuditEnums() {
+    @DisplayName("shouldContainExact13LoaiDoiTuongAuditEnums")
+    void shouldContainExact13LoaiDoiTuongAuditEnums() {
         Set<String> actualNames = Arrays.stream(LoaiDoiTuongAudit.values())
                 .map(Enum::name)
                 .collect(Collectors.toSet());
@@ -91,12 +92,13 @@ class AuditEnumContractTest {
                 "SHIPPING_FEE",
                 "QUESTION",
                 "REVIEW",
-                "RETURN"
+                "RETURN",
+                "PAYMENT"
         );
 
         assertThat(actualNames)
-                .as("LoaiDoiTuongAudit must match exactly the 12 planned entity types")
+                .as("LoaiDoiTuongAudit must match exactly the 13 planned entity types")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(LoaiDoiTuongAudit.values()).hasSize(12);
+        assertThat(LoaiDoiTuongAudit.values()).hasSize(13);
     }
 }

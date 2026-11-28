@@ -52,6 +52,7 @@ class SearchAdminRepositoryQueryTest {
         sources.addAnnotatedClass(QuanTriVien.class);
         sources.addAnnotatedClass(DonHang.class);
         sources.addAnnotatedClass(ChiTietDonHang.class);
+        sources.addAnnotatedClass(ThanhToan.class);
         sources.addAnnotatedClass(KhuyenMai.class);
 
         entityManagerFactory = sources.buildMetadata().buildSessionFactory();
@@ -131,7 +132,7 @@ class SearchAdminRepositoryQueryTest {
     }
 
     @Test
-    @DisplayName("DonHangRepository.searchAdmin JPQL query must compile cleanly against DonHang, KhachHang metamodels")
+    @DisplayName("DonHangRepository.searchAdmin JPQL query must compile cleanly against DonHang, KhachHang, ThanhToan metamodels")
     void shouldValidateDonHangRepositorySearchAdminQuery() throws Exception {
         Method method = DonHangRepository.class.getMethod("searchAdmin", String.class, Pageable.class);
         Query queryAnn = method.getAnnotation(Query.class);

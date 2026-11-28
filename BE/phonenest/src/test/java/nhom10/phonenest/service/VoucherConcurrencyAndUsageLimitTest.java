@@ -848,39 +848,40 @@ public class VoucherConcurrencyAndUsageLimitTest {
     }
 
     @Test
-    @DisplayName("TC17: MoMo IPN gọi lại nhiều lần cho cùng 1 đơn -> voucher không bị ảnh hưởng, giữ nguyên số lượt")
-    void tc17_momoIpnDuplicateCallback_voucherUnchanged() {
+    @DisplayName("TC17: Checkout MoMo chưa thanh toán -> không tạo đơn hoặc chiếm lượt voucher")
+    void tc17_onlineCheckoutDoesNotConsumeVoucherBeforePayment() {
         KhuyenMai km = createStandardVoucher("MOMO_VOUCHER", LoaiKhuyenMai.DON_HANG, 10, 0, 1);
         DonHangDto.Checkout req = new DonHangDto.Checkout(
                 PhuongThucTt.VI_DIEN_TU, "DC001", "MOMO_VOUCHER", null, "PB001", 1
         );
 
-        DonHangDto orderDto = datHang("KH001", req);
+        assertThatThrownBy(() -> datHang("KH001", req))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("phải thành công trước khi tạo đơn");
         releaseAllLocks();
 
-        assertThat(km.getDaDung()).isEqualTo(1);
-        assertThat(savedUsages).hasSize(1);
-
-        // Multiple IPN callback notifications do not alter SuDungKhuyenMai or KhuyenMai.daDung
-        assertThat(km.getDaDung()).isEqualTo(1);
-        assertThat(savedUsages).hasSize(1);
+        assertThat(km.getDaDung()).isZero();
+        assertThat(savedUsages).isEmpty();
+        assertThat(savedDonHang).isEmpty();
     }
 
     @Test
-    @DisplayName("TC18: Thanh toán MoMo thất bại -> voucher state preserved correctly")
-    void tc18_momoPaymentFailed_voucherStatePreserved() {
+    @DisplayName("TC18: Checkout online chưa xác nhận -> tồn kho và voucher được giữ nguyên")
+    void tc18_unconfirmedOnlineCheckoutPreservesStockAndVoucher() {
         KhuyenMai km = createStandardVoucher("MOMO_FAIL_KM", LoaiKhuyenMai.DON_HANG, 10, 0, 1);
         DonHangDto.Checkout req = new DonHangDto.Checkout(
                 PhuongThucTt.VI_DIEN_TU, "DC001", "MOMO_FAIL_KM", null, "PB001", 1
         );
 
-        DonHangDto orderDto = datHang("KH001", req);
+        int stockBefore = pb1.getSoLuongTon();
+        assertThatThrownBy(() -> datHang("KH001", req))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("phải thành công trước khi tạo đơn");
         releaseAllLocks();
 
-        assertThat(km.getDaDung()).isEqualTo(1);
-        // If order stays in CHO_THANH_TOAN, voucher remains applied
-        DonHang d = savedDonHang.get(0);
-        assertThat(d.getKhuyenMai().getMaKm()).isEqualTo("MOMO_FAIL_KM");
+        assertThat(km.getDaDung()).isZero();
+        assertThat(pb1.getSoLuongTon()).isEqualTo(stockBefore);
+        assertThat(savedDonHang).isEmpty();
     }
 
     @Test
@@ -956,17 +957,19 @@ public class VoucherConcurrencyAndUsageLimitTest {
     }
 
     @Test
-    @DisplayName("TC21: Regression test: MoMo integration (PNE-001) unbroken")
-    void tc21_regression_momoIntegrationUnbroken() {
+    @DisplayName("TC21: Regression: direct online checkout cannot create an unpaid order")
+    void tc21_regressionOnlineCheckoutRequiresPaymentFirst() {
         DonHangDto.Checkout req = new DonHangDto.Checkout(
                 PhuongThucTt.VI_DIEN_TU, "DC001", null, null, "PB001", 1
         );
 
-        DonHangDto order = datHang("KH001", req);
+        assertThatThrownBy(() -> datHang("KH001", req))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("phải thành công trước khi tạo đơn");
         releaseAllLocks();
 
-        assertThat(order).isNotNull();
-        assertThat(order.phuongThucTt()).isEqualTo(PhuongThucTt.VI_DIEN_TU);
+        assertThat(savedDonHang).isEmpty();
+        assertThat(savedThanhToan).isEmpty();
     }
 
     @Test

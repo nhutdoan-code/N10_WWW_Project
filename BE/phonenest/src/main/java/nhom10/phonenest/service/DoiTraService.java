@@ -29,6 +29,8 @@ public class DoiTraService {
     private final KhoService khoService;
     private final PhienBanSanPhamRepository phienBanRepo;
     private final ThanhToanRepository thanhToanRepo;
+    private final MomoPaymentService momoPaymentService;
+    private final VnPayPaymentService vnPayPaymentService;
 
     public record ExchangeOption(String id, String label, BigDecimal price, int stock) {}
     private boolean exchangeAvailable(PhienBanSanPham p, int quantity) {
@@ -241,7 +243,8 @@ public class DoiTraService {
         return dto(y);
     }
 
-    public DoiTraDto ghiNhanHoanTien(String ma, DoiTraDto.XacNhanHoanTienRequest request) {
+    public DoiTraDto ghiNhanHoanTien(
+            String ma, DoiTraDto.XacNhanHoanTienRequest request, String adminId) {
         YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
                 new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
         if (y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY) {
@@ -258,64 +261,97 @@ public class DoiTraService {
             throw new AppException(HttpStatus.CONFLICT, "Xác nhận đã nhận và nhập kho sản phẩm trước khi ghi nhận hoàn tiền");
         }
         String method = request.hinhThuc().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("MOMO", "CHUYEN_KHOAN", "TIEN_MAT", "KHAC").contains(method)) {
+        if (!Set.of("MOMO", "VNPAY", "CHUYEN_KHOAN", "TIEN_MAT", "KHAC").contains(method)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Hình thức hoàn tiền không hợp lệ");
+        }
+        boolean vnPayDangXuLy = "DANG_HOAN_TIEN".equals(y.getTrangThaiHoanVnPay());
+        if (vnPayDangXuLy && !"VNPAY".equals(method)) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Yêu cầu hoàn VNPay đang được xử lý; hãy đối soát cùng mã yêu cầu trước khi chọn hình thức khác");
         }
         int phanTram = request.phanTram() == null ? 100 : request.phanTram();
         if (phanTram < 1 || phanTram > 100) throw new AppException(HttpStatus.BAD_REQUEST, "Tỷ lệ hoàn tiền phải từ 1 đến 100");
-        tinhSoTienHoanDuKien(y);
-        BigDecimal ceiling = tongTienHoan(y);
+        BigDecimal ceiling = tinhTongHoanDuKien(y);
         BigDecimal requested = request.soTien();
         String adjustment = Objects.toString(request.lyDoDieuChinh(), "").trim();
         if (thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null) == PhuongThucTt.COD && !"CHUYEN_KHOAN".equals(method))
                 throw new AppException(HttpStatus.BAD_REQUEST, "Đơn COD phải hoàn qua chuyển khoản");
         if (y.getLyDoChung() != null && y.getLyDoChung().lines().anyMatch(line -> line.equals("Hoàn tiền đề nghị: Chuyển khoản")) && !"CHUYEN_KHOAN".equals(method))
                 throw new AppException(HttpStatus.BAD_REQUEST, "Khách hàng chọn hoàn qua chuyển khoản");
-        if (requested == null && phanTram < 100 && adjustment.isBlank()) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
-        if (requested != null) {
-            if (requested.stripTrailingZeros().scale() > 0 || requested.signum() <= 0 || requested.compareTo(ceiling) > 0)
-                throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền hoàn phải là số nguyên dương, không vượt giá trị đủ điều kiện");
-            if (requested.compareTo(ceiling) < 0 && adjustment.isBlank())
-                throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
-            // Allocate the exact total, never exceeding each line's refundable amount.
-            BigDecimal remaining = requested;
-            BigDecimal remainingCeiling = y.getChiTiet().stream().map(c -> c.getSoTienHoan().setScale(0, RoundingMode.FLOOR)).reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (requested.compareTo(remainingCeiling) > 0) throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền vượt mức hoàn nguyên đồng");
-            for (ChiTietDoiTra ct : y.getChiTiet()) {
-                BigDecimal base = ct.getSoTienHoan().setScale(0, RoundingMode.FLOOR);
-                BigDecimal allocated = remainingCeiling.signum() == 0 ? BigDecimal.ZERO :
-                        remaining.multiply(base).divide(remainingCeiling, 0, RoundingMode.FLOOR).min(base);
-                ct.setSoTienHoan(allocated);
-                remaining = remaining.subtract(allocated);
-                remainingCeiling = remainingCeiling.subtract(base);
-            }
+        if (vnPayDangXuLy) {
+            // Gửi lại VNPay: giữ nguyên số tiền từng dòng đã gửi cùng mã yêu cầu hoàn để tránh lệch đối soát.
+            if (y.getChiTiet().stream().anyMatch(ct -> ct.getSoTienHoan() == null))
+                throw new AppException(HttpStatus.CONFLICT, "Thiếu số tiền của yêu cầu hoàn VNPay đang xử lý; cần đối soát thủ công");
         } else {
-            for (ChiTietDoiTra ct : y.getChiTiet()) {
-                ct.setSoTienHoan(ct.getSoTienHoan().multiply(BigDecimal.valueOf(phanTram)).divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR));
+            tinhSoTienHoanDuKien(y);
+            if (requested == null && phanTram < 100 && adjustment.isBlank()) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
+            if (requested != null) {
+                if (requested.stripTrailingZeros().scale() > 0 || requested.signum() <= 0 || requested.compareTo(ceiling) > 0)
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền hoàn phải là số nguyên dương, không vượt giá trị đủ điều kiện");
+                if (requested.compareTo(ceiling) < 0 && adjustment.isBlank())
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng ghi lý do điều chỉnh số tiền hoàn");
+                // Allocate the exact total, never exceeding each line's refundable amount.
+                BigDecimal remaining = requested;
+                BigDecimal remainingCeiling = y.getChiTiet().stream().map(c -> c.getSoTienHoan().setScale(0, RoundingMode.FLOOR)).reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (requested.compareTo(remainingCeiling) > 0) throw new AppException(HttpStatus.BAD_REQUEST, "Số tiền vượt mức hoàn nguyên đồng");
+                for (ChiTietDoiTra ct : y.getChiTiet()) {
+                    BigDecimal base = ct.getSoTienHoan().setScale(0, RoundingMode.FLOOR);
+                    BigDecimal allocated = remainingCeiling.signum() == 0 ? BigDecimal.ZERO :
+                            remaining.multiply(base).divide(remainingCeiling, 0, RoundingMode.FLOOR).min(base);
+                    ct.setSoTienHoan(allocated);
+                    remaining = remaining.subtract(allocated);
+                    remainingCeiling = remainingCeiling.subtract(base);
+                }
+            } else {
+                for (ChiTietDoiTra ct : y.getChiTiet()) {
+                    ct.setSoTienHoan(ct.getSoTienHoan().multiply(BigDecimal.valueOf(phanTram)).divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR));
+                }
             }
         }
-        if (tongTienHoan(y).signum() <= 0) throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn phải lớn hơn 0");
+        BigDecimal soTienHoan = tongTienHoan(y);
+        if (soTienHoan.signum() <= 0) throw new AppException(HttpStatus.CONFLICT, "Số tiền hoàn phải lớn hơn 0");
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime paid = request.thoiDiemHoan() == null ? now : request.thoiDiemHoan();
         if (paid.isAfter(now) || y.getChiTiet().stream().anyMatch(ct -> ct.getNgayNhapKho() != null && paid.isBefore(ct.getNgayNhapKho())))
             throw new AppException(HttpStatus.BAD_REQUEST, "Thời điểm hoàn phải từ lúc nhập kho đến hiện tại");
         Map<String, Object> truoc = snapshot(y);
+        String maGiaoDich;
+        LocalDateTime ngayHoan;
+        if ("MOMO".equals(method)) {
+            // Hoàn thật qua MoMo; requestId cố định theo mã yêu cầu nên gửi lại không bị hoàn trùng.
+            maGiaoDich = momoPaymentService.refund(
+                    y.getDonHang().getMaDonHang(), soTienHoan, y.getMaYeuCau());
+            ngayHoan = now;
+        } else if ("VNPAY".equals(method)) {
+            VnPayPaymentService.ReturnRefundResult result = vnPayPaymentService.refundReturn(y, soTienHoan, adminId);
+            y.setTrangThaiHoanVnPay(result.status());
+            y.setThongBaoHoanVnPay(result.message());
+            maGiaoDich = "DA_HOAN_TIEN".equals(result.status()) ? result.transactionId() : null;
+            // VNPay có thể trả "đang xử lý": chưa ghi nhận ngày hoàn, giữ yêu cầu để đối soát/gửi lại.
+            ngayHoan = maGiaoDich != null ? (y.getNgayHoanTien() != null ? y.getNgayHoanTien() : now) : null;
+        } else {
+            if (request.maGiaoDich() == null || request.maGiaoDich().isBlank()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập mã giao dịch/đối soát");
+            }
+            maGiaoDich = request.maGiaoDich().trim();
+            ngayHoan = paid;
+        }
         y.setHinhThucHoanTien(method);
-        y.setMaGiaoDichHoanTien(request.maGiaoDich().trim());
-        y.setNgayHoanTien(paid);
+        y.setMaGiaoDichHoanTien(maGiaoDich);
+        y.setNgayHoanTien(ngayHoan);
         y.setNgayCapNhat(now);
         Map<String, Object> sau = snapshot(y);
-        sau.put("suKien", "REFUND");
+        sau.put("suKien", ngayHoan != null ? "REFUND" : "REFUND_PENDING");
         sau.put("giaTriDuDieuKien", ceiling);
-        sau.put("soTienHoan", tongTienHoan(y));
+        sau.put("soTienHoan", soTienHoan);
         sau.put("lyDoDieuChinh", adjustment);
-        sau.put("ngayHoanTien", paid.toString());
+        sau.put("ngayHoanTien", ngayHoan == null ? null : ngayHoan.toString());
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
                 LoaiDoiTuongAudit.RETURN, ma, truoc, sau);
         return dto(y);
     }
 
-    // Chỉ tính số tiền dự kiến được hoàn, KHÔNG thực hiện chuyển tiền qua cổng thanh toán.
+    // Phân bổ giảm giá theo từng dòng hàng để tính đúng số tiền phải hoàn.
     private void tinhSoTienHoanDuKien(YeuCauDoiTra y) {
         DonHang don = y.getDonHang();
         BigDecimal tam = don.getTamTinh() == null ? BigDecimal.ZERO : don.getTamTinh();
@@ -341,6 +377,8 @@ public class DoiTraService {
         duLieu.put("phanHoi", y.getGhiChuXuLy());
         duLieu.put("hinhThucHoanTien", y.getHinhThucHoanTien());
         duLieu.put("maGiaoDichHoanTien", y.getMaGiaoDichHoanTien());
+        duLieu.put("trangThaiHoanVnPay", y.getTrangThaiHoanVnPay());
+        duLieu.put("maYeuCauHoanVnPay", y.getMaYeuCauHoanVnPay());
         return duLieu;
     }
 
@@ -362,9 +400,13 @@ public class DoiTraService {
                 ct == null ? null : ct.getLoaiYeuCau(), tenSanPham,
                 soLuong, y.getGhiChuXuLy(), items,
                 y.getChiTiet().stream().anyMatch(item -> item.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN)
-                        ? (y.getNgayHoanTien() != null ? tongTienHoan(y) : tinhTongHoanDuKien(y)) : null,
+                        ? (y.getNgayHoanTien() != null || "DANG_HOAN_TIEN".equals(y.getTrangThaiHoanVnPay())
+                                ? tongTienHoan(y) : tinhTongHoanDuKien(y)) : null,
                 y.getHinhThucHoanTien(), y.getMaGiaoDichHoanTien(), y.getNgayHoanTien(),
-                !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho), y.getNgayTao());
+                !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho), y.getNgayTao(),
+                thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream()
+                        .findFirst().map(ThanhToan::getPhuongThuc).orElse(null),
+                y.getTrangThaiHoanVnPay(), y.getMaYeuCauHoanVnPay(), y.getThongBaoHoanVnPay());
     }
 
     private BigDecimal tinhTongHoanDuKien(YeuCauDoiTra y) {

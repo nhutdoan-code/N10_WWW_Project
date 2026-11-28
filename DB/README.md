@@ -31,7 +31,12 @@ DB/
 │   ├── 23_voucher_discount_type.sql        # Voucher % có trần / tiền mặt theo bậc, bộ voucher mới (+ _rollback)
 │   ├── 24_after_sales_optional_order.sql   # Hậu mãi V2: maKh, khiếu nại không gắn đơn (+ _rollback)
 │   ├── 25_after_sales_workflow.sql         # Bước kiểm tra/xác minh và kết quả xử lý (+ _rollback)
-│   └── 26_after_sales_assignment.sql       # Người phụ trách và hạn xử lý hậu mãi
+│   ├── 26_after_sales_assignment.sql       # Người phụ trách và hạn xử lý hậu mãi
+│   ├── 27_vnpay_payment_transaction.sql    # Lưu mã giao dịch ngân hàng do VNPay trả về (+ _rollback)
+│   ├── 28_order_payment_first_state.sql    # Trạng thái đơn chờ thanh toán online (+ _rollback)
+│   ├── 29_prepaid_checkout_sessions.sql    # Tạo đơn online sau khi IPN xác nhận thanh toán (+ _rollback)
+│   ├── 30_vnpay_refund_api.sql             # Hoàn giao dịch VNPay cần đối soát (+ _rollback)
+│   └── 31_vnpay_return_refund.sql          # Hoàn một phần VNPay cho yêu cầu đổi trả (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -44,9 +49,13 @@ DB/
 
 Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_optional_order.sql` và `25_after_sales_workflow.sql` trên database đang sử dụng trước khi chạy backend V2. Không xóa hoặc import đè database. M24 thêm `YeuCauHauMai.maKh`, điền chủ sở hữu từ đơn cũ và cho phép khiếu nại không gắn đơn. M25 thêm các trạng thái kiểm tra/xác minh và kết quả xử lý. Nếu trước đó đã áp dụng migration workflow số 24 trên nhánh cũ, M25 dùng `ADD COLUMN IF NOT EXISTS` nên vẫn áp dụng được. Không rollback M24 nếu đã có khiếu nại độc lập. Nếu cài mới, chỉ cần import `phonenest_full.sql`, không chạy lại migration. Sau M25, chạy thêm `26_after_sales_assignment.sql` để tạo bảng phân công; dữ liệu yêu cầu hiện có không bị thay đổi.
 
+### Migration 27–31 — Thanh toán & hoàn tiền VNPay
+
+Database đang dùng (đã có M26): sao lưu rồi chạy lần lượt `27_vnpay_payment_transaction.sql` → `28_order_payment_first_state.sql` → `29_prepaid_checkout_sessions.sql` → `30_vnpay_refund_api.sql` → `31_vnpay_return_refund.sql` trước khi chạy backend có VNPay. Các file này trước đây được đánh số 24–28 trên nhánh `feature/payment`; nếu đã chạy chúng dưới số cũ thì **không chạy lại** (nội dung giống hệt). Cài mới chỉ cần import `phonenest_full.sql`.
+
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 
-File `DB/phonenest_full.sql` (schema đã gồm M24, M25 và M26; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 43 bảng (schema gồm migration 03, 05–09, 11, 12 và 15–26; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 58 khóa ngoại và dữ liệu demo. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 đã được bổ sung vào dump này.
+File `DB/phonenest_full.sql` (schema đã gồm M24–M31; dữ liệu demo cập nhật 15/11/2026) là **file duy nhất cần import** cho máy mới: 44 bảng (schema gồm migration 03, 05–09, 11, 12 và 15–31; `pn_migration_log` có M12/M15/M16 nên backend qua được `SchemaCompatibilityVerifier`), 61 khóa ngoại và dữ liệu demo. Kết quả kiểm chứng tương đương trước đó được thực hiện ngày 15/11/2026; các thay đổi schema hậu mãi V2 (M24–M26) và thanh toán/hoàn tiền VNPay (M27–M31) đã được bổ sung vào dump này.
 
 | Dữ liệu | Số lượng |
 |---|---|
@@ -65,7 +74,7 @@ File `DB/phonenest_full.sql` (schema đã gồm M24, M25 và M26; dữ liệu de
 > 2. **Chỉ dùng cho database mới/trống**: `phonenest_full.sql` hoàn toàn **KHÔNG** chứa lệnh `DROP DATABASE` hay `CREATE DATABASE`, và **KHÔNG** chỉ định cứng `USE <db>`.
 > 3. **Cơ chế bảo vệ 2 lớp ngăn chặn tác động database không trống:**
 >    - **Lớp 1 (Fail-fast Pre-check):** Ngay đầu file `phonenest_full.sql`, một truy vấn kiểm tra tự động `information_schema.TABLES` sẽ kích hoạt lỗi hủy lệnh ngay lập tức (`ERROR 1103`) nếu database đích đang chứa bất kỳ bảng nào, ngăn chặn triệt để tình trạng ghi đè hoặc tạo bảng chắp vá trên database có sẵn dữ liệu.
->    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 42 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
+>    - **Lớp 2 (Strict CREATE TABLE):** Toàn bộ 44 bảng sử dụng cú pháp `CREATE TABLE <name>` nghiêm ngặt (không có `IF NOT EXISTS`). Nếu bảng đã tồn tại, MariaDB dừng khẩn cấp với lỗi `ERROR 1050 (42S01)`.
 > 4. Tuyệt đối không dùng `INSERT IGNORE` hay `REPLACE INTO`.
 
 **Quy trình kiểm tra database đích trống và import an toàn:**
@@ -113,6 +122,11 @@ Nếu cần kiểm thử hoặc tái hiện từng bước nâng cấp:
 17. *(sau 23)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/24_after_sales_optional_order.sql` — thêm `YeuCauHauMai.maKh` (điền từ đơn cũ), cho phép `maDonHang` NULL để khiếu nại không gắn đơn. Rollback: `24_after_sales_optional_order_rollback.sql` (dừng nếu đã có yêu cầu không gắn đơn).
 18. *(sau 24)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/25_after_sales_workflow.sql` — thêm bước kiểm tra/xác minh riêng cho bảo hành và khiếu nại, cùng cột kết quả xử lý. **Bắt buộc** với backend hiện tại. Rollback: `25_after_sales_workflow_rollback.sql`.
 19. *(sau 25)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/26_after_sales_assignment.sql` — tạo bảng phân công và hạn xử lý, không thay đổi các yêu cầu đã có. Bắt buộc với backend hiện tại.
+20. *(sau 26)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/27_vnpay_payment_transaction.sql` — thêm `ThanhToan.maGiaoDichNganHang` và unique index để lưu mã giao dịch VNPay. Bắt buộc với bản backend có tích hợp ngân hàng. Rollback: `27_vnpay_payment_transaction_rollback.sql`.
+21. *(sau 27)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/28_order_payment_first_state.sql` — thêm trạng thái `CHO_THANH_TOAN` cho đơn hàng và lịch sử trạng thái. Bắt buộc với bản backend chỉ tiếp nhận đơn MoMo/VNPay sau khi thanh toán thành công. Rollback: `28_order_payment_first_state_rollback.sql`.
+22. *(sau 28)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/29_prepaid_checkout_sessions.sql` — tạo bảng phiên thanh toán tạm, lưu snapshot giỏ hàng và chỉ tạo `DonHang` sau IPN thành công. Bắt buộc với checkout trả trước hiện tại. Chỉ rollback sau khi đã đối soát hết các phiên đang chờ thanh toán/hoàn tiền: `29_prepaid_checkout_sessions_rollback.sql`.
+23. *(sau 29)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/30_vnpay_refund_api.sql` — lưu mã yêu cầu/mã giao dịch hoàn VNPay và trạng thái `DANG_HOAN_TIEN` cho giao dịch cần đối soát. Bắt buộc với tính năng hoàn VNPay. Rollback: `30_vnpay_refund_api_rollback.sql`.
+24. *(sau 30)* `mariadb -h 127.0.0.1 -P 3307 -u root -p BanDienThoai < DB/migrations/31_vnpay_return_refund.sql` — lưu trạng thái và mã yêu cầu để hoàn VNPay toàn phần/một phần trong luồng đổi trả hậu mãi. Bắt buộc với backend có hoàn tiền VNPay cho đổi trả. Rollback: `31_vnpay_return_refund_rollback.sql`.
 
 ---
 
@@ -137,7 +151,7 @@ Migration `11_user_behavior_tracking.sql` bổ sung bảng lưu vết toàn bộ
 
 ## 4. Kiểm chứng tương đương (Verification)
 
-> Bản `phonenest_full.sql` ngày 15/11/2026 được kiểm chứng: import vào database trống thành công; import lần 2 bị chặn bởi guard; `CHECKSUM TABLE` 38/38 bảng khớp database nguồn; 55/55 khóa ngoại; backend chạy `SCHEMA_CHECK OK`. Phần dưới mô tả lần kiểm chứng của bản cũ (33 bảng).
+> Bản `phonenest_full.sql` ngày 15/11/2026 được kiểm chứng: import vào database trống thành công; import lần 2 bị chặn bởi guard; `CHECKSUM TABLE` 43/43 bảng khớp database nguồn; 58/58 khóa ngoại; backend chạy `SCHEMA_CHECK OK`. Phần dưới mô tả lần kiểm chứng của bản cũ (33 bảng).
 
 Cơ chế tạo `phonenest_full.sql` được kiểm chứng bằng script so sánh tự động giữa cơ sở dữ liệu chạy tuần tự (`test_phonenest_source`) và cơ sở dữ liệu import từ `phonenest_full.sql` (`test_phonenest_full`).
 

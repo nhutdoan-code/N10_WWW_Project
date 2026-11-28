@@ -2,7 +2,7 @@
 // Backend vẫn phải xác thực trạng thái trước khi thực hiện hành động.
 const REORDER_STATES = new Set(['DA_GIAO', 'DA_HUY']);
 const COMPLAINT_STATES = new Set(['DANG_GIAO', 'CHO_KHACH_XAC_NHAN', 'DA_GIAO', 'DA_HUY']);
-const CANCEL_STATES = new Set(['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI']);
+const CANCEL_STATES = new Set(['CHO_THANH_TOAN', 'CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI']);
 
 export function getOrderActions(status) {
   return {

@@ -47,5 +47,6 @@ public enum HanhDongAudit {
 
     DELETE_REVIEW,
 
-    CHANGE_RETURN_STATUS
+    CHANGE_RETURN_STATUS,
+    REFUND_PAYMENT
 }

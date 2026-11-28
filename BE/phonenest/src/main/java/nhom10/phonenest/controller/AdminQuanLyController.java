@@ -8,10 +8,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import nhom10.phonenest.dto.DonHangDto;
 import nhom10.phonenest.dto.KhoDto;
+import nhom10.phonenest.dto.PaymentStatusDto;
+import nhom10.phonenest.dto.VnPayRefundStatusDto;
 import nhom10.phonenest.dto.TaiKhoanDto;
 import nhom10.phonenest.enums.TrangThaiDonHang;
 import nhom10.phonenest.service.DonHangService;
+import nhom10.phonenest.service.MomoPaymentService;
 import nhom10.phonenest.service.TaiKhoanService;
+import nhom10.phonenest.service.VnPayPaymentService;
+import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -31,6 +36,8 @@ public class AdminQuanLyController {
 
     private final DonHangService donHangService;
     private final TaiKhoanService taiKhoanService;
+    private final MomoPaymentService momoPaymentService;
+    private final VnPayPaymentService vnPayPaymentService;
 
     @GetMapping("/orders")
     public List<DonHangDto> orders() {
@@ -58,6 +65,26 @@ public class AdminQuanLyController {
     @GetMapping("/orders/{ma}")
     public DonHangDto order(@PathVariable String ma) {
         return donHangService.chiTietQuanTri(ma);
+    }
+
+    @GetMapping("/orders/{ma}/momo/refund-status")
+    public PaymentStatusDto refundStatus(@PathVariable String ma) {
+        return momoPaymentService.refundStatus(ma);
+    }
+
+    @PostMapping("/orders/{ma}/momo/refund")
+    public PaymentStatusDto refundMomo(@PathVariable String ma) {
+        return momoPaymentService.refundPendingPayment(ma);
+    }
+
+    @GetMapping("/orders/{ma}/vnpay/refund-status")
+    public VnPayRefundStatusDto vnPayRefundStatus(@PathVariable String ma) {
+        return vnPayPaymentService.refundStatus(ma);
+    }
+
+    @PostMapping("/orders/{ma}/vnpay/refund")
+    public VnPayRefundStatusDto refundVnPay(@PathVariable String ma) {
+        return vnPayPaymentService.refundPendingPayment(ma, SecurityUtil.currentUserId());
     }
 
     @PutMapping("/orders/{ma}/items/{maSanPham}")
