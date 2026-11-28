@@ -36,7 +36,8 @@ DB/
 │   ├── 28_order_payment_first_state.sql    # Trạng thái đơn chờ thanh toán online (+ _rollback)
 │   ├── 29_prepaid_checkout_sessions.sql    # Tạo đơn online sau khi IPN xác nhận thanh toán (+ _rollback)
 │   ├── 30_vnpay_refund_api.sql             # Hoàn giao dịch VNPay cần đối soát (+ _rollback)
-│   └── 31_vnpay_return_refund.sql          # Hoàn một phần VNPay cho yêu cầu đổi trả (+ _rollback)
+│   ├── 31_vnpay_return_refund.sql          # Hoàn một phần VNPay cho yêu cầu đổi trả (+ _rollback)
+│   └── 32_after_sales_customer_confirmation.sql # Khách xác nhận kết quả hậu mãi, tự đóng sau 3 ngày (+ _rollback)
 ├── phonenest_full.sql                      # File SQL hợp nhất toàn bộ (Schema + Migrations + Seeds)
 └── README.md                               # Hướng dẫn này
 ```
@@ -52,6 +53,10 @@ Nếu đã cài database, sao lưu rồi chạy lần lượt `24_after_sales_op
 ### Migration 27–31 — Thanh toán & hoàn tiền VNPay
 
 Database đang dùng (đã có M26): sao lưu rồi chạy lần lượt `27_vnpay_payment_transaction.sql` → `28_order_payment_first_state.sql` → `29_prepaid_checkout_sessions.sql` → `30_vnpay_refund_api.sql` → `31_vnpay_return_refund.sql` trước khi chạy backend có VNPay. Các file này trước đây được đánh số 24–28 trên nhánh `feature/payment`; nếu đã chạy chúng dưới số cũ thì **không chạy lại** (nội dung giống hệt). Cài mới chỉ cần import `phonenest_full.sql`.
+
+### Migration 32 — Khách xác nhận kết quả hậu mãi
+
+Database đang dùng: sao lưu rồi chạy `32_after_sales_customer_confirmation.sql` trước khi chạy backend mới. Sau khi cửa hàng ghi nhận giao máy đổi, trả máy bảo hành, hoàn tiền hoặc phương án khiếu nại, khách có 3 ngày để xác nhận hoặc báo chưa nhận. Quá hạn sẽ tự hoàn tất và có nhật ký riêng. Cài mới chỉ cần import `phonenest_full.sql`.
 
 ### Phương án A: Dùng file hợp nhất `phonenest_full.sql` (Khuyến nghị cho Setup mới)
 

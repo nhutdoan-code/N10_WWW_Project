@@ -21,6 +21,9 @@ public interface YeuCauHauMaiRepository extends JpaRepository<YeuCauHauMai, Stri
 
     List<YeuCauHauMai> findAllByOrderByNgayTaoDesc();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<YeuCauHauMai> findByTrangThaiXacNhanKhachAndHanXacNhanKhachBefore(String state, java.time.LocalDateTime deadline);
+
     @Query(value = """
             SELECT y FROM YeuCauHauMai y
               LEFT JOIN y.khachHang own LEFT JOIN y.donHang d LEFT JOIN d.khachHang orderOwner

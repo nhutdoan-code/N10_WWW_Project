@@ -15,6 +15,7 @@ import java.util.List;
 public class DoiTraController {
 
     private final DoiTraService doiTraService;
+    private final nhom10.phonenest.service.AfterSalesCustomerConfirmationService confirmations;
     private final LuuTruAnhService luuTruAnhService;
 
     @PostMapping
@@ -33,5 +34,12 @@ public class DoiTraController {
     @GetMapping
     public List<DoiTraDto> cuaToi() {
         return doiTraService.cuaToi(SecurityUtil.currentUserId()).stream().map(DoiTraDto::customerView).toList();
+    }
+
+    @PostMapping("/{ma}/confirmation")
+    public java.util.Map<String, String> confirm(@PathVariable String ma, @RequestBody java.util.Map<String, String> body) {
+        boolean received = Boolean.parseBoolean(body.getOrDefault("received", "false"));
+        confirmations.confirm(ma, SecurityUtil.currentUserId(), received, body.get("note"));
+        return java.util.Map.of("message", received ? "Đã xác nhận nhận kết quả" : "Đã gửi phản hồi cho cửa hàng");
     }
 }

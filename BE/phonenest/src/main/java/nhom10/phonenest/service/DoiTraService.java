@@ -31,6 +31,7 @@ public class DoiTraService {
     private final ThanhToanRepository thanhToanRepo;
     private final MomoPaymentService momoPaymentService;
     private final VnPayPaymentService vnPayPaymentService;
+    private final AfterSalesCustomerConfirmationService customerConfirmation;
 
     public record ExchangeOption(String id, String label, BigDecimal price, int stock) {}
     private boolean exchangeAvailable(PhienBanSanPham p, int quantity) {
@@ -221,6 +222,10 @@ public class DoiTraService {
     }
 
     public DoiTraDto xacNhanNhapKho(String ma, String adminId) {
+        return xacNhanNhapKho(ma, adminId, null);
+    }
+
+    public DoiTraDto xacNhanNhapKho(String ma, String adminId, String ghiNhan) {
         YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
                 new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
         if (y.getTrangThai() != TrangThaiDoiTra.DA_DUYET && y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY) {
@@ -239,7 +244,7 @@ public class DoiTraService {
         }
         y.setNgayCapNhat(now);
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, ma,
-                Map.of(), Map.of("suKien", "RESTOCK"));
+                Map.of(), ghiNhan == null || ghiNhan.isBlank() ? Map.of("suKien", "RESTOCK") : Map.of("suKien", "RESTOCK", "ghiNhan", ghiNhan.trim()));
         return dto(y);
     }
 
@@ -340,11 +345,13 @@ public class DoiTraService {
         y.setMaGiaoDichHoanTien(maGiaoDich);
         y.setNgayHoanTien(ngayHoan);
         y.setNgayCapNhat(now);
+        if (ngayHoan != null) customerConfirmation.request(y, "Đã ghi nhận hoàn tiền " + soTienHoan.toPlainString() + " VNĐ qua " + method + ".");
         Map<String, Object> sau = snapshot(y);
         sau.put("suKien", ngayHoan != null ? "REFUND" : "REFUND_PENDING");
         sau.put("giaTriDuDieuKien", ceiling);
         sau.put("soTienHoan", soTienHoan);
         sau.put("lyDoDieuChinh", adjustment);
+        sau.put("ghiNhan", Objects.toString(request.ghiChu(), "Ghi nhận hoàn tiền").trim());
         sau.put("ngayHoanTien", ngayHoan == null ? null : ngayHoan.toString());
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS,
                 LoaiDoiTuongAudit.RETURN, ma, truoc, sau);
@@ -406,7 +413,8 @@ public class DoiTraService {
                 !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho), y.getNgayTao(),
                 thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream()
                         .findFirst().map(ThanhToan::getPhuongThuc).orElse(null),
-                y.getTrangThaiHoanVnPay(), y.getMaYeuCauHoanVnPay(), y.getThongBaoHoanVnPay());
+                y.getTrangThaiHoanVnPay(), y.getMaYeuCauHoanVnPay(), y.getThongBaoHoanVnPay(),
+                y.getTrangThaiXacNhanKhach(), y.getHanXacNhanKhach(), y.getGhiChuXacNhanKhach());
     }
 
     private BigDecimal tinhTongHoanDuKien(YeuCauDoiTra y) {

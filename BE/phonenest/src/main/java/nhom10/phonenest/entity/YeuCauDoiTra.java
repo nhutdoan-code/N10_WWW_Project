@@ -36,6 +36,12 @@ public class YeuCauDoiTra {
     private String maGiaoDichHoanTien;
     private LocalDateTime ngayHoanTien;
 
+    @Column(length = 24)
+    private String trangThaiXacNhanKhach;
+    private LocalDateTime hanXacNhanKhach;
+    @Column(length = 500)
+    private String ghiChuXacNhanKhach;
+
     @Column(length = 20)
     private String trangThaiHoanVnPay;
 
