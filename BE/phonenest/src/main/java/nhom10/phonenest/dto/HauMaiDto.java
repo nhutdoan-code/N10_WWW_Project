@@ -24,7 +24,10 @@ public record HauMaiDto(
         String ketQuaXuLy,
         LocalDateTime ngayTao,
         LocalDateTime ngayCapNhat,
-        List<LichSu> lichSu) {
+        List<LichSu> lichSu,
+        String trangThaiXacNhanKhach,
+        LocalDateTime hanXacNhanKhach,
+        String ghiChuXacNhanKhach) {
 
     @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
     public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }

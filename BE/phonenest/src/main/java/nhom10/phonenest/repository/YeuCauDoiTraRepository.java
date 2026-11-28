@@ -6,8 +6,10 @@ import nhom10.phonenest.enums.TrangThaiDoiTra;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -84,6 +86,9 @@ public interface YeuCauDoiTraRepository extends JpaRepository<YeuCauDoiTra, Stri
                                       @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     List<YeuCauDoiTra> findByDonHangMaDonHangOrderByNgayTaoDesc(String maDonHang);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<YeuCauDoiTra> findByTrangThaiXacNhanKhachAndHanXacNhanKhachBefore(String state, LocalDateTime deadline);
 
     @Query("SELECT COUNT(y) FROM YeuCauDoiTra y WHERE (:start IS NULL OR y.ngayTao >= :start) AND (:end IS NULL OR y.ngayTao < :end)")
     long countByNgayTaoRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);

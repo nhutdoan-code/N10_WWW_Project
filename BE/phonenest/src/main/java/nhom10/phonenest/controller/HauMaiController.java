@@ -17,6 +17,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HauMaiController {
     private final HauMaiService service;
+    private final nhom10.phonenest.service.AfterSalesCustomerConfirmationService confirmations;
     private final LuuTruAnhService luuTruAnhService;
 
     @PostMapping("/images")
@@ -46,6 +47,13 @@ public class HauMaiController {
     @GetMapping
     public List<HauMaiDto> danhSach() {
         return service.cuaToi(SecurityUtil.currentUserId());
+    }
+
+    @PostMapping("/{ma}/confirmation")
+    public Map<String, String> confirm(@PathVariable String ma, @RequestBody Map<String, String> body) {
+        boolean received = Boolean.parseBoolean(body.getOrDefault("received", "false"));
+        confirmations.confirm(ma, SecurityUtil.currentUserId(), received, body.get("note"));
+        return Map.of("message", received ? "Đã xác nhận nhận kết quả" : "Đã gửi phản hồi cho cửa hàng");
     }
 
     @GetMapping("/{ma}")

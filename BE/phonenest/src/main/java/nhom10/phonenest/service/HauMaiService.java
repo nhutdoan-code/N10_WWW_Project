@@ -197,6 +197,7 @@ public class HauMaiService {
                 y.getHinhAnhMinhChung(), y.getTrangThai(), y.getGhiChuXuLy(), y.getKetQuaXuLy(),
                 y.getNgayTao(), y.getNgayCapNhat(),
                 y.getLichSu().stream().map(l -> new HauMaiDto.LichSu(
-                        l.getTrangThai(), l.getGhiChu(), l.getThoiGian())).toList());
+                        l.getTrangThai(), l.getGhiChu(), l.getThoiGian())).toList(),
+                y.getTrangThaiXacNhanKhach(), y.getHanXacNhanKhach(), y.getGhiChuXacNhanKhach());
     }
 }

@@ -31,6 +31,7 @@ public class AfterSalesAdminWorkflow {
     private final QuanTriVienRepository admins;
     private final PhanCongHauMaiRepository assignments;
     private final ThanhToanRepository payments;
+    private final AfterSalesCustomerConfirmationService customerConfirmation;
     public static final Set<String> REJECT_REASONS = Set.of("Quá hạn chính sách", "Không đủ điều kiện", "Minh chứng không hợp lệ", "Sản phẩm không khớp", "Khác");
     public record Action(String action, String note, String reason, String department, String status, String ketQuaXuLy) {
         public Action(String action, String note, String reason, String department, String status) {
@@ -175,6 +176,17 @@ public class AfterSalesAdminWorkflow {
         var done = steps(history(id));
         if ("STATUS".equals(event)) {
             String next = Objects.toString(action.status(), "");
+            if (note.isBlank()) throw bad("Vui lòng ghi chú cho bước chuyển tiếp");
+            if (!ret && "HOAN_TAT".equals(next) && (h.getLoai() == LoaiHauMai.KHIEU_NAI || warranty)) {
+                String outcome = Objects.toString(action.ketQuaXuLy(), "").trim();
+                if (note.isBlank() || outcome.isBlank()) throw bad("Nhập phản hồi khách hàng và kết quả xử lý trước khi yêu cầu xác nhận");
+                if (warranty && !done.contains("WARRANTY_HANDOVER")) throw bad("Cần ghi nhận trả máy bảo hành trước khi yêu cầu khách xác nhận");
+                if (warranty && !nhom10.phonenest.util.WarrantyDevicePolicy.validResolution(note)) throw bad("Chọn kết quả bảo hành và ghi rõ xử lý thực tế");
+                h.setKetQuaXuLy(outcome);
+                customerConfirmation.request(h, "Cửa hàng đã hoàn tất " + (warranty ? "xử lý bảo hành" : "xác minh khiếu nại") + ": " + note);
+                record(id, Map.of("suKien", "CHO_KHACH_XAC_NHAN", "phanHoi", note, "ketQuaXuLy", outcome));
+                return;
+            }
             if ("TU_CHOI".equals(next)) {
                 if (!REJECT_REASONS.contains(Objects.toString(action.reason(), "")) || note.isBlank()) throw bad("Chọn lý do từ chối và nhập phản hồi riêng");
                 note = "Từ chối — " + action.reason() + ": " + note;
@@ -201,10 +213,19 @@ public class AfterSalesAdminWorkflow {
             case "REQUEST_INFO", "REPLY" -> { if (note.isBlank()) throw bad("Vui lòng nhập phản hồi gửi khách"); send = true; }
             case "TRANSFER" -> { if (!Set.of("Kỹ thuật", "Kho", "Kế toán", "Chăm sóc khách hàng").contains(Objects.toString(action.department(), "")) || note.isBlank()) throw bad("Chọn bộ phận và ghi lý do điều chuyển"); }
             case "RECEIVE_CHECK" -> { if (!ret || !Set.of("DA_DUYET", "DANG_XU_LY").contains(status) || note.isBlank()) throw bad("Chỉ xác nhận nhận và kiểm tra hàng đã duyệt; cần ghi kết quả"); }
+            case "RESTOCK" -> { if (!ret || !done.contains("RECEIVE_CHECK") || r.getChiTiet().isEmpty() || r.getChiTiet().stream().anyMatch(c -> c.isDaNhapKho()) || note.isBlank()) throw bad("Cần kiểm tra máy trước khi nhập kho và ghi chú tình trạng"); }
             case "EXCHANGE_HANDOVER" -> { if (!ret || !"DANG_XU_LY".equals(status) || r.getChiTiet().isEmpty() || r.getChiTiet().stream().anyMatch(c -> !c.isDaNhapKho() || c.getLoaiYeuCau() != LoaiYeuCauDoiTra.DOI_HANG) || note.isBlank()) throw bad("Cần nhập kho máy cũ và ghi thông tin máy đã giao đổi"); }
             case "WARRANTY_RECEIVE" -> { if (!warranty || !"DANG_XU_LY".equals(status) || note.isBlank()) throw bad("Cần tiếp nhận bảo hành và ghi nhận tình trạng máy"); }
             case "WARRANTY_REPAIR" -> { if (!warranty || !"DANG_XU_LY".equals(status) || !done.contains("WARRANTY_RECEIVE") || note.isBlank()) throw bad("Cần nhận máy và ghi thông tin sửa chữa"); }
-            case "WARRANTY_HANDOVER" -> { if (!warranty || !"DANG_XU_LY".equals(status) || !done.contains("WARRANTY_REPAIR") || note.isBlank()) throw bad("Cần xử lý máy và ghi nhận trả máy cho khách"); }
+            case "WARRANTY_HANDOVER" -> { if (!warranty || !"DANG_XU_LY".equals(status) || !done.contains("WARRANTY_REPAIR") || !nhom10.phonenest.util.WarrantyDevicePolicy.validResolution(note)) throw bad("Chọn kết quả bảo hành và ghi rõ xử lý thực tế trước khi bàn giao"); h.setKetQuaXuLy(note); }
+            case "REQUEST_CONFIRMATION" -> {
+                boolean completedWork = ret
+                        ? r.getChiTiet().stream().anyMatch(c -> c.getLoaiYeuCau() == LoaiYeuCauDoiTra.DOI_HANG)
+                            ? done.contains("EXCHANGE_HANDOVER") : r.getNgayHoanTien() != null
+                        : warranty && done.contains("WARRANTY_HANDOVER");
+                if (!completedWork || note.isBlank() || !"DANG_XU_LY".equals(status)) throw bad("Chỉ yêu cầu xác nhận sau khi đã ghi nhận giao máy/hoàn tiền và cần ghi chú");
+            }
+            case "RESEND_CONFIRMATION" -> { if (note.isBlank() || !"CAN_HO_TRO".equals(ret ? r.getTrangThaiXacNhanKhach() : h.getTrangThaiXacNhanKhach())) throw bad("Chỉ gửi xác nhận lại sau khi khách báo chưa nhận và cần ghi chú"); }
             default -> throw bad("Thao tác không hợp lệ");
         }
         if (!Set.of("REQUEST_INFO", "REPLY", "TRANSFER").contains(event) && done.contains(event)) throw bad("Bước này đã được ghi nhận");
@@ -221,24 +242,43 @@ public class AfterSalesAdminWorkflow {
             notifications.gui(customer, message, ThongBaoService.linkYeuCau(id));
         }
         if (ret) r.setNgayCapNhat(now); else h.setNgayCapNhat(now);
+        if ("EXCHANGE_HANDOVER".equals(event)) customerConfirmation.request(r, "Cửa hàng đã giao máy đổi. " + note);
+        if ("WARRANTY_HANDOVER".equals(event)) customerConfirmation.request(h, "Cửa hàng đã sửa chữa/thay thế và trả máy bảo hành. " + note);
+        if ("RESTOCK".equals(event)) returnService.xacNhanNhapKho(id, SecurityUtil.currentUserId(), note);
+        if ("REQUEST_CONFIRMATION".equals(event)) {
+            if (ret) customerConfirmation.request(r, note);
+            else customerConfirmation.request(h, note);
+        }
+        if ("RESEND_CONFIRMATION".equals(event)) {
+            if (note.isBlank()) throw bad("Ghi chú nội dung xác nhận lại là bắt buộc");
+            if (ret) customerConfirmation.request(r, "Cửa hàng cập nhật việc giao máy/hoàn tiền. " + note);
+            else customerConfirmation.request(h, "Cửa hàng cập nhật kết quả xử lý. " + note);
+        }
         Map<String,Object> data = new LinkedHashMap<>(); data.put("suKien", event);
         data.put(send ? "phanHoi" : "ghiNhan", note);
         if ("TRANSFER".equals(event)) data.put("boPhan", action.department());
-        record(id, data);
+        if (!"RESTOCK".equals(event)) record(id, data);
     }
-    public DoiTraDto restock(String id, String admin) {
+    public DoiTraDto restock(String id, String admin, String note) {
         var y = returns.findByIdForUpdate(id).orElseThrow(this::missing);
+        if (note == null || note.isBlank()) throw bad("Vui lòng ghi chú tình trạng khi nhập kho");
         if (!steps(history(id)).contains("RECEIVE_CHECK")) throw bad("Cần xác nhận đã nhận và kiểm tra máy trước khi nhập kho");
-        return returnService.xacNhanNhapKho(id, admin);
+        return returnService.xacNhanNhapKho(id, admin, note.trim());
+    }
+    /** Retained for older callers; the new workflow endpoint must supply an audit note. */
+    public DoiTraDto restock(String id, String admin) {
+        return restock(id, admin, "");
     }
     public void checkCompletion(String source, String id) {
         if (isReturn(source)) {
             var y = returns.findByIdForUpdate(id).orElseThrow(this::missing);
+            if (!"DA_XAC_NHAN".equals(y.getTrangThaiXacNhanKhach()) && !"TU_DONG_HOAN_TAT".equals(y.getTrangThaiXacNhanKhach())) throw bad("Đang chờ khách xác nhận trước khi hoàn tất");
             if (y.getChiTiet().stream().anyMatch(c -> c.getLoaiYeuCau() == LoaiYeuCauDoiTra.DOI_HANG) && !steps(history(id)).contains("EXCHANGE_HANDOVER"))
                 throw bad("Cần ghi nhận đã giao máy đổi");
         } else {
             var y = after.findByIdForUpdate(id).orElseThrow(this::missing);
             if (y.getLoai() == LoaiHauMai.BAO_HANH && !steps(history(id)).contains("WARRANTY_HANDOVER")) throw bad("Cần xác nhận đã trả máy cho khách");
+            if (!"DA_XAC_NHAN".equals(y.getTrangThaiXacNhanKhach()) && !"TU_DONG_HOAN_TAT".equals(y.getTrangThaiXacNhanKhach())) throw bad("Đang chờ khách xác nhận trước khi hoàn tất");
         }
     }
     private void record(String id, Map<String, ?> data) {

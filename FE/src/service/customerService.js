@@ -22,9 +22,11 @@ export const customerService = {
   exchangeOptions: () => api.get('/customer/returns/exchange-options'),
   returns: () => api.get('/customer/returns'),
   requestReturn: (data) => api.post('/customer/returns', data),
+  confirmReturn: (ma, received, note = '') => api.post(`/customer/returns/${encodeURIComponent(ma)}/confirmation`, { received, note }),
   afterSales: () => api.get('/customer/after-sales'),
   afterSalesPolicy: () => api.get('/customer/after-sales/policy'),
   createAfterSale: (data) => api.post('/customer/after-sales', data),
+  confirmAfterSale: (ma, received, note = '') => api.post(`/customer/after-sales/${encodeURIComponent(ma)}/confirmation`, { received, note }),
   uploadAfterSaleImage: (file) => {
     const form = new FormData();
     form.append('file', file);

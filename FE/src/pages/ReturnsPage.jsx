@@ -64,6 +64,7 @@ export default function ReturnsPage() {
   const [locLoai, setLocLoai] = useState('');
   const [locStatus, setLocStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmingId, setConfirmingId] = useState('');
   const [success, setSuccess] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [orderPicker, setOrderPicker] = useState(false);
@@ -117,6 +118,23 @@ export default function ReturnsPage() {
     if (loai === 'TRA_HANG_HOAN_TIEN' && order?.phuongThucTt === 'COD') setForm(f => f.refund === 'Chuyển khoản' ? f : {...f,refund:'Chuyển khoản'});
   }, [loai, order?.maDonHang, order?.phuongThucTt]);
   const identifiers = deviceIdentifiers(product, form.serialKind);
+  const confirmAfterSalesResult = async (request, received) => {
+    let note = '';
+    if (!received) {
+      note = window.prompt('Cho cửa hàng biết bạn chưa nhận được gì (máy/tiền) hoặc vấn đề gặp phải:') || '';
+      if (!note.trim()) return;
+    } else if (!window.confirm('Xác nhận bạn đã nhận được kết quả xử lý của yêu cầu này?')) return;
+    setConfirmingId(request.maYeuCau);
+    try {
+      const type = requestType(request);
+      if (type === 'DOI_HANG' || type === 'TRA_HANG_HOAN_TIEN') await customerService.confirmReturn(request.maYeuCau, received, note);
+      else await customerService.confirmAfterSale(request.maYeuCau, received, note);
+      toast(received ? 'Đã xác nhận nhận kết quả' : 'Đã gửi thông tin cho cửa hàng');
+      await reload();
+      window.dispatchEvent(new Event('phonenest:after-sales-updated'));
+    } catch (e) { toast(errorMessage(e), 'error'); }
+    finally { setConfirmingId(''); }
+  };
   useEffect(() => {
     if (loai === 'BAO_HANH' && identifiers.length === 1) setForm(f => f.serial ? f : {...f, serial:identifiers[0]});
   }, [loai, form.maDonHang, form.maPhienBan, form.serialKind, identifiers.join('|')]);
@@ -307,7 +325,11 @@ export default function ReturnsPage() {
         <p>Đơn hàng: {r.maDonHang ? <Link to={`/orders/${encodeURIComponent(r.maDonHang)}`}>{r.maDonHang}</Link> : 'Không gắn đơn hàng'}</p><p>Sản phẩm: {r.tenSanPham || 'Không chỉ định'}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p><p style={{whiteSpace:'pre-wrap'}}>{maskAccount(r.lyDo)}</p>
         {r.soTienHoanDuKien != null && <p><b>{r.ngayHoanTien ? 'Đã ghi nhận hoàn tiền' : 'Tiền hoàn dự kiến'}:</b> {formatPrice(r.soTienHoanDuKien)}</p>}
         <div className="as-thumbs">{requestImages(r).map((url,i) => <a key={url} href={url} target="_blank" rel="noreferrer"><img className="as-evidence" src={url} alt={`Minh chứng ${i+1}`} /></a>)}</div>
-        <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}{r.ketQuaXuLy && <p className="after-sales-outcome"><b>Kết quả xử lý:</b> {maskAccount(r.ketQuaXuLy)}</p>}<div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details open><summary>Tiến trình xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><RequestStatus request={r} status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{maskAccount(item.ghiChu)}</div>}</li>)}</ol></details>}
+        <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}{r.ketQuaXuLy && <p className="after-sales-outcome"><b>Kết quả xử lý:</b> {maskAccount(r.ketQuaXuLy)}</p>}
+        {r.trangThaiXacNhanKhach==='CHO_XAC_NHAN'&&<div className="as-customer-confirm"><b>Cửa hàng đã ghi nhận kết quả xử lý.</b><p>Vui lòng xác nhận bạn đã nhận máy/tiền hoặc phản hồi nếu chưa nhận. Hạn xác nhận: {formatDate(r.hanXacNhanKhach)}. Nếu không có phản hồi trong 3 ngày, yêu cầu sẽ tự hoàn tất.</p><div className="as-receipt-actions"><button type="button" className="btn btn-primary" disabled={!!confirmingId} onClick={()=>confirmAfterSalesResult(r,true)}>{confirmingId===r.maYeuCau?'Đang gửi…':'Tôi đã nhận'}</button><button type="button" className="btn" disabled={!!confirmingId} onClick={()=>confirmAfterSalesResult(r,false)}>Chưa nhận / có vấn đề</button></div></div>}
+        {r.trangThaiXacNhanKhach==='CAN_HO_TRO'&&<p className="as-confirmation-issue"><b>Cửa hàng đang kiểm tra phản hồi của bạn:</b> {r.ghiChuXacNhanKhach}</p>}
+        {r.trangThaiXacNhanKhach==='TU_DONG_HOAN_TAT'&&<p className="muted">Yêu cầu tự hoàn tất do quá hạn xác nhận của khách.</p>}
+        <div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details open><summary>Tiến trình xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><RequestStatus request={r} status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{maskAccount(item.ghiChu)}</div>}</li>)}</ol></details>}
       </article>)}
     </section>
   </div>;

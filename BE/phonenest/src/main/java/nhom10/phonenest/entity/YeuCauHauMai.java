@@ -53,6 +53,12 @@ public class YeuCauHauMai {
     @Column(length = 1000)
     private String ghiChuNoiBo;
 
+    @Column(length = 24)
+    private String trangThaiXacNhanKhach;
+    private LocalDateTime hanXacNhanKhach;
+    @Column(length = 500)
+    private String ghiChuXacNhanKhach;
+
     @Column(nullable = false)
     private LocalDateTime ngayTao;
 

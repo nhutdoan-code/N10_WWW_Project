@@ -1,8 +1,8 @@
 -- ====================================================================
--- PhoneNest — Database đầy đủ (Schema + Migration 03..31 + Dữ liệu demo)
+-- PhoneNest — Database đầy đủ (Schema + Migration 03..32 + Dữ liệu demo)
 --
 -- NỘI DUNG
---   * Schema đã gồm migration 03, 05-09, 11, 12, 15-31 (pn_migration_log có M12/M15/M16).
+--   * Schema đã gồm migration 03, 05-09, 11, 12, 15-32 (pn_migration_log có M12/M15/M16).
 --     M24: YeuCauHauMai.maKh (chủ sở hữu) + maDonHang cho phép NULL; M25: trạng thái kiểm tra/xác minh + ketQuaXuLy. M26 adds after-sales assignment storage.
 --     M27-M31 (thanh toán VNPay): ThanhToan.maGiaoDichNganHang + cột hoàn VNPay, trạng thái đơn CHO_THANH_TOAN,
 --     bảng PhienThanhToan (checkout trả trước), trạng thái DANG_HOAN_TIEN, cột hoàn VNPay trên YeuCauDoiTra.
@@ -5915,6 +5915,9 @@ CREATE TABLE `YeuCauDoiTra` (
   `hinhThucHoanTien` varchar(60) DEFAULT NULL,
   `maGiaoDichHoanTien` varchar(150) DEFAULT NULL,
   `ngayHoanTien` datetime DEFAULT NULL,
+  `trangThaiXacNhanKhach` varchar(24) DEFAULT NULL,
+  `hanXacNhanKhach` datetime DEFAULT NULL,
+  `ghiChuXacNhanKhach` varchar(500) DEFAULT NULL,
   `trangThaiHoanVnPay` varchar(20) DEFAULT NULL,
   `maYeuCauHoanVnPay` varchar(32) DEFAULT NULL,
   `ngayYeuCauHoanVnPay` datetime DEFAULT NULL,
@@ -5946,6 +5949,9 @@ CREATE TABLE `YeuCauHauMai` (
   `ngayTao` datetime NOT NULL DEFAULT current_timestamp(),
   `ngayCapNhat` datetime NOT NULL DEFAULT current_timestamp(),
   `ghiChuNoiBo` varchar(1000) DEFAULT NULL,
+  `trangThaiXacNhanKhach` varchar(24) DEFAULT NULL,
+  `hanXacNhanKhach` datetime DEFAULT NULL,
+  `ghiChuXacNhanKhach` varchar(500) DEFAULT NULL,
   `maKh` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`maYeuCau`),
   KEY `FK_YeuCauHauMai_ChiTiet` (`maChiTietDonHang`),

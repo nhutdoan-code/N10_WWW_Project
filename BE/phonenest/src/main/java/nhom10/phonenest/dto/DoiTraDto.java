@@ -35,7 +35,10 @@ public record DoiTraDto(
         PhuongThucTt phuongThucTt,
         String trangThaiHoanVnPay,
         String maYeuCauHoanVnPay,
-        String thongBaoHoanVnPay) {
+        String thongBaoHoanVnPay,
+        String trangThaiXacNhanKhach,
+        LocalDateTime hanXacNhanKhach,
+        String ghiChuXacNhanKhach) {
 
     @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
     public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }
@@ -47,7 +50,8 @@ public record DoiTraDto(
         return new DoiTraDto(maYeuCau, maDonHang, tenKhach, soDienThoai, maskAccount(lyDo), hinhAnhMinhChung,
                 ngayTao, ngayCapNhat, trangThai, loaiYeuCau, tenSanPham, soLuong, maskAccount(ghiChuXuLy), chiTiet,
                 soTienHoanDuKien, hinhThucHoanTien, maGiaoDichHoanTien, ngayHoanTien, daNhapKho, ngayTaoChinhXac,
-                phuongThucTt, trangThaiHoanVnPay, maYeuCauHoanVnPay, thongBaoHoanVnPay);
+                phuongThucTt, trangThaiHoanVnPay, maYeuCauHoanVnPay, thongBaoHoanVnPay,
+                trangThaiXacNhanKhach, hanXacNhanKhach, ghiChuXacNhanKhach);
     }
 
     static String maskAccount(String text) {
@@ -64,9 +68,10 @@ public record DoiTraDto(
             @NotBlank(message = "Vui lòng chọn hình thức hoàn tiền") @Size(max = 60) String hinhThuc,
             // Bắt buộc với hình thức thủ công; MOMO/VNPAY tự sinh mã giao dịch từ cổng thanh toán.
             @Size(max = 150) String maGiaoDich,
-            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) Integer phanTram, BigDecimal soTien, @Size(max = 500) String lyDoDieuChinh, LocalDateTime thoiDiemHoan) {
-        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich, Integer phanTram) { this(hinhThuc, maGiaoDich, phanTram, null, null, null); }
-        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich) { this(hinhThuc, maGiaoDich, 100, null, null, null); }
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) Integer phanTram, BigDecimal soTien, @Size(max = 500) String lyDoDieuChinh, LocalDateTime thoiDiemHoan, @NotBlank(message = "Vui lòng ghi chú kết quả hoàn tiền") @Size(max = 500) String ghiChu) {
+        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich, Integer phanTram, BigDecimal soTien, String lyDoDieuChinh, LocalDateTime thoiDiemHoan) { this(hinhThuc, maGiaoDich, phanTram, soTien, lyDoDieuChinh, thoiDiemHoan, "Ghi nhận hoàn tiền"); }
+        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich, Integer phanTram) { this(hinhThuc, maGiaoDich, phanTram, null, null, null, "Ghi nhận hoàn tiền"); }
+        public XacNhanHoanTienRequest(String hinhThuc, String maGiaoDich) { this(hinhThuc, maGiaoDich, 100, null, null, null, "Ghi nhận hoàn tiền"); }
     }
 
     public record Request(
