@@ -36,6 +36,7 @@ class DoiTraRefundGatewayTest {
     @Mock ThanhToanRepository thanhToanRepo;
     @Mock MomoPaymentService momo;
     @Mock VnPayPaymentService vnPay;
+    @Mock AfterSalesCustomerConfirmationService customerConfirmation;
     @InjectMocks DoiTraService service;
 
     YeuCauDoiTra y;
