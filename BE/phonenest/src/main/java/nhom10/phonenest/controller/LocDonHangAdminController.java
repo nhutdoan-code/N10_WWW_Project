@@ -44,6 +44,9 @@ public class LocDonHangAdminController {
             @RequestParam(required = false)
             String nhomTrangThai,
 
+            @RequestParam(required = false) PhuongThucTt phuongThucTt,
+            @RequestParam(required = false) TrangThaiThanhToan trangThaiThanhToan,
+
             @RequestParam(defaultValue = "ngayMua")
             String ngayTheo,
 
@@ -149,28 +152,24 @@ public class LocDonHangAdminController {
 
             Subquery<Integer> paymentExists = query.subquery(Integer.class);
             var payment = paymentExists.from(ThanhToan.class);
-            paymentExists.select(cb.literal(1)).where(
-                    cb.equal(payment.get("donHang"), root),
-                    cb.or(
-                            cb.equal(payment.get("phuongThuc"), PhuongThucTt.COD),
-                            cb.and(
-                                    cb.equal(payment.get("phuongThuc"), PhuongThucTt.CHUYEN_KHOAN),
-                                    payment.get("trangThai").in(
-                                            TrangThaiThanhToan.DA_THANH_TOAN,
-                                            TrangThaiThanhToan.CAN_HOAN_TIEN,
-                                            TrangThaiThanhToan.DANG_HOAN_TIEN,
-                                            TrangThaiThanhToan.DA_HOAN_TIEN)
-                            ),
-                            cb.and(
-                                    cb.equal(payment.get("phuongThuc"), PhuongThucTt.VI_DIEN_TU),
-                                            payment.get("trangThai").in(
-                                                    TrangThaiThanhToan.DA_THANH_TOAN,
-                                                    TrangThaiThanhToan.CAN_HOAN_TIEN,
-                                                    TrangThaiThanhToan.DANG_HOAN_TIEN,
-                                                    TrangThaiThanhToan.DA_HOAN_TIEN)
-                            )
-                    )
-            );
+            List<Predicate> paymentPredicates = new ArrayList<>();
+            paymentPredicates.add(cb.equal(payment.get("donHang"), root));
+            paymentPredicates.add(visiblePayment(cb, payment));
+            if (phuongThucTt != null || trangThaiThanhToan != null) {
+                // Lọc trước phân trang, trên đúng bản ghi mà mapper hiển thị.
+                Subquery<Integer> newer = paymentExists.subquery(Integer.class);
+                var other = newer.from(ThanhToan.class);
+                newer.select(cb.literal(1)).where(
+                        cb.equal(other.get("donHang"), payment.get("donHang")),
+                        visiblePayment(cb, other),
+                        cb.or(cb.greaterThan(other.<LocalDateTime>get("ngayTao"), payment.<LocalDateTime>get("ngayTao")),
+                                cb.and(cb.equal(other.get("ngayTao"), payment.get("ngayTao")),
+                                        cb.greaterThan(other.<String>get("maThanhToan"), payment.<String>get("maThanhToan")))));
+                paymentPredicates.add(cb.not(cb.exists(newer)));
+                if (phuongThucTt != null) paymentPredicates.add(cb.equal(payment.get("phuongThuc"), phuongThucTt));
+                if (trangThaiThanhToan != null) paymentPredicates.add(cb.equal(payment.get("trangThai"), trangThaiThanhToan));
+            }
+            paymentExists.select(cb.literal(1)).where(paymentPredicates.toArray(new Predicate[0]));
             ps.add(cb.exists(paymentExists));
 
             // Lọc trạng thái
@@ -263,5 +262,11 @@ public class LocDonHangAdminController {
         return repository
                 .findAll(spec, PageRequest.of(page, size, order))
                 .map(mapper::toDto);
+    }
+    private static Predicate visiblePayment(jakarta.persistence.criteria.CriteriaBuilder cb,
+            jakarta.persistence.criteria.Root<ThanhToan> payment) {
+        return cb.or(cb.equal(payment.get("phuongThuc"), PhuongThucTt.COD),
+                cb.and(payment.get("phuongThuc").in(PhuongThucTt.CHUYEN_KHOAN, PhuongThucTt.VI_DIEN_TU),
+                        payment.get("trangThai").in(nhom10.phonenest.util.OrderPaymentPolicy.CAPTURED)));
     }
 }

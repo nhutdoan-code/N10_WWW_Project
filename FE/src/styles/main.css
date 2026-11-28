@@ -1784,3 +1784,18 @@ aside.summary { margin-top: 0; position: sticky; top: 86px; }
 
 .as-decision-overlay {position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;}
 .as-decision-overlay .as-decision {width:min(560px,100%);max-height:90vh;overflow:auto;background:var(--surface);color:var(--text);margin:0;box-shadow:var(--shadow-lg);}
+
+/* V9 - trạng thái thanh toán tách biệt trạng thái giao hàng */
+.admin-payment-badge { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; font-size: .8rem; font-weight: 600; line-height: 1.45; white-space: nowrap; border: 1px solid transparent; }
+.admin-payment-paid { background: #e3f6e9; color: #14532d; border-color: #a8dbc0; }
+.admin-payment-pending { background: #fff4da; color: #854d0e; border-color: #f0d599; }
+.admin-payment-failed { background: #fee8e8; color: #991b1b; border-color: #efb9b9; }
+.admin-payment-refunded { background: #e1effe; color: #1e40af; border-color: #b8d3f3; }
+.admin-payment-unknown { background: var(--surface); color: var(--muted); border-color: var(--line); }
+.admin-order-payment-info { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); margin: 16px 0; }
+.admin-order-payment-info h3 { margin: 0; font-size: 1rem; }
+.admin-order-payment-info dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px 16px; margin: 12px 0; }
+.admin-order-payment-info dt { color: var(--muted); }
+.admin-order-payment-info dd { margin: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.admin-order-payment-info > .row { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 480px) { .admin-order-payment-info dl { grid-template-columns: 1fr; gap: 4px; } .admin-order-payment-info dd { text-align: left; margin-bottom: 8px; } }

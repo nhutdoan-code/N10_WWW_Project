@@ -33,9 +33,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @TestPropertySource(properties = {
         "momo.partner-code=PN_TEST_PARTNER",
         "momo.access-key=PN_TEST_ACCESS",
-        "momo.secret-key=PN_TEST_SECRET_NOT_REAL"
+        "momo.secret-key=PN_TEST_SECRET_NOT_REAL",
+        "app.orders.auto-complete-enabled=false"
 })
 class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private DonHangService orderService;
 
     private static final String PB = "PB010";
     private static final int VONG = 5;
@@ -300,7 +304,7 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         var upload = goi(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/customer/after-sales/images").file(file), customer, null);
         assertThat(upload.getResponse().getStatus()).isEqualTo(200);
         String proof = json(upload).get("url").asText();
-        var warranty = goi(post("/api/customer/after-sales"), customer, Map.of("maDonHang",don,"maPhienBan",PB,"loai","BAO_HANH","lyDo","Máy nhận được đang gặp lỗi màn hình", "anhMinhChung",List.of(proof), "chiTiet",Map.of("serialKind","SERIAL","serial","TEST123","appearance","Bình thường","fault","Màn hình / cảm ứng")));
+        var warranty = goi(post("/api/customer/after-sales"), customer, Map.of("maDonHang",don,"maPhienBan",PB,"loai","BAO_HANH","lyDo","Máy nhận được đang gặp lỗi màn hình", "anhMinhChung",List.of(proof), "chiTiet",Map.of("appearance","Bình thường","fault","Màn hình / cảm ứng")));
         assertThat(warranty.getResponse().getStatus()).isEqualTo(400);
         assertThat(json(warranty).get("message").asText()).contains("xác nhận đã nhận hàng");
         var complaint = goi(post("/api/customer/after-sales"),customer,Map.of("loai","KHIEU_NAI","lyDo","Góp ý về trải nghiệm tìm kiếm sản phẩm", "chiTiet",Map.of("topic","Khác")));
@@ -310,6 +314,53 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         assertThat(goi(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/customer/after-sales/"+requestId),customer,null).getResponse().getStatus()).isEqualTo(200);
         assertThat(goi(put("/api/customer/orders/" + don + "/confirm-received"), customer, null).getResponse().getStatus()).isEqualTo(200);
         assertThat(yeuCauDoiTra(don)).isIn(200,201);
+    }
+
+    @Test
+    void autoCompletionWaits72HoursAndFullPaymentAndRunsOnlyOnce() throws Exception {
+        String don = datDon("COD", null);
+        assertThat(orderService.tuDongHoanThanh(don)).isFalse();
+        for (String tt : List.of("DA_XAC_NHAN", "DANG_CHUAN_BI", "DANG_GIAO")) {
+            assertThat(goi(put("/api/admin/orders/" + don + "/status").param("trangThai", tt), admin, null).getResponse().getStatus()).isEqualTo(200);
+        }
+        assertThat(goi(put("/api/admin/orders/" + don + "/mark-delivered"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        jdbc.update("UPDATE donhang SET ngayGiao=? WHERE maDonHang=?", java.time.LocalDateTime.now().minusHours(73), don);
+        assertThat(orderService.tuDongHoanThanh(don)).isFalse(); // COD chưa thu
+        assertThat(goi(put("/api/admin/orders/" + don + "/confirm-cod-payment"), admin, null).getResponse().getStatus()).isEqualTo(200);
+        jdbc.update("UPDATE donhang SET ngayGiao=? WHERE maDonHang=?", java.time.LocalDateTime.now().minusHours(71), don);
+        assertThat(orderService.tuDongHoanThanh(don)).isFalse();
+        jdbc.update("UPDATE donhang SET ngayGiao=? WHERE maDonHang=?", java.time.LocalDateTime.now().minusHours(73), don);
+        String maKh = jdbc.queryForObject("SELECT maKh FROM donhang WHERE maDonHang=?", String.class, don);
+        int before = jdbc.queryForObject("SELECT diemTichLuy FROM khachhang WHERE maKh=?", Integer.class, maKh);
+        int points = jdbc.queryForObject("SELECT tamTinh - IFNULL(giamGia,0) FROM donhang WHERE maDonHang=?", BigDecimal.class, don).intValue() / 10000;
+        List<Integer> result = song(() -> orderService.tuDongHoanThanh(don) ? 1 : 0,
+                () -> orderService.tuDongHoanThanh(don) ? 1 : 0);
+        assertThat(result).containsExactlyInAnyOrder(1, 0);
+        assertThat(jdbc.queryForObject("SELECT trangThai FROM donhang WHERE maDonHang=?", String.class, don)).isEqualTo("DA_GIAO");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM donhang WHERE maDonHang=? AND ngayKhachXacNhan IS NOT NULL AND nguoiXacNhan IS NULL", Integer.class, don)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT diemTichLuy FROM khachhang WHERE maKh=?", Integer.class, maKh)).isEqualTo(before + points);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lichsutrangthaidonhang WHERE maDonHang=? AND trangThai='DA_GIAO'", Integer.class, don)).isEqualTo(1);
+        assertThat(thongBao(don, "tự động hoàn thành")).isEqualTo(1);
+        assertThat(goi(put("/api/customer/orders/" + don + "/confirm-received"), customer, null).getResponse().getStatus()).isEqualTo(409);
+        assertThat(orderService.tuDongHoanThanh(don)).isFalse();
+    }
+
+    @Test
+    void codCollectionRequiresDeliveryAdminAndOnlySucceedsOnce() throws Exception {
+        String don = datDon("COD", null);
+        String url = "/api/admin/orders/" + don + "/confirm-cod-payment";
+        assertThat(goi(put(url), admin, null).getResponse().getStatus()).isEqualTo(409);
+        assertThat(goi(put(url), customer, null).getResponse().getStatus()).isEqualTo(403);
+        for (String tt : List.of("DA_XAC_NHAN", "DANG_CHUAN_BI", "DANG_GIAO")) {
+            assertThat(goi(put("/api/admin/orders/" + don + "/status").param("trangThai", tt), admin, null).getResponse().getStatus()).isEqualTo(200);
+        }
+        List<Integer> result = song(() -> goi(put(url), admin, null).getResponse().getStatus(),
+                () -> goi(put(url), admin, null).getResponse().getStatus());
+        assertThat(result).containsExactlyInAnyOrder(200, 409);
+        assertThat(jdbc.queryForObject("SELECT trangThai FROM thanhtoan WHERE maDonHang=?", String.class, don)).isEqualTo("DA_THANH_TOAN");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM thanhtoan WHERE maDonHang=? AND ngayThanhToan IS NOT NULL", Integer.class, don)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM nhatkyhoatdong WHERE hanhDong='CONFIRM_COD_PAYMENT' AND maDoiTuong=?", Integer.class, don)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT trangThai FROM donhang WHERE maDonHang=?", String.class, don)).isEqualTo("DANG_GIAO");
     }
 
     @Test
@@ -336,6 +387,8 @@ class PaymentReturnConcurrencyIntegrationTest extends ItHttpBase {
         assertThat(goi(post("/api/admin/after-sales-workflow/return/" + yc), admin, Map.of("action", "RECEIVE_CHECK", "note", "Đã nhận đủ và kiểm tra máy" )).getResponse().getStatus()).isEqualTo(200);
         assertThat(goi(post("/api/admin/returns/" + yc + "/restock"), admin, null).getResponse().getStatus()).isEqualTo(200);
         BigDecimal eligible = jdbc.queryForObject("SELECT tamTinh - IFNULL(giamGia,0) FROM donhang WHERE maDonHang=?", BigDecimal.class, don);
+        assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible)).getResponse().getStatus()).isEqualTo(409);
+        assertThat(goi(put("/api/admin/orders/" + don + "/confirm-cod-payment"), admin, null).getResponse().getStatus()).isEqualTo(200);
         assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible.add(BigDecimal.ONE))).getResponse().getStatus()).isIn(400,409);
         assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible.subtract(BigDecimal.ONE))).getResponse().getStatus()).isIn(400,409);
         assertThat(goi(post("/api/admin/returns/" + yc + "/refund"), admin, Map.of("hinhThuc", "CHUYEN_KHOAN", "maGiaoDich", "TEST-" + yc, "soTien", eligible)).getResponse().getStatus()).isEqualTo(200);

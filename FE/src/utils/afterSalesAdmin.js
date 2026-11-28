@@ -79,6 +79,12 @@ export function parseRequestText(text) {
   }
   return {fields, description};
 }
+export function adminRefundMethod(payment, fields = {}) {
+  if (payment === 'COD') return 'CHUYEN_KHOAN';
+  if (payment === 'CHUYEN_KHOAN') return 'VNPAY';
+  if (payment === 'VI_DIEN_TU') return fields['Hoàn tiền đề nghị'] === 'Chuyển khoản' ? 'CHUYEN_KHOAN' : 'MOMO';
+  return null;
+}
 export function canComplete(row, steps = []) {
   if (row.trangThai !== 'DANG_XU_LY') return false;
   if (row.source === 'return') return !!row.daNhapKho && (row.loai === 'DOI_HANG' ? steps.includes('EXCHANGE_HANDOVER') : !!row.ngayHoanTien);

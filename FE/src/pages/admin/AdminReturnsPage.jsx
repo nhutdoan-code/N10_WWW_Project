@@ -12,6 +12,7 @@ import {
   RETURN_ACTIONS, STATUS_LABELS, TYPE_LABELS,
   formatAdminDate, isOverdue, parseRequestText, canComplete, REJECT_REASONS, money, SLA_HOURS,
 } from '../../utils/afterSalesAdmin';
+import { adminRefundMethod } from '../../utils/afterSalesAdmin';
 import { afterSalesActions, afterSalesStatusLabel } from '../../utils/afterSalesWorkflow';
 
 const initial = { query: '', status: '', source: '', type: '', from: '', to: '', sort: 'priority', mine: false, deadlineOverdue: false };
@@ -37,7 +38,7 @@ const filtersToParams = (filters) => {
 };
 const actionsFor = request => request?.source === 'after'
   ? afterSalesActions(request)
-  : (RETURN_ACTIONS[request?.trangThai] || []);
+  : [...(RETURN_ACTIONS[request?.trangThai] || []), ...(request?.loai === 'DOI_HANG' && ['DA_DUYET','DANG_XU_LY'].includes(request.trangThai) && !request.exchange?.paidAt && !request.exchange?.handedOver && !request.daNhapKho ? [['TU_CHOI','Từ chối / giải phóng máy đổi']] : [])];
 const statusLabel = (request, status = request?.trangThai) => request?.source === 'after'
   ? afterSalesStatusLabel(status, request.loai)
   : (STATUS_LABELS[status] || status);
@@ -55,7 +56,6 @@ export default function AdminReturnsPage() {
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [savingInternal, setSavingInternal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [refundMethod, setRefundMethod] = useState('MOMO');
   const [refundReference, setRefundReference] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
   const [adjustment, setAdjustment] = useState('');
@@ -95,7 +95,6 @@ export default function AdminReturnsPage() {
   useEffect(() => {
     setNote('');
     setInternalNote('');
-    setRefundMethod('MOMO');
     setRefundReference('');
     setRefundAmount(''); setAdjustment(''); setRefundDate(''); setDecision(null); setPhoto(null); setActionNote(''); setRejectReason(''); setDepartment('');
     setResultNote('');
@@ -109,15 +108,15 @@ export default function AdminReturnsPage() {
       .then(payload => { if (alive) setInternalNote(payload?.ghiChu || ''); })
       .catch(() => { if (alive) toast('Không tải được ghi chú nội bộ', 'error'); })
       .finally(() => { if (alive) setLoadingInternal(false); });
-    adminService.afterSalesRequest(selected.source, selected.maYeuCau)
-      .then(row => { if (alive) setRequestDetail({ ...row, source: selected.source }); })
-      .catch(e => { if (alive) toast(errorMessage(e), 'error'); });
     return () => { alive = false; };
   }, [selected]);
   useEffect(() => {
     if (!selected) { setWorkflow(null); return; }
     let active = true;
     setWorkflow(null); setWorkflowError('');
+    adminService.afterSalesRequest(selected.source, selected.maYeuCau)
+      .then(row => { if(active) setRequestDetail({...row, source:selected.source, loai:row.loai || row.loaiYeuCau}); })
+      .catch(e => { if(active) setWorkflowError(errorMessage(e)); });
     adminService.afterSalesWorkflow(selected.source, selected.maYeuCau)
       .then(v => { if(active) setWorkflow(v); })
       .catch(e => { if(active) setWorkflowError(errorMessage(e)); });
@@ -129,9 +128,6 @@ export default function AdminReturnsPage() {
     setAssigneeId(assignment.maNguoiPhuTrach || '');
     setDueAt(assignment.hanXuLy ? String(assignment.hanXuLy).slice(0, 16) : '');
   }, [workflow]);
-  // Đơn thanh toán qua VNPay (CHUYEN_KHOAN) mặc định hoàn qua VNPay, còn lại mặc định MoMo.
-  const paymentMethod = workflow?.payment || detail?.phuongThucTt;
-  useEffect(() => { setRefundMethod(paymentMethod === 'CHUYEN_KHOAN' ? 'VNPAY' : 'MOMO'); }, [selected, paymentMethod]);
   const refresh = () => { reload(); reloadSummary(); setRevision(v => v+1); };
   const draftKey = r => `phonenest:after-sales-draft:${user?.maTk}:${r.source}:${r.maYeuCau}`;
   const draftRead = r => { try { return sessionStorage.getItem(draftKey(r)) || ''; } catch { return ''; } };
@@ -200,11 +196,13 @@ export default function AdminReturnsPage() {
   const copy = async (e,value) => { e.stopPropagation(); try { await navigator.clipboard.writeText(value); toast('Đã sao chép'); } catch { toast('Không sao chép được','error'); } };
   const restock = async () => {
     if (!detail || busy || !steps.includes('RECEIVE_CHECK')) return;
-    if (!window.confirm('Xác nhận đã nhận và kiểm tra sản phẩm trả về? Hệ thống sẽ cộng số lượng vào kho và ghi lịch sử biến động.')) return;
+    const unsafe = ['Máy lỗi','Giao sai hàng'].includes(fields['Lý do']) || fields['Tình trạng máy'] === 'Có lỗi';
+    const sellable = !unsafe && !!fields['Tình trạng máy'] && window.confirm('Máy thực tế đúng phiên bản, không lỗi và đủ điều kiện bán lại? OK: cộng tồn bán; Cancel: cách ly, không cộng tồn.');
+    if (!window.confirm(sellable ? 'Xác nhận cộng tồn kho bán được?' : 'Xác nhận ghi nhận hàng trả, cách ly và KHÔNG cộng tồn bán?')) return;
     setBusy(true);
     try {
-      await adminService.restockReturn(detail.maYeuCau);
-      toast('Đã xác nhận nhận hàng và nhập lại kho');
+      await adminService.restockReturn(detail.maYeuCau,sellable);
+      toast(sellable?'Đã nhập lại kho bán':'Đã ghi nhận hàng trả, không cộng tồn bán');
       refresh();
     } catch (e) { toast(errorMessage(e), 'error'); }
     finally { setBusy(false); }
@@ -212,7 +210,12 @@ export default function AdminReturnsPage() {
 
   const recordRefund = async () => {
     if (!detail || busy) return;
-    const method = workflow?.payment === 'COD' || fields['Hoàn tiền đề nghị'] === 'Chuyển khoản' ? 'CHUYEN_KHOAN' : refundMethod;
+    if (!workflow?.payment || (workflow.payment === 'COD' && !workflow.codPaid)) {
+      toast('Cần đối soát và xác nhận thu tiền COD tại Quản lý đơn hàng trước khi hoàn tiền', 'error');
+      return;
+    }
+    const method = adminRefundMethod(workflow?.payment, fields);
+    if (!method) return;
     const automatic = ['MOMO', 'VNPAY'].includes(method);
     if (!automatic && !refundReference.trim()) return;
     const retryingVnPay = method === 'VNPAY' && detail.trangThaiHoanVnPay === 'DANG_HOAN_TIEN';
@@ -266,7 +269,7 @@ export default function AdminReturnsPage() {
   };
   const refundBase = Number(detail?.soTienHoanDuKien || 0);
 
-  const actionNames = {TRIAGE:'Tiếp nhận để thẩm định',REPLY:'Gửi phản hồi',REQUEST_INFO:'Yêu cầu bổ sung thông tin/ảnh',TRANSFER:'Chuyển bộ phận',RECEIVE_CHECK:'Xác nhận nhận máy và kiểm tra',EXCHANGE_HANDOVER:'Xác nhận đã giao máy đổi',WARRANTY_RECEIVE:'Nhận máy bảo hành',WARRANTY_REPAIR:'Ghi nhận đã xử lý kỹ thuật',WARRANTY_HANDOVER:'Xác nhận trả máy cho khách',RESTOCK:'Nhập kho',REFUND:'Ghi nhận hoàn tiền',INTERNAL_NOTE:'Lưu ghi chú nội bộ',STATUS:'Cập nhật trạng thái'};
+  const actionNames = {TRIAGE:'Tiếp nhận để thẩm định',REPLY:'Gửi phản hồi',REQUEST_INFO:'Yêu cầu bổ sung thông tin/ảnh',TRANSFER:'Chuyển bộ phận',RECEIVE_CHECK:'Xác nhận nhận máy và kiểm tra',EXCHANGE_PAYMENT:'Ghi nhận đã thu đủ chênh lệch',EXCHANGE_HANDOVER:'Xác nhận đã giao máy đổi',WARRANTY_RECEIVE:'Nhận máy bảo hành',WARRANTY_REPAIR:'Ghi nhận đã xử lý kỹ thuật',WARRANTY_HANDOVER:'Xác nhận trả máy cho khách',RESTOCK:'Nhập kho',REFUND:'Ghi nhận hoàn tiền',INTERNAL_NOTE:'Lưu ghi chú nội bộ',STATUS:'Cập nhật trạng thái'};
   const statCards = [['waiting','Chờ tiếp nhận',summary?.waiting ?? '—'],['processing','Đang xử lý',summary?.processing ?? '—'],['open','Cần duyệt / xử lý',summary?.open ?? '—'],['overdue','Quá hạn phản hồi',summary?.overdue ?? '—'],['today','Hoàn tất hôm nay',summary?.completedToday ?? '—'],['','Tổng yêu cầu',summary?.total ?? '—']];
   return <div className="after-sales-admin">
     <h2>Quản lý hậu mãi</h2>
@@ -335,7 +338,7 @@ export default function AdminReturnsPage() {
           </>}
         </section>
         <p><b>Sản phẩm:</b> {detail.tenSanPham || (detail.maDonHang ? 'Toàn đơn' : 'Không chỉ định')} {detail.soLuong ? `· Số lượng ${detail.soLuong}` : ''}</p>
-        {detail.chiTiet?.length > 0 && <div className="as-request-items"><b>Các dòng hàng</b>{detail.chiTiet.map((item) => <p key={item.maPhienBan}>{item.tenSanPham} · SL {item.soLuong} · {item.daNhapKho ? `Đã nhập kho ${formatAdminDate(item.ngayNhapKho)}` : 'Chưa nhập kho'}</p>)}</div>}
+        {detail.chiTiet?.length > 0 && <div className="as-request-items"><b>Các dòng hàng</b>{detail.chiTiet.map((item) => <p key={item.maPhienBan}>{item.tenSanPham} · SL {item.soLuong} · {item.daNhapKho ? `${detail.hangTraBanDuoc===false ? 'Đã cách ly' : 'Đã nhập kho'} ${formatAdminDate(item.ngayNhapKho)}` : 'Chưa xử lý hàng trả'}</p>)}</div>}
         <section className="as-work-block"><h4>Kiểm tra điều kiện</h4>
           {!workflow && !workflowError && <p>Đang tải điều kiện...</p>}
           {workflowError && <p className="error">{workflowError} <button className="btn" onClick={()=>setRevision(v=>v+1)}>Thử lại</button></p>}
@@ -354,30 +357,37 @@ export default function AdminReturnsPage() {
           <textarea rows="3" maxLength={1000} placeholder="Thông tin trao đổi nội bộ, không gửi cho khách hàng" value={internalNote} disabled={loadingInternal} onChange={e=>setInternalNote(e.target.value)} />
         </label><button className="btn" disabled={savingInternal || loadingInternal} onClick={saveInternal}>{savingInternal ? 'Đang lưu...' : 'Lưu ghi chú nội bộ'}</button></div>
         <section className="as-work-block"><h4>Nhật ký xử lý & phản hồi</h4>{workflow?.timeline?.length ? <ol className="as-history">{workflow.timeline.map(h=>{const d=h.duLieuSau||{};return <li key={h.maNhatKy}><strong>{actionNames[d.suKien] || (d.trangThai ? statusLabel(detail, d.trangThai) : h.moTa)}</strong><div className="muted">{formatAdminDate(h.thoiGian)} · {h.tenNguoiThucHien}</div>{d.trangThai&&<div>{statusLabel(detail,d.trangThai)}</div>}{d.phanHoi&&<p>Phản hồi gửi khách: {d.phanHoi}</p>}{d.ghiNhan&&<p>{d.ghiNhan}</p>}{d.boPhan&&<p>Bộ phận: {d.boPhan}</p>}{d.soTienHoan!=null&&<p>Hoàn: {money(d.soTienHoan)} · {d.lyDoDieuChinh || 'Không điều chỉnh'}</p>}</li>})}</ol>:<p className="muted">Chưa có nhật ký quản trị.</p>}{detail.lichSu?.length>0&&<details><summary>Lịch sử trạng thái khách hàng</summary><ol className="as-history">{detail.lichSu.map((h,i)=><li key={i}>{formatAdminDate(h.thoiGian)} · {statusLabel(detail,h.trangThai)} {h.ghiChu||''}</li>)}</ol></details>}</section>
-        {detail.source==='return'&&<section className="as-work-block"><h4>Quy trình đổi trả</h4><ol className="as-steps">{[['Duyệt yêu cầu',!['CHO_DUYET','TU_CHOI'].includes(detail.trangThai)],['Nhận máy và kiểm tra',steps.includes('RECEIVE_CHECK')||detail.daNhapKho],['Nhập kho',detail.daNhapKho],[detail.loai==='DOI_HANG'?'Giao máy đổi':'Ghi nhận hoàn tiền',detail.loai==='DOI_HANG'?steps.includes('EXCHANGE_HANDOVER'):!!detail.ngayHoanTien],['Hoàn tất',detail.trangThai==='HOAN_TAT']].map(([label,done])=><li key={label} className={done?'done':''}>{done?'✓':'○'} {label}</li>)}</ol>
-          {isOpen&&['DA_DUYET','DANG_XU_LY'].includes(detail.trangThai)&&!detail.daNhapKho&&<>{!steps.includes('RECEIVE_CHECK')?<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('RECEIVE_CHECK')}>Nhận máy và kiểm tra</button>:<button className="btn btn-primary" disabled={!workflow||busy} onClick={restock}>Xác nhận nhập kho</button>}<p className="muted">Chỉ nhập kho bán được khi hàng thực tế đủ điều kiện nhập; hàng hỏng cần xử lý riêng, không cộng tồn bán.</p></>}
-          {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='DANG_XU_LY'&&detail.daNhapKho&&!steps.includes('EXCHANGE_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('EXCHANGE_HANDOVER')}>Ghi nhận đã giao máy đổi</button>}
+        {detail.source==='return'&&<section className="as-work-block"><h4>Quy trình đổi trả</h4>
+          {detail.loai==='DOI_HANG'&&detail.exchange&&<div className="as-description"><b>Phương án đổi máy</b><p>Phiên bản đổi: {detail.exchange.targetId} · Giá trị thực mua: {money(detail.exchange.oldNet)} · Chênh lệch cần thu: {money(detail.exchange.difference)}</p><p>{detail.exchange.paidAt?'Đã ghi nhận thu chênh lệch':Number(detail.exchange.difference)>0?'Chưa thu chênh lệch (đối soát thực tế sau duyệt)':'Không cần thu thêm'}</p></div>}
+          {detail.loai==='DOI_HANG'&&!detail.exchange&&isOpen&&<p className="as-warning">Yêu cầu cũ chưa có phương án đổi V17. Không duyệt/giao tự động; cần đối soát và tạo yêu cầu mới nếu chưa xử lý.</p>}
+          {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='CHO_DUYET'&&detail.exchange&&!detail.exchange.inspected&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('RECEIVE_CHECK')}>Nhận máy và kiểm tra đạt</button>}
+          {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='DANG_XU_LY'&&Number(detail.exchange?.difference)>0&&!detail.exchange?.paidAt&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('EXCHANGE_PAYMENT')}>Ghi nhận đã thu đủ {money(detail.exchange.difference)}</button>}
+          {detail.daNhapKho&&detail.hangTraBanDuoc===false&&<p className="muted">Đã ghi nhận hàng trả cách ly — không cộng tồn kho bán.</p>}<ol className="as-steps">{[...(detail.loai==='DOI_HANG'?[['Nhận máy và kiểm tra',!!detail.exchange?.inspected],['Duyệt yêu cầu',!['CHO_DUYET','TU_CHOI'].includes(detail.trangThai)],['Thu chênh lệch',Number(detail.exchange?.difference)===0||!!detail.exchange?.paidAt]]:[['Duyệt yêu cầu',!['CHO_DUYET','TU_CHOI'].includes(detail.trangThai)],['Nhận máy và kiểm tra',steps.includes('RECEIVE_CHECK')||detail.daNhapKho]]),['Xử lý hàng trả',detail.daNhapKho],[detail.loai==='DOI_HANG'?'Giao máy đổi':'Ghi nhận hoàn tiền',detail.loai==='DOI_HANG'?steps.includes('EXCHANGE_HANDOVER'):!!detail.ngayHoanTien],['Hoàn tất',detail.trangThai==='HOAN_TAT']].map(([label,done])=><li key={label} className={done?'done':''}>{done?'✓':'○'} {label}</li>)}</ol>
+          {isOpen&&['DA_DUYET','DANG_XU_LY'].includes(detail.trangThai)&&!detail.daNhapKho&&<>{!steps.includes('RECEIVE_CHECK')?<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('RECEIVE_CHECK')}>Nhận máy và kiểm tra</button>:<button className="btn btn-primary" disabled={!workflow||busy||(detail.loai==='DOI_HANG'&&(!detail.exchange||(Number(detail.exchange.difference)>0&&!detail.exchange.paidAt)))} onClick={restock}>Xác nhận xử lý hàng trả</button>}<p className="muted">Chỉ nhập kho bán được khi hàng thực tế đủ điều kiện nhập; hàng hỏng cần xử lý riêng, không cộng tồn bán.</p></>}
+          {isOpen&&detail.loai==='DOI_HANG'&&detail.trangThai==='DANG_XU_LY'&&detail.daNhapKho&&detail.exchange&&(Number(detail.exchange.difference)===0||detail.exchange.paidAt)&&!steps.includes('EXCHANGE_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('EXCHANGE_HANDOVER')}>Ghi nhận đã giao máy đổi</button>}
         </section>}
         {detail.loai==='BAO_HANH'&&<section className="as-work-block"><h4>Quy trình bảo hành</h4><ol className="as-steps">{[['Tiếp nhận yêu cầu',detail.trangThai!=='CHO_TIEP_NHAN'&&detail.trangThai!=='TU_CHOI'],['Nhận máy',steps.includes('WARRANTY_RECEIVE')],['Kiểm tra / sửa chữa',steps.includes('WARRANTY_REPAIR')],['Trả máy',steps.includes('WARRANTY_HANDOVER')],['Hoàn tất',detail.trangThai==='HOAN_TAT']].map(([label,done])=><li key={label} className={done?'done':''}>{done?'✓':'○'} {label}</li>)}</ol>{isOpen&&detail.trangThai==='DANG_XU_LY'&&!steps.includes('WARRANTY_HANDOVER')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction(!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER')}>{actionNames[!steps.includes('WARRANTY_RECEIVE')?'WARRANTY_RECEIVE':!steps.includes('WARRANTY_REPAIR')?'WARRANTY_REPAIR':'WARRANTY_HANDOVER']}</button>}</section>}
         {detail.source==='return'&&detail.loai==='TRA_HANG_HOAN_TIEN'&&(detail.trangThai==='DANG_XU_LY'||detail.ngayHoanTien)&&(()=>{
-          const forcedBank = workflow?.payment==='COD'||fields['Hoàn tiền đề nghị']==='Chuyển khoản';
-          const method = forcedBank ? 'CHUYEN_KHOAN' : refundMethod;
+          const method = adminRefundMethod(workflow?.payment, fields);
           const automatic = ['MOMO','VNPAY'].includes(method);
           const retryingVnPay = method==='VNPAY'&&detail.trangThaiHoanVnPay==='DANG_HOAN_TIEN';
+          const paymentBlocked = !method || (workflow.payment==='COD' && !workflow.codPaid);
           return <section className="as-work-block"><h4>Đối soát hoàn tiền</h4>{detail.ngayHoanTien?<p>Đã ghi nhận {money(refundBase)} qua {detail.hinhThucHoanTien} · Mã: {detail.maGiaoDichHoanTien} · {formatAdminDate(detail.ngayHoanTien)}</p>:<>
+            {paymentBlocked ? <p className="error" role="alert">{workflow?.payment==='COD'?'Đơn COD chưa được xác nhận thu đủ tiền. Vào Quản lý đơn hàng để đối soát trước khi hoàn tiền.':'Chưa có dữ liệu thanh toán. Cần đối soát trước khi hoàn tiền.'}</p> : <>
             <p className="muted">{method==='MOMO'?'Hệ thống gọi API MoMo để hoàn tiền về giao dịch đã thanh toán.':method==='VNPAY'?'Hệ thống gửi yêu cầu hoàn (toàn phần hoặc một phần) tới VNPay. Chỉ ghi nhận hoàn tất khi VNPay xác nhận.':'Chuyển tiền bên ngoài hệ thống trước, sau đó nhập mã giao dịch để lưu đối soát.'}</p>
             {detail.trangThaiHoanVnPay&&<p>VNPay: <strong>{detail.trangThaiHoanVnPay==='DANG_HOAN_TIEN'?'Đang xử lý':'Cần thử lại / đối soát'}</strong>{detail.maYeuCauHoanVnPay&&<> · Mã yêu cầu: <code>{detail.maYeuCauHoanVnPay}</code></>}{detail.thongBaoHoanVnPay?` · ${detail.thongBaoHoanVnPay}`:''}</p>}
             <label>{retryingVnPay?'Số tiền đã gửi VNPay':'Giá trị đủ điều kiện'}: {money(refundBase)}</label>
             {!retryingVnPay&&<><label>Số tiền thực hoàn (VNĐ)<MoneyInput value={refundAmount} placeholder={refundBase.toLocaleString('vi-VN')} onChange={setRefundAmount} aria-label="Số tiền thực hoàn" /></label><p>Giá trị sau ưu đãi {money(refundBase)} − phí/điều chỉnh {money(Math.max(0,refundBase-Number(refundAmount||refundBase)))} = {money(refundAmount||refundBase)}</p>{Number(refundAmount||refundBase)<refundBase&&<label>Lý do điều chỉnh *<textarea maxLength={500} value={adjustment} onChange={e=>setAdjustment(e.target.value)}/></label>}</>}
-            {forcedBank?<p><b>Hình thức:</b> Chuyển khoản</p>:<label>Hình thức<select value={refundMethod} disabled={retryingVnPay} onChange={e=>setRefundMethod(e.target.value)}><option value="MOMO">MoMo (tự động)</option>{paymentMethod==='CHUYEN_KHOAN'&&<option value="VNPAY">VNPay (tự động)</option>}<option value="CHUYEN_KHOAN">Chuyển khoản (thủ công)</option><option value="TIEN_MAT">Tiền mặt</option><option value="KHAC">Khác</option></select></label>}
+            <p><b>Hình thức:</b> {method==='VNPAY'?'VNPay (giao dịch gốc)':method==='MOMO'?'MoMo (giao dịch gốc)':'Chuyển khoản'}</p>
+            {method==='VNPAY'&&fields['Hoàn tiền đề nghị']==='Chuyển khoản'&&<p className="muted">Yêu cầu cũ có đề nghị chuyển khoản. Chính sách hiện tại chỉ hoàn về VNPay gốc; cần thông báo cho khách trước khi xử lý.</p>}
             {!automatic&&<><label>Mã giao dịch *<input maxLength={150} value={refundReference} onChange={e=>setRefundReference(e.target.value)}/></label><label>Thời điểm hoàn thực tế (để trống = hiện tại)<input type="datetime-local" value={refundDate} onChange={e=>setRefundDate(e.target.value)}/></label></>}
-            <button className="btn btn-primary" disabled={busy||!workflow||!detail.daNhapKho||(!automatic&&!refundReference.trim())} onClick={recordRefund}>{busy?'Đang xử lý...':method==='MOMO'?'Hoàn tiền qua MoMo':method==='VNPAY'?(retryingVnPay?'Kiểm tra lại cùng yêu cầu VNPay':'Hoàn tiền qua VNPay'):'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho&&<p className="muted">Cần nhập kho trước khi hoàn tiền.</p>}</>}</section>;
+            <button className="btn btn-primary" disabled={busy||paymentBlocked||!detail.daNhapKho||(!automatic&&!refundReference.trim())} onClick={recordRefund}>{busy?'Đang xử lý...':method==='MOMO'?'Hoàn tiền qua MoMo':method==='VNPAY'?(retryingVnPay?'Kiểm tra lại cùng yêu cầu VNPay':'Hoàn tiền qua VNPay'):'Ghi nhận đã hoàn tiền'}</button>{!detail.daNhapKho&&<p className="muted">Cần xác nhận xử lý hàng trả trước khi hoàn tiền.</p>}</>}</>}</section>;
         })()}
         {isOpen&&<section className="as-work-block"><h4>Phản hồi gửi khách hàng</h4>{detail.loai==='BAO_HANH'&&detail.trangThai==='DANG_XU_LY'&&<label>Kết quả bảo hành<select value={warrantyOutcome} onChange={e=>setWarrantyOutcome(e.target.value)}><option value="">Chọn kết quả thực tế</option>{WARRANTY_OPTIONS.map(x=><option key={x} value={x}>{x}</option>)}</select></label>}
           <textarea rows="3" maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="Nội dung khách hàng sẽ nhìn thấy"/>
           <div className="after-sales-actions"><button className="btn" disabled={busy} onClick={saveDraft}>Lưu nháp</button><button className="btn" disabled={busy||!note.trim()} onClick={()=>beginAction('REPLY')}>Gửi phản hồi</button><button className="btn" disabled={busy} onClick={()=>beginAction('REQUEST_INFO')}>Yêu cầu bổ sung</button><button className="btn" disabled={busy} onClick={()=>beginAction('TRANSFER')}>Chuyển bộ phận</button></div>
-          <div className="after-sales-actions">{detail.source==='return'&&detail.trangThai==='CHO_DUYET'&&!steps.includes('TRIAGE')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('TRIAGE')}>Tiếp nhận để thẩm định</button>}{actionsFor(detail).map(([next,label])=><button key={next} className={`btn ${next==='DA_DUYET'?'btn-primary':''}`} disabled={busy||!workflow||(next==='HOAN_TAT'&&!canComplete(detail,steps))} onClick={()=>beginAction('STATUS',next)}>{next==='HOAN_TAT'&&detail.loai==='KHIEU_NAI'?'Giải quyết và đóng':label}</button>)}</div></section>}
-        {decision&&<div className="as-decision-overlay" onKeyDown={e=>{if(e.key==='Escape'&&!busy)setDecision(null)}}><section className="as-work-block as-decision" role="dialog" aria-modal="true" aria-label="Xác nhận thao tác"><h4>{decision.action==='STATUS' ? `Xác nhận ${statusLabel(detail,decision.status)}` : actionNames[decision.action]}</h4>{decision.status==='TU_CHOI'&&<label>Lý do từ chối *<select autoFocus value={rejectReason} onChange={e=>setRejectReason(e.target.value)}><option value="">Chọn lý do</option>{REJECT_REASONS.map(x=><option key={x}>{x}</option>)}</select></label>}{decision.action==='TRANSFER'&&<label>Bộ phận *<select value={department} onChange={e=>setDepartment(e.target.value)}><option value="">Chọn bộ phận</option>{['Kỹ thuật','Kho','Kế toán','Chăm sóc khách hàng'].map(x=><option key={x}>{x}</option>)}</select></label>}<label>{['STATUS','REPLY','REQUEST_INFO','TRIAGE'].includes(decision.action)?'Phản hồi khách sẽ nhìn thấy':'Ghi nhận nội bộ'}<textarea autoFocus={decision.status!=='TU_CHOI'} rows="4" value={actionNote} maxLength={500} onChange={e=>setActionNote(e.target.value)}/></label>{decision.action==='STATUS'&&decision.status==='HOAN_TAT'&&detail.source==='after'&&<label>Kết quả xử lý *<textarea rows="3" maxLength={1000} value={resultNote} onChange={e=>setResultNote(e.target.value)} placeholder="Ghi rõ phương án đã thực hiện và kết quả"/></label>}{decision.status==='DA_DUYET'&&<p>Duyệt xong: tiếp nhận máy, kiểm tra và nhập kho trước bước hoàn tiền/đổi máy.</p>}{decision.status==='TU_CHOI'&&<p className="muted">Phản hồi từ chối được nhập riêng, không dùng lại nội dung duyệt.</p>}{decision.status==='TU_CHOI'&&rejectReason&&actionNote.trim()&&<p className="as-description">Khách sẽ thấy: Từ chối — {rejectReason}: {actionNote.trim()}</p>}<div className="after-sales-actions"><button className="btn" disabled={busy} onClick={()=>setDecision(null)}>Hủy</button><button className="btn btn-primary" disabled={busy} onClick={executeAction}>Xác nhận</button></div></section></div>}
+          <div className="after-sales-actions">{detail.source==='return'&&detail.trangThai==='CHO_DUYET'&&!steps.includes('TRIAGE')&&<button className="btn" disabled={!workflow||busy} onClick={()=>beginAction('TRIAGE')}>Tiếp nhận để thẩm định</button>}{actionsFor(detail).map(([next,label])=><button key={next} className={`btn ${next==='DA_DUYET'?'btn-primary':''}`} disabled={busy||!workflow||(next==='HOAN_TAT'&&!canComplete(detail,steps))||(next==='DA_DUYET'&&detail.loai==='DOI_HANG'&&!detail.exchange?.inspected)} onClick={()=>beginAction('STATUS',next)}>{next==='HOAN_TAT'&&detail.loai==='KHIEU_NAI'?'Giải quyết và đóng':label}</button>)}</div></section>}
+        {decision&&<div className="as-decision-overlay" onKeyDown={e=>{if(e.key==='Escape'&&!busy)setDecision(null)}}><section className="as-work-block as-decision" role="dialog" aria-modal="true" aria-label="Xác nhận thao tác"><h4>{decision.action==='STATUS' ? `Xác nhận ${statusLabel(detail,decision.status)}` : actionNames[decision.action]}</h4>{decision.status==='TU_CHOI'&&<label>Lý do từ chối *<select autoFocus value={rejectReason} onChange={e=>setRejectReason(e.target.value)}><option value="">Chọn lý do</option>{REJECT_REASONS.map(x=><option key={x}>{x}</option>)}</select></label>}{decision.action==='TRANSFER'&&<label>Bộ phận *<select value={department} onChange={e=>setDepartment(e.target.value)}><option value="">Chọn bộ phận</option>{['Kỹ thuật','Kho','Kế toán','Chăm sóc khách hàng'].map(x=><option key={x}>{x}</option>)}</select></label>}<label>{['STATUS','REPLY','REQUEST_INFO','TRIAGE'].includes(decision.action)?'Phản hồi khách sẽ nhìn thấy':'Ghi nhận nội bộ'}<textarea autoFocus={decision.status!=='TU_CHOI'} rows="4" value={actionNote} maxLength={500} onChange={e=>setActionNote(e.target.value)}/></label>{decision.action==='STATUS'&&decision.status==='HOAN_TAT'&&detail.source==='after'&&<label>Kết quả xử lý *<textarea rows="3" maxLength={1000} value={resultNote} onChange={e=>setResultNote(e.target.value)} placeholder="Ghi rõ phương án đã thực hiện và kết quả"/></label>}{decision.status==='DA_DUYET'&&<p>{detail.loai==='DOI_HANG'?'Duyệt sau khi đã nhận và kiểm tra đạt; hệ thống giữ tồn máy đổi.':'Duyệt xong: tiếp nhận máy, kiểm tra và xử lý hàng trả trước khi hoàn tiền.'}</p>}{decision.action==='RECEIVE_CHECK'&&detail.loai==='DOI_HANG'&&<p>Chỉ ghi nhận đạt sau khi kiểm tra máy, hộp/phụ kiện, ngoại hình, khóa tài khoản và điều kiện đổi theo chính sách. Không đạt: chọn Từ chối.</p>}{decision.action==='EXCHANGE_PAYMENT'&&<p>Chỉ xác nhận sau khi đã thực tế thu đủ {money(detail.exchange?.difference)}. Nhập mã chứng từ thu tiền (không phải lệnh thanh toán VNPay).</p>}{decision.status==='TU_CHOI'&&<p className="muted">Phản hồi từ chối được nhập riêng, không dùng lại nội dung duyệt.</p>}{decision.status==='TU_CHOI'&&rejectReason&&actionNote.trim()&&<p className="as-description">Khách sẽ thấy: Từ chối — {rejectReason}: {actionNote.trim()}</p>}<div className="after-sales-actions"><button className="btn" disabled={busy} onClick={()=>setDecision(null)}>Hủy</button><button className="btn btn-primary" disabled={busy} onClick={executeAction}>Xác nhận</button></div></section></div>}
         {photo!==null&&images[photo]&&<div className="as-lightbox" role="dialog" aria-label="Xem ảnh minh chứng" onKeyDown={e=>{if(e.key==='Escape')setPhoto(null)}}><button className="btn" autoFocus onClick={()=>setPhoto(null)}>Đóng ảnh ✕</button><img src={images[photo]} alt={`Minh chứng ${photo+1}`}/><div className="after-sales-actions"><button className="btn" disabled={photo===0} onClick={()=>setPhoto(p=>p-1)}>Trước</button><span>{photo+1}/{images.length}</span><button className="btn" disabled={photo===images.length-1} onClick={()=>setPhoto(p=>p+1)}>Sau</button><a href={images[photo]} download target="_blank" rel="noreferrer">Tải ảnh</a></div></div>}
         <button className="btn" disabled={busy} onClick={()=>setSelected(null)}>Đóng</button>
       </section>

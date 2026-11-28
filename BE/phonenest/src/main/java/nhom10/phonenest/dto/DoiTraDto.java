@@ -35,7 +35,7 @@ public record DoiTraDto(
         PhuongThucTt phuongThucTt,
         String trangThaiHoanVnPay,
         String maYeuCauHoanVnPay,
-        String thongBaoHoanVnPay) {
+        String thongBaoHoanVnPay, ExchangeDto exchange, Boolean hangTraBanDuoc) {
 
     @com.fasterxml.jackson.annotation.JsonProperty("hinhAnhMinhChung")
     public String hinhAnhMinhChung() { return anhMinhChung().stream().findFirst().orElse(null); }
@@ -47,7 +47,7 @@ public record DoiTraDto(
         return new DoiTraDto(maYeuCau, maDonHang, tenKhach, soDienThoai, maskAccount(lyDo), hinhAnhMinhChung,
                 ngayTao, ngayCapNhat, trangThai, loaiYeuCau, tenSanPham, soLuong, maskAccount(ghiChuXuLy), chiTiet,
                 soTienHoanDuKien, hinhThucHoanTien, maGiaoDichHoanTien, ngayHoanTien, daNhapKho, ngayTaoChinhXac,
-                phuongThucTt, trangThaiHoanVnPay, maYeuCauHoanVnPay, thongBaoHoanVnPay);
+                phuongThucTt, trangThaiHoanVnPay, maYeuCauHoanVnPay, thongBaoHoanVnPay, exchange, hangTraBanDuoc);
     }
 
     static String maskAccount(String text) {
@@ -55,6 +55,8 @@ public record DoiTraDto(
         return java.util.regex.Pattern.compile("(?m)^(Số tài khoản:[ \\t]*)([0-9]{4,30})(?=[ \\t]*\\r?$)")
                 .matcher(text).replaceAll(m -> java.util.regex.Matcher.quoteReplacement(m.group(1) + "•••• " + m.group(2).substring(m.group(2).length() - 4)));
     }
+
+    public record ExchangeDto(String targetId, String reason, BigDecimal oldNet, BigDecimal difference, boolean inspected, LocalDateTime paidAt, boolean handedOver) {}
 
     public record ChiTietDto(String maPhienBan, String tenSanPham, int soLuong,
                              LoaiYeuCauDoiTra loaiYeuCau, boolean daNhapKho,

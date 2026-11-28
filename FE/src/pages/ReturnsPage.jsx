@@ -9,11 +9,11 @@ import { orderService } from '../service/orderService';
 import { errorMessage, formatDate, formatDay, formatPrice } from '../utils/format';
 import { afterSalesStatusLabel } from '../utils/afterSalesWorkflow';
 import { eligible, remainingLabel, warrantyEnd, returnEnd, deadlineTone } from '../utils/warrantyPolicy';
-import { TYPES, REASONS, allowedConditions, refundOptions, FAULTS, descriptionHint, APPEARANCES, TOPICS, MAX_IMAGES, imageError, proofRequired, validateForm, deviceIdentifiers, MISMATCHES, BANKS, accountDigits, normalizeHolder, preferredCondition, refundEstimate, maskAccount, evidenceHint, clearFieldErrors, validationAfterChange, visibleValidationErrors, descriptionMin, selectedFaults, toggleFault, warrantyAppearanceWarning } from '../utils/afterSalesForm';
+import { TYPES, REASONS, allowedConditions, refundOptions, FAULTS, descriptionHint, APPEARANCES, TOPICS, MAX_IMAGES, imageError, proofRequired, validateForm, MISMATCHES, BANKS, accountDigits, normalizeHolder, preferredCondition, refundEstimate, maskAccount, evidenceHint, clearFieldErrors, validationAfterChange, visibleValidationErrors, selectedFaults, toggleFault, warrantyAppearanceWarning, sameExchange, upgradeExchange, exchangeQuote } from '../utils/afterSalesForm';
 
 import { downloadReceipt, printReceipt } from '../utils/afterSalesReceipt';
 
-const EMPTY = { maDonHang: '', maPhienBan: '', soLuong: 1, lyDo: '', reason: '', condition: '', fault: '', sealConfirmed: '', mismatch: '', refund: '', bank: '', account: '', holder: '', targetId: '', serial: '', serialKind: 'IMEI', appearance: '', topic: '' };
+const EMPTY = { maDonHang: '', maPhienBan: '', soLuong: 1, lyDo: '', reason: '', condition: '', fault: '', sealConfirmed: '', mismatch: '', refund: '', bank: '', account: '', holder: '', targetId: '', appearance: '', topic: '' };
 const STATUS = { CHO_DUYET: 'Chờ tiếp nhận', CHO_TIEP_NHAN: 'Chờ tiếp nhận', DANG_KIEM_TRA: 'Đang kiểm tra', DANG_XAC_MINH: 'Đang xác minh', DANG_XU_LY: 'Đang xử lý', DA_DUYET: 'Đã duyệt', TU_CHOI: 'Từ chối', HOAN_TAT: 'Hoàn tất', DA_HOAN_TIEN: 'Đã hoàn tiền' };
 const HINTS = { TRA_HANG_HOAN_TIEN: 'Ví dụ: máy không lên nguồn khi mở hộp, đã thử sạc...', DOI_HANG: 'Nêu lý do đổi và phiên bản bạn mong muốn...', KHIEU_NAI: 'Nêu sự việc, thời điểm và cách bạn mong muốn được hỗ trợ...' };
 const policyLines = (type, p) => {
@@ -99,8 +99,11 @@ export default function ReturnsPage() {
   const validOrders = allOrders.filter(o => eligible(o, loai));
   const order = validOrders.find(o => o.maDonHang === form.maDonHang);
   const product = order?.chiTiet?.find(d => d.maPhienBan === form.maPhienBan);
-  const target = catalog.find(v => v.id === form.targetId && v.stock >= Number(form.soLuong));
-  const targetMatches = catalog.filter(v => v.stock >= Number(form.soLuong) && targetQuery.toLocaleLowerCase('vi').trim().split(/\s+/).every(word => v.label.toLocaleLowerCase('vi').includes(word))).slice(0,20);
+  const same = sameExchange(form.reason);
+  const quoteFor = v => exchangeQuote(order, product, form.soLuong, form.reason, v);
+  const target = catalog.find(v => v.id === (same ? form.maPhienBan : form.targetId) && quoteFor(v));
+  const quote = target ? quoteFor(target) : null;
+  const targetMatches = catalog.filter(v => quoteFor(v) && targetQuery.toLocaleLowerCase('vi').trim().split(/\s+/).every(word => v.label.toLocaleLowerCase('vi').includes(word))).slice(0,20);
   useEffect(() => {
     if (loai !== 'DOI_HANG') return;
     let active = true; setCatalogLoading(true); setCatalogError(''); setCatalog([]);
@@ -114,15 +117,13 @@ export default function ReturnsPage() {
     if (loai && loai !== 'KHIEU_NAI' && order?.chiTiet?.length === 1 && !form.maPhienBan) setForm(f => ({...f, maPhienBan:order.chiTiet[0].maPhienBan}));
   }, [loai, order?.maDonHang, form.maPhienBan, order?.chiTiet?.length]);
   useEffect(() => {
-    if (loai === 'TRA_HANG_HOAN_TIEN' && order?.phuongThucTt === 'COD') setForm(f => f.refund === 'Chuyển khoản' ? f : {...f,refund:'Chuyển khoản'});
+    if (loai !== 'TRA_HANG_HOAN_TIEN') return;
+    const options = refundOptions(order);
+    if (options.length === 1) setForm(f => f.refund === options[0] ? f : {...f, refund:options[0], ...(options[0] !== 'Chuyển khoản' ? {bank:'',account:'',holder:''} : {})});
   }, [loai, order?.maDonHang, order?.phuongThucTt]);
-  const identifiers = deviceIdentifiers(product, form.serialKind);
-  useEffect(() => {
-    if (loai === 'BAO_HANH' && identifiers.length === 1) setForm(f => f.serial ? f : {...f, serial:identifiers[0]});
-  }, [loai, form.maDonHang, form.maPhienBan, form.serialKind, identifiers.join('|')]);
   useEffect(() => {
     if (orders && loai && form.maDonHang && !orders.some(o => o.maDonHang === form.maDonHang && eligible(o, loai))) {
-      setForm(f => ({...f, maDonHang:'', maPhienBan:'', soLuong:1, targetId:'', serial:'', refund:'', bank:'', account:'', holder:'', sealConfirmed:'', ...(loai === 'BAO_HANH' ? {fault:'', appearance:''} : {})}));
+      setForm(f => ({...f, maDonHang:'', maPhienBan:'', soLuong:1, targetId:'', refund:'', bank:'', account:'', holder:'', sealConfirmed:'', ...(loai === 'BAO_HANH' ? {fault:'', appearance:''} : {})}));
       setInteraction(e => clearFieldErrors(e,'maDonHang')); setSubmitError(''); setBankQuery(''); setBankOpen(false); setTargetQuery(''); setTargetOpen(false);
     }
   }, [orders, loai, form.maDonHang]);
@@ -134,19 +135,17 @@ export default function ReturnsPage() {
   const allRequests = [...new Map([...(requests || []), ...recent.filter(r => !(requests || []).some(x => x.maYeuCau === r.maYeuCau))].map(r => [r.maYeuCau, r])).values()].sort((a,b) => new Date(b.ngayTao) - new Date(a.ngayTao));
   const filtered = allRequests.filter(r => (!locLoai || requestType(r) === locLoai) && (!locStatus || r.trangThai === locStatus || (locStatus === 'HOAN_TAT' && r.trangThai === 'DA_HOAN_TIEN')));
   const invalidFields = validateForm(loai, form, order, product, images);
-  if (loai === 'DOI_HANG' && !target) invalidFields.targetId = 'Vui lòng chọn phiên bản còn đủ hàng từ danh mục.';
+  if (loai === 'DOI_HANG' && !target) invalidFields.targetId = (same ? 'Phiên bản đã mua không đủ hàng để đổi 1–1; vui lòng chọn hoàn tiền.' : 'Chọn máy còn hàng có giá không thấp hơn giá trị thực mua.');
   const errors = {...visibleValidationErrors(invalidFields, interaction), submit:submitError};
-  const minDescription = descriptionMin(loai, form.reason);
   const allowed = allowedConditions(form.reason);
   function change(name, value) {
     if (name === 'reason' && value !== form.reason) { resetValidation(); setImageErrors([]); }
     setForm(f => {
       const next = {...f, [name]:value};
-      if (name === 'maDonHang' || name === 'maPhienBan') { Object.assign(next,{soLuong:1,serial:'',targetId:'',sealConfirmed:''}); if (loai === 'BAO_HANH') Object.assign(next,{fault:'',appearance:''}); if (name === 'maDonHang') Object.assign(next,{maPhienBan:'',refund:'',bank:'',account:'',holder:''}); }
-      if (name === 'serialKind') next.serial = '';
+      if (name === 'maDonHang' || name === 'maPhienBan') { Object.assign(next,{soLuong:1,targetId:'',sealConfirmed:''}); if (loai === 'BAO_HANH') Object.assign(next,{fault:'',appearance:''}); if (name === 'maDonHang') Object.assign(next,{maPhienBan:'',refund:'',bank:'',account:'',holder:''}); }
       if (name === 'reason') {
         next.condition = preferredCondition(value) || (allowedConditions(value).includes(f.condition) ? f.condition : '');
-        next.fault = ''; next.mismatch = ''; next.sealConfirmed = '';
+        next.fault = ''; next.mismatch = ''; next.sealConfirmed = ''; next.targetId = '';
       }
       if (name === 'soLuong' || next.reason !== 'Đổi ý') next.sealConfirmed = '';
       if (loai !== 'BAO_HANH' && next.reason !== 'Máy lỗi') next.fault = '';
@@ -155,7 +154,7 @@ export default function ReturnsPage() {
       if (name === 'soLuong' && target && target.stock < Number(value)) next.targetId = '';
       return next;
     });
-    if (['maDonHang','maPhienBan'].includes(name) || (name === 'soLuong' && target && target.stock < Number(value))) { setTargetQuery(''); setTargetOpen(false); }
+    if (['maDonHang','maPhienBan','reason'].includes(name) || (name === 'soLuong' && target && target.stock < Number(value))) { setTargetQuery(''); setTargetOpen(false); }
     if (name === 'maDonHang' || (name === 'refund' && value !== 'Chuyển khoản')) { setBankQuery(''); setBankOpen(false); }
     // New dependent fields start clean even after a previous submit.
     setInteraction(e => validationAfterChange(e,name)); setSubmitError('');
@@ -190,7 +189,7 @@ export default function ReturnsPage() {
   async function submit(e) {
     e.preventDefault(); if (lock.current) return;
     const invalid = validateForm(loai, form, order, product, images);
-    if (loai === 'DOI_HANG' && !target) invalid.targetId = 'Vui lòng chọn phiên bản còn đủ hàng từ danh mục.';
+    if (loai === 'DOI_HANG' && !target) invalid.targetId = (same ? 'Phiên bản đã mua không đủ hàng để đổi 1–1; vui lòng chọn hoàn tiền.' : 'Chọn máy còn hàng có giá không thấp hơn giá trị thực mua.');
     setInteraction(old => ({...old, ...Object.fromEntries(Object.keys(invalid).map(key => [key,'submitted']))})); setSubmitError('');
     if (Object.keys(invalid).length) { requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus()); return; }
     lock.current = true; setBusy(true); setSuccess('');
@@ -198,6 +197,9 @@ export default function ReturnsPage() {
       const urls = [];
       for (const file of images) { try { urls.push((await customerService.uploadAfterSaleImage(file)).url); } catch (err) { throw new Error(`${file.name}: ${errorMessage(err)}`); } }
       const {maDonHang, maPhienBan, soLuong, lyDo, ...chiTiet} = form;
+      if (loai === 'DOI_HANG' && same) chiTiet.targetId = maPhienBan;
+      if (isReturn && chiTiet.reason === 'Máy lỗi') delete chiTiet.condition;
+      if (loai === 'TRA_HANG_HOAN_TIEN' && chiTiet.refund !== 'Chuyển khoản') { delete chiTiet.bank; delete chiTiet.account; delete chiTiet.holder; }
       const payload = {maDonHang: maDonHang || null, maPhienBan: loai === 'KHIEU_NAI' ? null : maPhienBan, lyDo: lyDo.trim(), chiTiet, anhMinhChung: urls};
       const saved = isReturn ? await customerService.requestReturn({...payload, loaiYeuCau: loai, soLuong:Number(soLuong)}) : await customerService.createAfterSale({...payload, loai});
       setReceipt(saved); setRecent(old => [saved, ...old]); setLocLoai(''); setLocStatus(''); setSuccess(`Đã gửi yêu cầu ${saved.maYeuCau}. Dự kiến tiếp nhận trong 1–2 ngày làm việc.`); toast(`Đã gửi yêu cầu ${saved.maYeuCau}`);
@@ -209,7 +211,7 @@ export default function ReturnsPage() {
     <h2>Đổi trả &amp; bảo hành</h2><p className="muted">Gửi và theo dõi yêu cầu hỗ trợ sau mua hàng.</p>
     <section className="card after-sales-section">
       <div className="row between after-sales-heading"><h3>Tạo yêu cầu mới</h3></div>
-      <div className="as-support"><a href="tel:18006868">Hotline 1800 6868</a><button type="button" className="btn" onClick={() => window.dispatchEvent(new Event('phonenest:open-chat'))}>Mở chat hỗ trợ</button></div>
+      <div className="as-support"><a href="tel:18006868">Hotline 1800 6868</a></div>
       {success && <div className="as-success" role="status">{success}{receipt && <div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(receipt)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(receipt)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>}</div>}
       <details key={loai || "initial"} className="as-policy-light"><summary>Xem chính sách hỗ trợ sau mua</summary><ul>{policyLines(loai,policy).map(line => <li key={line}>{line}</li>)}</ul></details>
       {orderError && <p className="as-error" role="alert">Không tải được đơn hàng: {orderError}</p>}
@@ -236,28 +238,24 @@ export default function ReturnsPage() {
             {loai !== 'KHIEU_NAI' && <Field name="maPhienBan" label="Sản phẩm cần xử lý" error={errors.maPhienBan}>{order?.chiTiet?.length === 1 ? <div id="as-maPhienBan" className="as-product-fixed" tabIndex={0} aria-invalid={!!errors.maPhienBan}><strong>{order.chiTiet[0].tenMay}</strong><small>{formatPrice(order.chiTiet[0].donGia)} / máy · Số lượng đã mua: {order.chiTiet[0].soLuong}</small></div> : <select {...attrs('maPhienBan')} required value={form.maPhienBan} onChange={e => change('maPhienBan',e.target.value)}><option value="" disabled>Chọn sản phẩm</option>{(order?.chiTiet || []).map(d => <option key={d.maPhienBan} value={d.maPhienBan}>{d.tenMay} · Mã phiên bản: {d.maPhienBan} · SL {d.soLuong}</option>)}</select>}</Field>}
             {isReturn && product && product.soLuong > 1 && <Field name="soLuong" label="Số lượng" error={errors.soLuong}><div className="as-stepper"><button type="button" className="btn" disabled={Number(form.soLuong)<=1} aria-label="Giảm số lượng" onClick={() => change('soLuong',Math.max(1,Number(form.soLuong)-1))}>−</button><output {...attrs('soLuong')} tabIndex={0} aria-live="polite">{form.soLuong} / {product.soLuong}</output><button type="button" className="btn" disabled={Number(form.soLuong)>=product.soLuong} aria-label="Tăng số lượng" onClick={() => change('soLuong',Math.min(product.soLuong,Number(form.soLuong)+1))}>+</button></div></Field>}
             {(isReturn || loai === 'BAO_HANH') && <h4 className="as-group-title">Thông tin sự cố</h4>}
-            {isReturn && cards('reason','Lý do',REASONS)}
+            {isReturn && cards('reason','Lý do',loai === 'DOI_HANG' ? REASONS.filter(r => sameExchange(r) || upgradeExchange(r)) : REASONS)}
             {isReturn && form.reason === 'Đổi ý' && <p className="as-warning">Đổi ý: máy phải còn nguyên seal, đầy đủ phụ kiện; có thể phát sinh phí sau thẩm định.</p>}
-            {isReturn && form.reason && (allowed.length === 1 ? <Field name="condition" label="Tình trạng máy" error={errors.condition}><div id="as-condition" tabIndex={0} aria-invalid={!!errors.condition} aria-describedby={errors.condition ? 'as-condition-error' : undefined} className="as-fixed-condition"><span aria-hidden="true">✓</span><strong>{allowed[0]}</strong><small>{form.reason === 'Đổi ý' ? 'Theo chính sách đổi ý.' : 'Theo lý do máy lỗi.'}</small></div></Field> : cards('condition','Tình trạng máy',allowed))}
+            {isReturn && form.reason && form.reason !== 'Máy lỗi' && (allowed.length === 1 ? <Field name="condition" label="Tình trạng máy" error={errors.condition}><div id="as-condition" tabIndex={0} aria-invalid={!!errors.condition} aria-describedby={errors.condition ? 'as-condition-error' : undefined} className="as-fixed-condition"><span aria-hidden="true">✓</span><strong>{allowed[0]}</strong><small>Theo chính sách đổi ý.</small></div></Field> : cards('condition','Tình trạng máy',allowed))}
             {isReturn && form.reason === 'Đổi ý' && <div className="as-field"><label className="as-seal-confirm"><input {...attrs('sealConfirmed')} type="checkbox" required checked={form.sealConfirmed === 'true'} onChange={e => change('sealConfirmed',e.target.checked ? 'true' : '')}/><span>Tôi xác nhận tất cả máy yêu cầu xử lý chưa bóc seal, đầy đủ phụ kiện. <span className="as-required">*</span></span></label>{errors.sealConfirmed && <small className="as-error" id="as-sealConfirmed-error" role="alert">{errors.sealConfirmed}</small>}</div>}
             {isReturn && form.reason === 'Giao sai hàng' && <small className="muted">Ưu tiên còn nguyên seal; nếu đã mở máy để kiểm tra, chọn Đã kích hoạt. Nếu máy bị hỏng, chọn lý do Máy lỗi.</small>}
             {isReturn && form.reason === 'Không đúng mô tả' && <>{cards('mismatch','Điểm khác với mô tả',MISMATCHES)}<small className="muted">Chọn điểm khác chính; nêu thêm các điểm khác trong mô tả chi tiết.</small></>}
             {isReturn && form.reason === 'Máy lỗi' && faultPicker()}
-            {loai === 'DOI_HANG' && <Field name="targetId" label="Sản phẩm/phiên bản muốn đổi" error={errors.targetId}>
+            {loai === 'DOI_HANG' && same && <Field name="targetId" label="Đổi 1–1 cùng phiên bản" error={errors.targetId}><div id="as-targetId" className="as-product-fixed" tabIndex={0}><strong>{product?.tenMay || 'Chọn sản phẩm đã mua'}</strong><small>{target ? `${target.label} · Còn ${target.stock} máy · Không chênh lệch` : catalogLoading ? 'Đang tải tồn kho…' : 'Chưa đủ hàng để đổi đúng phiên bản. Có thể chọn Trả hàng / hoàn tiền.'}</small></div>{catalogError && <button type="button" className="btn" onClick={() => setCatalogRetry(n=>n+1)}>Thử tải lại tồn kho</button>}</Field>}
+            {loai === 'DOI_HANG' && upgradeExchange(form.reason) && <Field name="targetId" label="Sản phẩm/phiên bản muốn đổi" error={errors.targetId}>
               <div onBlur={e => {if (!e.currentTarget.contains(e.relatedTarget)) setTargetOpen(false);}}>
               <input {...attrs('targetId')} value={targetQuery} placeholder="Tìm tên máy, dung lượng hoặc màu sắc" onFocus={() => setTargetOpen(true)} onChange={e => {setTargetQuery(e.target.value);change('targetId','');setTargetOpen(true);}} />
               {catalogLoading && <small>Đang tải danh mục…</small>}{catalogError && <p role="alert" className="as-error">Không tải được danh mục. <button type="button" className="btn" onClick={() => setCatalogRetry(n => n+1)}>Thử lại</button></p>}
               {targetOpen && !catalogLoading && !catalogError && <div className="as-order-options" role="group" aria-label="Phiên bản còn hàng">{targetMatches.length ? targetMatches.map(v => <button type="button" key={v.id} className={`as-order-choice ${target?.id === v.id ? 'selected' : ''}`} onClick={() => {change('targetId',v.id);setTargetQuery(v.label);setTargetOpen(false);}}><strong>{v.label}</strong><span>{formatPrice(v.price)} · Còn {v.stock} máy</span></button>) : <small>Không có phiên bản phù hợp hoặc đủ số lượng.</small>}</div>}
-              {target && <div className="as-selected-order after-sales-order-preview"><strong>{target.label}</strong><span>{formatPrice(target.price)} / máy</span>{product && (() => {const delta=(Number(target.price)-Number(product.donGia))*Number(form.soLuong);return <small>{delta > 0 ? `Bạn cần bù thêm khoảng ${formatPrice(delta)}.` : delta < 0 ? `Chênh lệch thấp hơn khoảng ${formatPrice(-delta)}; cửa hàng sẽ xác nhận có hoàn chênh lệch hay không.` : 'Không chênh lệch theo đơn giá hiện tại.'} Dự kiến, chưa tính phân bổ ưu đãi và phí; không giữ hàng tự động.</small>;})()}</div>}
+              {target && quote && <div className="as-selected-order after-sales-order-preview"><strong>{target.label}</strong><span>{formatPrice(target.price)} / máy</span><small>Giá trị thực mua: {formatPrice(quote.net)} · Cần bù: {formatPrice(quote.difference)}. Chỉ thu sau khi cửa hàng kiểm tra và duyệt; chưa giữ hàng khi gửi yêu cầu.</small></div>}
+              {product && estimate && <small className="muted">Chỉ hiện máy còn hàng có tổng giá từ {formatPrice(estimate.amount)} trở lên (cho số lượng đã chọn).</small>}
               </div>
             </Field>}
             {loai === 'BAO_HANH' && <>
-              <Field name="serialKind" label="Loại mã thiết bị"><select id="as-serialKind" value={form.serialKind} onChange={e => change('serialKind',e.target.value)}><option value="IMEI">IMEI (15 chữ số)</option><option value="SERIAL">Số Serial</option></select></Field>
-              <Field name="serial" label={form.serialKind === 'IMEI' ? 'IMEI' : 'Số Serial'} error={errors.serial}>
-                {identifiers.length > 0 && <div className="as-chips" role="group" aria-label="Mã thiết bị đã lưu">{identifiers.map(id => <button type="button" className="btn" key={id} aria-pressed={form.serial === id} onClick={() => change('serial',id)}>{id}</button>)}</div>}
-                <input {...attrs('serial')} required value={form.serial} inputMode={form.serialKind === 'IMEI' ? 'numeric' : 'text'} maxLength={form.serialKind === 'IMEI' ? 15 : 60} autoComplete="off" placeholder={form.serialKind === 'IMEI' ? 'Nhập 15 chữ số' : 'Nhập mã trên máy hoặc hộp'} onChange={e => change('serial',e.target.value)}/>
-                <small className="muted">{form.serialKind === 'IMEI' ? 'Bấm *#06# hoặc xem trên hộp máy. Với iPhone: Cài đặt → Cài đặt chung → Giới thiệu.' : 'Xem trong Cài đặt → Giới thiệu thiết bị hoặc trên hộp máy.'}</small>
-              </Field>
               <Field name="appearance" label="Tình trạng ngoại hình" error={errors.appearance}><div className="as-chips" role="group" aria-label="Tình trạng ngoại hình">{APPEARANCES.map((item,i) => <button key={item} type="button" {...(i === 0 ? attrs('appearance') : {})} className="btn" aria-pressed={form.appearance === item} onClick={() => change('appearance',item)}>{item}</button>)}</div></Field>
               {warrantyAppearanceWarning(form.appearance) && <p className="as-warning" role="status">{warrantyAppearanceWarning(form.appearance)}</p>}
               {faultPicker()}
@@ -265,7 +263,7 @@ export default function ReturnsPage() {
             </>}
             {loai === 'KHIEU_NAI' && select('topic','Chủ đề',TOPICS)}
             {(isReturn || loai === 'BAO_HANH') && <h4 className="as-group-title">Bằng chứng</h4>}
-            <Field name="lyDo" label="Mô tả chi tiết"><textarea {...attrs('lyDo')} rows="5" required maxLength={1000} placeholder={isReturn || loai === 'BAO_HANH' ? descriptionHint(loai,form.reason) : HINTS[loai]} value={form.lyDo} onChange={e => change('lyDo',e.target.value)} /><div className={`as-count ${!errors.lyDo && form.lyDo.trim().length >= minDescription ? 'as-count-valid' : 'muted'}`}><span id="as-lyDo-hint" className={errors.lyDo ? 'as-error' : undefined} role={errors.lyDo ? 'alert' : undefined}>{errors.lyDo || (form.reason === 'Khác' ? `Nêu rõ lý do khác · tối thiểu ${minDescription} ký tự` : `Tối thiểu ${minDescription} ký tự`)}</span><span>{form.lyDo.length}/1000</span></div></Field>
+            <Field name="lyDo" label="Mô tả chi tiết"><textarea {...attrs('lyDo')} rows="5" required maxLength={1000} placeholder={isReturn || loai === 'BAO_HANH' ? descriptionHint(loai,form.reason) : HINTS[loai]} value={form.lyDo} onChange={e => change('lyDo',e.target.value)} /><div className={`as-count ${!errors.lyDo && form.lyDo.trim().length > 0 ? 'as-count-valid' : 'muted'}`}><span id="as-lyDo-hint" className={errors.lyDo ? 'as-error' : undefined} role={errors.lyDo ? 'alert' : undefined}>{errors.lyDo || (form.reason === 'Khác' ? 'Nêu rõ lý do khác.' : 'Mô tả ngắn gọn vấn đề.')}</span><span>{form.lyDo.length}/1000</span></div></Field>
             <Field name="images" label="Ảnh minh chứng" required={requiredProof} error={errors.images}>
               <small className={`as-proof-hint ${requiredProof ? 'as-proof-required' : 'muted'}`}>{evidenceHint(loai,form.reason,form.condition)}</small>
               <div className="as-drop" onDragOver={e => e.preventDefault()} onDrop={e => {e.preventDefault(); if (!busy) addFiles(e.dataTransfer.files);}}>
@@ -277,10 +275,10 @@ export default function ReturnsPage() {
             </Field>
             {loai === 'TRA_HANG_HOAN_TIEN' && <>
               <h4 className="as-group-title">Hoàn tiền</h4>
-              {order?.phuongThucTt === 'COD' ? <div className="as-refund-fixed" id="as-refund" tabIndex={0} aria-invalid={!!errors.refund}><strong>Hoàn tiền qua chuyển khoản</strong><small>Đơn của bạn thanh toán COD nên sẽ được hoàn tiền qua chuyển khoản.</small>{errors.refund && <small className="as-error" role="alert">{errors.refund}</small>}</div> : cards('refund','Hình thức hoàn tiền',refundOptions(order))}
-              {form.refund === 'Chuyển khoản' && <div className="as-fields as-subfields">
+              {order?.phuongThucTt === 'COD' ? <div className="as-refund-fixed" id="as-refund" tabIndex={0} aria-invalid={!!errors.refund}><strong>Hoàn tiền qua chuyển khoản</strong><small>Đơn của bạn thanh toán COD nên sẽ được hoàn tiền qua chuyển khoản.</small>{errors.refund && <small className="as-error" role="alert">{errors.refund}</small>}</div> : order?.phuongThucTt === 'CHUYEN_KHOAN' ? <div className="as-refund-fixed" id="as-refund" tabIndex={0} aria-invalid={!!errors.refund}><strong>Hoàn về giao dịch VNPay gốc</strong><small>Không cần nhập tài khoản ngân hàng. Cửa hàng sẽ gửi yêu cầu hoàn về giao dịch đã thanh toán.</small>{errors.refund && <small className="as-error" role="alert">{errors.refund}</small>}</div> : order?.phuongThucTt === 'VI_DIEN_TU' ? cards('refund','Hình thức hoàn tiền',refundOptions(order)) : <p className="muted">Chọn đơn có thông tin thanh toán để xác định hình thức hoàn tiền.</p>}
+              {refundOptions(order).includes('Chuyển khoản') && form.refund === 'Chuyển khoản' && <div className="as-fields as-subfields">
                 <p className="as-bank-notice">🔒 Chỉ nhập thông tin nhận tiền, không nhập mật khẩu hoặc mã OTP.</p>
-                <Field name="holder" label="Chủ tài khoản" error={errors.holder}><input {...attrs('holder')} required value={form.holder} maxLength={100} autoComplete="off" placeholder="VD: NGUYEN VAN AN" onChange={e => change('holder',normalizeHolder(e.target.value))}/><small className="muted">Nhập đúng họ tên trên tài khoản ngân hàng.</small></Field>
+                <Field name="holder" label="Chủ tài khoản" error={errors.holder}><input {...attrs('holder')} required value={form.holder} maxLength={100} autoComplete="off" placeholder="VD: NGUYEN VAN AN" onChange={e => change('holder',normalizeHolder(e.target.value))}/><small className="muted">Nhập đúng họ tên trên tài khoản ngân hàng (in hoa, không dấu). Nên dùng tài khoản của người đặt hàng.</small>{order?.tenKhach && form.holder.trim() && normalizeHolder(order.tenKhach).trim().replace(/\s+/g,' ') !== form.holder.trim().replace(/\s+/g,' ') && <small className="muted">Tên chủ tài khoản khác tên người đặt hàng. Vui lòng kiểm tra lại; cửa hàng có thể yêu cầu đối soát.</small>}</Field>
                 <Field name="account" label="Số tài khoản" error={errors.account}><input {...attrs('account')} type="text" required inputMode="numeric" pattern="[0-9]{6,20}" autoComplete="off" maxLength={20} value={form.account} placeholder="Nhập 6–20 chữ số" onChange={e => change('account',accountDigits(e.target.value))}/></Field>
                 <Field name="bank" label="Ngân hàng" error={errors.bank}>
                   <div onBlur={e => {if (!e.currentTarget.contains(e.relatedTarget)) setBankOpen(false);}}>
@@ -305,6 +303,7 @@ export default function ReturnsPage() {
       {!loading && !error && filtered.length === 0 && <p className="muted">{allRequests.length ? 'Không có kết quả theo bộ lọc.' : 'Bạn chưa có yêu cầu nào'}</p>}
       {filtered.map(r => <article key={r.maYeuCau} id={r.maYeuCau} className="card after-sales-request"><div className="row between after-sales-heading"><div><b>{TYPES[requestType(r)]}</b> · <span className="muted">{r.maYeuCau}</span></div><RequestStatus request={r}/></div>
         <p>Đơn hàng: {r.maDonHang ? <Link to={`/orders/${encodeURIComponent(r.maDonHang)}`}>{r.maDonHang}</Link> : 'Không gắn đơn hàng'}</p><p>Sản phẩm: {r.tenSanPham || 'Không chỉ định'}{r.soLuong ? ` · SL: ${r.soLuong}` : ''}</p><p style={{whiteSpace:'pre-wrap'}}>{maskAccount(r.lyDo)}</p>
+        {r.exchange && <div className="as-description"><b>Giá trị đổi máy:</b> {formatPrice(r.exchange.oldNet)}<p>{Number(r.exchange.difference) === 0 ? 'Không chênh lệch' : `Cần bù ${formatPrice(r.exchange.difference)} · ${r.exchange.paidAt ? 'Đã ghi nhận thu tiền' : ['DA_DUYET','DANG_XU_LY'].includes(r.trangThai) ? 'Đã duyệt, liên hệ cửa hàng để thanh toán chênh lệch' : 'Chưa thu tiền khi gửi yêu cầu'}`}</p></div>}
         {r.soTienHoanDuKien != null && <p><b>{r.ngayHoanTien ? 'Đã ghi nhận hoàn tiền' : 'Tiền hoàn dự kiến'}:</b> {formatPrice(r.soTienHoanDuKien)}</p>}
         <div className="as-thumbs">{requestImages(r).map((url,i) => <a key={url} href={url} target="_blank" rel="noreferrer"><img className="as-evidence" src={url} alt={`Minh chứng ${i+1}`} /></a>)}</div>
         <p className="muted">Gửi lúc: {formatDate(r.ngayTao)}{r.ngayCapNhat && ` · Cập nhật: ${formatDate(r.ngayCapNhat)}`}</p>{r.ghiChuXuLy && <p><b>Phản hồi:</b> {maskAccount(r.ghiChuXuLy)}</p>}{r.ketQuaXuLy && <p className="after-sales-outcome"><b>Kết quả xử lý:</b> {maskAccount(r.ketQuaXuLy)}</p>}<div className="as-receipt-actions"><button type="button" className="btn" onClick={() => downloadReceipt(r)}>Tải phiếu tiếp nhận</button><button type="button" className="btn" onClick={() => {if (!printReceipt(r)) toast('Vui lòng cho phép cửa sổ in.', 'error');}}>In / lưu PDF</button></div>{r.lichSu?.length > 0 && <details open><summary>Tiến trình xử lý ({r.lichSu.length})</summary><ol className="after-sales-timeline">{r.lichSu.map((item,i) => <li key={i}><RequestStatus request={r} status={item.trangThai}/> <span className="muted">{formatDate(item.thoiGian)}</span>{item.ghiChu && <div>{maskAccount(item.ghiChu)}</div>}</li>)}</ol></details>}

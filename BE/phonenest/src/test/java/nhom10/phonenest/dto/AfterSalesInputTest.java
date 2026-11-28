@@ -17,7 +17,7 @@ class AfterSalesInputTest {
     @Test void descriptionBoundariesAndWhitespace() {
         assertThrows(AppException.class, () -> input(" ".repeat(40),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
         assertThrows(AppException.class, () -> input("\u00a0".repeat(40),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
-        assertThrows(AppException.class, () -> input("a".repeat(19),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
+        assertDoesNotThrow(() -> input("a",RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
         assertDoesNotThrow(() -> input("a".repeat(20),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
         assertDoesNotThrow(() -> input("a".repeat(1000),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
         assertThrows(AppException.class, () -> input("a".repeat(1001),RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
@@ -36,8 +36,10 @@ class AfterSalesInputTest {
         assertThrows(AppException.class, () -> input(VALID,RETURN,List.of("a","b","c","d","e","f")).images("TRA_HANG_HOAN_TIEN","KH1",storage));
     }
     @Test void warrantyDoesNotRequireCustomerOutcome() {
-        var details = Map.of("serialKind", "IMEI", "serial", "490154203237518", "appearance", "Bình thường", "fault", "Camera / âm thanh");
-        assertTrue(input(VALID,details,List.of()).description("BAO_HANH").contains("IMEI: 490154203237518"));
+        var details = Map.of("appearance", "Bình thường", "fault", "Camera / âm thanh");
+        assertTrue(input(VALID,details,List.of()).description("BAO_HANH").contains("Ngoại hình: Bình thường"));
+        var legacy = new HashMap<>(details); legacy.put("serial", "invalid legacy value");
+        assertEquals(input(VALID,details,List.of()).description("BAO_HANH"), input(VALID,legacy,List.of()).description("BAO_HANH"));
         var old = new HashMap<>(details); old.put("outcome", "Đề nghị hoàn tiền 100%");
         assertFalse(input(VALID,old,List.of()).description("BAO_HANH").contains("Hoàn tiền"));
         assertThrows(AppException.class, () -> input(VALID,null,List.of()).description("BAO_HANH"));
@@ -51,7 +53,9 @@ class AfterSalesInputTest {
     }
     @Test void rejectContradictoryConditionsAndRequireFault() {
         var invalid = new HashMap<>(RETURN); invalid.put("condition", "Còn nguyên seal");
-        assertThrows(AppException.class, () -> input(VALID,invalid,List.of()).description("TRA_HANG_HOAN_TIEN"));
+        assertTrue(input(VALID,invalid,List.of()).description("TRA_HANG_HOAN_TIEN").contains("Tình trạng máy: Có lỗi"));
+        invalid.remove("condition");
+        assertTrue(input(VALID,invalid,List.of()).description("TRA_HANG_HOAN_TIEN").contains("Tình trạng máy: Có lỗi"));
         invalid.put("reason", "Đổi ý"); invalid.put("condition", "Có lỗi");
         assertThrows(AppException.class, () -> input(VALID,invalid,List.of()).description("TRA_HANG_HOAN_TIEN"));
         var missing = new HashMap<>(RETURN); missing.remove("fault");
@@ -74,7 +78,7 @@ class AfterSalesInputTest {
         var details = new HashMap<>(RETURN);
         details.putAll(Map.of("refund", "Chuyển khoản", "bank", "MB", "account", "00123456", "holder", "Nguyễn Văn A"));
         String description = input(VALID,details,List.of()).description("TRA_HANG_HOAN_TIEN");
-        assertTrue(description.contains("Chủ tài khoản: NGUYỄN VĂN A"));
+        assertTrue(description.contains("Chủ tài khoản: NGUYEN VAN A"));
         assertTrue(description.contains("00123456"));
         assertFalse(DoiTraDto.maskAccount(description).contains("00123456"));
         assertTrue(DoiTraDto.maskAccount(description).contains("•••• 3456"));
@@ -95,7 +99,7 @@ class AfterSalesInputTest {
         }
         assertDoesNotThrow(() -> input(VALID,RETURN,List.of()).description("TRA_HANG_HOAN_TIEN"));
     }
-    @Test void v6ChangeOfMindRequiresSealCommitmentAndTenCharacters() {
+    @Test void changeOfMindRequiresSealCommitmentAndNonblankDescription() {
         var details = new HashMap<>(Map.of("reason", "Đổi ý", "condition", "Còn nguyên seal", "refund", "Phương thức thanh toán gốc", "target", "Máy B"));
         for (String type : List.of("TRA_HANG_HOAN_TIEN", "DOI_HANG")) {
             details.remove("sealConfirmed");
@@ -104,14 +108,14 @@ class AfterSalesInputTest {
             assertThrows(AppException.class, () -> input("a".repeat(10),details,List.of()).description(type));
             details.put("sealConfirmed", "true");
             assertTrue(input("a".repeat(10),details,List.of()).description(type).contains("Cam kết khách hàng:"));
-            assertThrows(AppException.class, () -> input("a".repeat(9),details,List.of()).description(type));
+            assertDoesNotThrow(() -> input("a",details,List.of()).description(type));
             assertThrows(AppException.class, () -> input(" ".repeat(10),details,List.of()).description(type));
             assertThrows(AppException.class, () -> input("a".repeat(1001),details,List.of()).description(type));
         }
     }
 
     @Test void warrantyFaultClassificationAndPhysicalDamage() {
-        var details = new HashMap<>(Map.of("serialKind", "IMEI", "serial", "490154203237518", "appearance", "Rơi vỡ", "fault", "Pin / sạc; Camera / âm thanh"));
+        var details = new HashMap<>(Map.of("appearance", "Rơi vỡ", "fault", "Pin / sạc; Camera / âm thanh"));
         String description = input(VALID,details,List.of()).description("BAO_HANH");
         assertTrue(description.contains("Loại lỗi: Pin / sạc; Camera / âm thanh"));
         assertTrue(description.contains("Ngoại hình: Rơi vỡ"));

@@ -7,6 +7,8 @@ import nhom10.phonenest.enums.*;
 import nhom10.phonenest.exception.AppException;
 import nhom10.phonenest.repository.*;
 import nhom10.phonenest.util.IdGenerator;
+import nhom10.phonenest.util.ExchangePolicy;
+import nhom10.phonenest.util.SecurityUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,23 +54,51 @@ public class DoiTraService {
         if (input.maPhienBan() == null || input.maPhienBan().isBlank() || input.soLuong() == null || input.soLuong() < 1)
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn sản phẩm và số lượng hợp lệ");
         var details = new HashMap<>(input.chiTiet());
-        var payment = thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null);
-        if (type == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN && payment == PhuongThucTt.COD && !"Chuyển khoản".equals(details.get("refund")))
-            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn COD chỉ hỗ trợ hoàn tiền qua chuyển khoản");
+        if (type == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN) {
+            var payment = nhom10.phonenest.util.OrderPaymentPolicy.effective(
+                    thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()));
+            if (payment == null || payment.getPhuongThuc() == null)
+                throw new AppException(HttpStatus.CONFLICT, "Chưa có dữ liệu thanh toán; cần đối soát trước khi gửi yêu cầu hoàn tiền");
+            if (!nhom10.phonenest.util.ReturnRefundPolicy.customerAllowed(payment.getPhuongThuc(), details.get("refund")))
+                throw new AppException(HttpStatus.BAD_REQUEST, "Hình thức hoàn tiền không phù hợp với giao dịch gốc");
+            if (!"Chuyển khoản".equals(details.get("refund"))) {
+                details.remove("bank"); details.remove("account"); details.remove("holder");
+            }
+        }
+        ExchangePlan plan = null;
         if (type == LoaiYeuCauDoiTra.DOI_HANG) {
-            int quantity = input.soLuong() == null ? 1 : input.soLuong();
-            String targetId = details.get("targetId");
-            if (targetId == null || targetId.isBlank() || quantity < 1) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn phiên bản muốn đổi và số lượng hợp lệ");
+            int quantity = input.soLuong();
+            var line = order.getChiTiet().stream().filter(c -> c.getPhienBan().getMaPhienBan().equals(input.maPhienBan())).findFirst()
+                    .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm không thuộc đơn hàng"));
+            if (quantity > line.getSoLuong()) throw new AppException(HttpStatus.BAD_REQUEST, "Số lượng đổi không hợp lệ");
+            String reason = details.get("reason");
+            if (!ExchangePolicy.same(reason) && !ExchangePolicy.upgrade(reason))
+                throw new AppException(HttpStatus.BAD_REQUEST, "Lý do này không hỗ trợ đổi máy; vui lòng chọn trả hàng / hoàn tiền");
+            String targetId = ExchangePolicy.same(reason) ? input.maPhienBan() : details.get("targetId");
+            if (targetId == null || targetId.isBlank()) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn phiên bản muốn đổi");
+            if (ExchangePolicy.same(reason) && details.get("targetId") != null && !details.get("targetId").isBlank() && !targetId.equals(details.get("targetId")))
+                throw new AppException(HttpStatus.BAD_REQUEST, "Máy lỗi hoặc giao sai hàng chỉ được đổi đúng phiên bản đã mua");
             var target = phienBanRepo.findById(targetId).filter(p -> exchangeAvailable(p, quantity))
                     .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Phiên bản muốn đổi không còn đủ hàng hoặc không được bán"));
+            var net = ExchangePolicy.net(line.getDonGia(), quantity, order.getTamTinh(), order.getGiamGia());
+            var delta = exchangeDifference(reason, net, target.getGiaBan().multiply(BigDecimal.valueOf(quantity)));
+            plan = new ExchangePlan(reason, targetId, net, delta);
             var option = exchangeOption(target);
             details.put("target", option.label() + " [" + option.id() + "]");
         }
         var normalized = new nhom10.phonenest.dto.AfterSalesInput(input.maDonHang(), input.maPhienBan(), input.soLuong(), input.loai(), type, input.lyDo(), input.hinhAnhMinhChung(), input.anhMinhChung(), details);
-        return tao(maKh, new DoiTraDto.Request(input.maDonHang(), normalized.description(type.name()), normalized.images(type.name(), maKh, storage), type, input.maPhienBan(), input.soLuong()));
+        return tao(maKh, new DoiTraDto.Request(input.maDonHang(), normalized.description(type.name()), normalized.images(type.name(), maKh, storage), type, input.maPhienBan(), input.soLuong()), plan);
     }
 
+    private record ExchangePlan(String reason, String targetId, BigDecimal oldNet, BigDecimal delta) {}
+    private BigDecimal exchangeDifference(String reason, BigDecimal oldNet, BigDecimal total) {
+        try { return ExchangePolicy.difference(reason, oldNet, total); }
+        catch (IllegalArgumentException e) { throw new AppException(HttpStatus.CONFLICT, e.getMessage()); }
+    }
     public DoiTraDto tao(String maKh, DoiTraDto.Request r) {
+        return tao(maKh, r, null);
+    }
+    private DoiTraDto tao(String maKh, DoiTraDto.Request r, ExchangePlan plan) {
         // 2B.7E: khoa dong don hang (serialize cac yeu cau dong thoi); kiem tra trung tung san pham
         // ben duoi chay trong khoa nay -> mot san pham khong the duoc hoan tien nhieu lan.
         DonHang don = donRepo.findByIdForUpdate(r.maDonHang())
@@ -113,6 +143,11 @@ public class DoiTraService {
         LoaiYeuCauDoiTra loai = r.loaiYeuCau() == null
                 ? LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN : r.loaiYeuCau();
 
+        if (loai == LoaiYeuCauDoiTra.DOI_HANG) {
+            if (plan == null) throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng sử dụng biểu mẫu đổi máy mới");
+            yeuCau.setLyDoDoi(plan.reason()); yeuCau.setMaPhienBanDoi(plan.targetId());
+            yeuCau.setGiaTriDoi(plan.oldNet()); yeuCau.setTienBu(plan.delta());
+        }
         for (ChiTietDonHang c : mucYeuCau) {
             int soLuong = r.soLuong() == null ? c.getSoLuong() : r.soLuong();
             if (soLuong <= 0 || soLuong > c.getSoLuong()) {
@@ -163,8 +198,8 @@ public class DoiTraService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
         boolean hopLe = switch (yeuCau.getTrangThai()) {
             case CHO_DUYET -> moi == TrangThaiDoiTra.DA_DUYET || moi == TrangThaiDoiTra.TU_CHOI;
-            case DA_DUYET -> moi == TrangThaiDoiTra.DANG_XU_LY || moi == TrangThaiDoiTra.HOAN_TAT;
-            case DANG_XU_LY -> moi == TrangThaiDoiTra.HOAN_TAT;
+            case DA_DUYET -> moi == TrangThaiDoiTra.DANG_XU_LY || moi == TrangThaiDoiTra.HOAN_TAT || (isExchange(yeuCau) && moi == TrangThaiDoiTra.TU_CHOI);
+            case DANG_XU_LY -> moi == TrangThaiDoiTra.HOAN_TAT || (isExchange(yeuCau) && moi == TrangThaiDoiTra.TU_CHOI);
             default -> false;
         };
         if (!hopLe) throw new AppException(HttpStatus.BAD_REQUEST, "Không thể chuyển trạng thái này");
@@ -177,6 +212,19 @@ public class DoiTraService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do từ chối");
         }
         Map<String, Object> truoc = snapshot(yeuCau);
+        if (isExchange(yeuCau) && moi == TrangThaiDoiTra.DA_DUYET) approveExchange(yeuCau);
+        if (isExchange(yeuCau) && moi == TrangThaiDoiTra.TU_CHOI && yeuCau.getTrangThai() != TrangThaiDoiTra.CHO_DUYET) {
+            if (yeuCau.isDaGiaoMayDoi() || yeuCau.getNgayThuChenhLech() != null || yeuCau.getChiTiet().stream().anyMatch(ChiTietDoiTra::isDaNhapKho))
+                throw new AppException(HttpStatus.CONFLICT, "Đã xử lý hàng trả hoặc đã thu tiền; cần đối soát thủ công, không thể từ chối tự động");
+            if (yeuCau.getMaPhienBanDoi() != null) {
+                var target = phienBanRepo.findByIdForUpdate(yeuCau.getMaPhienBanDoi())
+                        .orElseThrow(() -> new AppException(HttpStatus.CONFLICT, "Không tìm thấy phiên bản đã giữ"));
+                int quantity = yeuCau.getChiTiet().stream().mapToInt(ChiTietDoiTra::getSoLuong).sum();
+                khoService.thayDoiTonDoiTra(target, quantity, yeuCau, SecurityUtil.currentUserId(), "Giải phóng máy đổi " + ma);
+            }
+        }
+        if (isExchange(yeuCau) && moi == TrangThaiDoiTra.HOAN_TAT && yeuCau.getMaPhienBanDoi() != null && !yeuCau.isDaGiaoMayDoi())
+            throw new AppException(HttpStatus.CONFLICT, "Chưa giao máy đổi");
         if (moi == TrangThaiDoiTra.HOAN_TAT) {
             boolean hasReturn = yeuCau.getChiTiet().stream()
                     .anyMatch(ct -> ct.getLoaiYeuCau() == LoaiYeuCauDoiTra.TRA_HANG_HOAN_TIEN);
@@ -220,7 +268,48 @@ public class DoiTraService {
         }
     }
 
-    public DoiTraDto xacNhanNhapKho(String ma, String adminId) {
+    private boolean isExchange(YeuCauDoiTra y) {
+        return y.getChiTiet().stream().anyMatch(c -> c.getLoaiYeuCau() == LoaiYeuCauDoiTra.DOI_HANG);
+    }
+    public void inspectExchange(String ma) {
+        var y = repo.findByIdForUpdate(ma).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        if (!isExchange(y) || y.getTrangThai() != TrangThaiDoiTra.CHO_DUYET || y.getMaPhienBanDoi() == null || y.isDaKiemTraDoi())
+            throw new AppException(HttpStatus.CONFLICT, "Không thể xác nhận kiểm tra yêu cầu đổi này");
+        y.setDaKiemTraDoi(true);
+    }
+    private void approveExchange(YeuCauDoiTra y) {
+        if (!y.isDaKiemTraDoi() || y.getMaPhienBanDoi() == null || y.getChiTiet().size() != 1)
+            throw new AppException(HttpStatus.CONFLICT, "Cần nhận và kiểm tra máy cũ trước khi duyệt; yêu cầu cũ chưa có phương án đổi cần tạo lại");
+        var originalPayment = nhom10.phonenest.util.OrderPaymentPolicy.effective(
+                thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()));
+        if (originalPayment == null || originalPayment.getTrangThai() != TrangThaiThanhToan.DA_THANH_TOAN
+                || !nhom10.phonenest.util.OrderPaymentPolicy.matchesOrderAmount(originalPayment, y.getDonHang().getTongThanhToan()))
+            throw new AppException(HttpStatus.CONFLICT, "Đơn gốc chưa được xác nhận thanh toán đầy đủ; cần đối soát trước khi duyệt đổi");
+        var item = y.getChiTiet().get(0);
+        var target = phienBanRepo.findByIdForUpdate(y.getMaPhienBanDoi()).filter(p -> exchangeAvailable(p, item.getSoLuong()))
+                .orElseThrow(() -> new AppException(HttpStatus.CONFLICT, "Máy đổi không còn đủ hàng"));
+        if (ExchangePolicy.same(y.getLyDoDoi()) && !item.getChiTietDonHang().getPhienBan().getMaPhienBan().equals(target.getMaPhienBan()))
+            throw new AppException(HttpStatus.CONFLICT, "Đổi 1–1 phải đúng phiên bản đã mua");
+        var delta = exchangeDifference(y.getLyDoDoi(), y.getGiaTriDoi(), target.getGiaBan().multiply(BigDecimal.valueOf(item.getSoLuong())));
+        // Do not silently change a quote after customer submission. Reject and request a new quote instead.
+        if (delta.compareTo(y.getTienBu()) != 0) throw new AppException(HttpStatus.CONFLICT, "Giá máy đổi đã thay đổi; cần báo khách và tạo yêu cầu mới");
+        khoService.thayDoiTonDoiTra(target, -item.getSoLuong(), y, SecurityUtil.currentUserId(), "Giữ máy đổi " + y.getMaYeuCau());
+    }
+    public void recordExchangePayment(String ma, String reference) {
+        var y = repo.findByIdForUpdate(ma).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        if (!isExchange(y) || !y.isDaKiemTraDoi() || y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY || y.getTienBu() == null || y.getTienBu().signum() <= 0 || y.getNgayThuChenhLech() != null)
+            throw new AppException(HttpStatus.CONFLICT, "Chưa đủ điều kiện ghi nhận thu chênh lệch hoặc đã ghi nhận");
+        if (reference == null || reference.isBlank() || reference.length() > 150) throw new AppException(HttpStatus.BAD_REQUEST, "Nhập mã chứng từ thu tiền thực tế (tối đa 150 ký tự)");
+        y.setMaThuChenhLech(reference.trim()); y.setNgayThuChenhLech(LocalDateTime.now());
+        thongBao.gui(y.getDonHang().getKhachHang().getMaKh(), "Đã ghi nhận thu chênh lệch đổi máy " + y.getTienBu().toPlainString() + " VND", ThongBaoService.linkYeuCau(ma));
+    }
+    public void handoverExchange(String ma) {
+        var y = repo.findByIdForUpdate(ma).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
+        if (!isExchange(y) || y.getMaPhienBanDoi() == null || !y.isDaKiemTraDoi() || y.isDaGiaoMayDoi() || y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY || y.getTienBu() == null || (y.getTienBu().signum() > 0 && y.getNgayThuChenhLech() == null) || !y.getChiTiet().stream().allMatch(ChiTietDoiTra::isDaNhapKho))
+            throw new AppException(HttpStatus.CONFLICT, "Cần hoàn tất kiểm tra, xử lý máy cũ và thu đủ chênh lệch trước khi ghi nhận giao máy đổi");
+        y.setDaGiaoMayDoi(true); // replacement stock was already reserved at approval
+    }
+    public DoiTraDto xacNhanNhapKho(String ma, String adminId, boolean sellable) {
         YeuCauDoiTra y = repo.findByIdForUpdate(ma).orElseThrow(() ->
                 new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"));
         if (y.getTrangThai() != TrangThaiDoiTra.DA_DUYET && y.getTrangThai() != TrangThaiDoiTra.DANG_XU_LY) {
@@ -229,17 +318,26 @@ public class DoiTraService {
         if (y.getChiTiet().isEmpty() || y.getChiTiet().stream().anyMatch(ChiTietDoiTra::isDaNhapKho)) {
             throw new AppException(HttpStatus.CONFLICT, "Yêu cầu đã được nhập kho hoặc không có sản phẩm");
         }
+        if (isExchange(y) && (y.getMaPhienBanDoi() == null || !y.isDaKiemTraDoi() || y.getTienBu() == null
+                || (y.getTienBu().signum() > 0 && y.getNgayThuChenhLech() == null)))
+            throw new AppException(HttpStatus.CONFLICT, "Cần duyệt phương án và thu đủ chênh lệch (nếu có) trước khi xử lý hàng trả");
+        // Only inspect structured header; customer free-text description must not override condition.
+        String header = Objects.toString(y.getLyDoChung(), "").split("\\r?\\nMô tả chi tiết: ", 2)[0];
+        boolean unsafe = header.lines().anyMatch(l -> Set.of("Lý do: Máy lỗi", "Lý do: Giao sai hàng", "Tình trạng máy: Có lỗi").contains(l.strip()));
+        // Unknown legacy payloads and faulty/wrong items are not automatically resalable.
+        boolean addStock = sellable && !unsafe && (header.startsWith("Lý do: ") && header.contains("Tình trạng máy: "));
+        y.setHangTraBanDuoc(addStock);
         LocalDateTime now = LocalDateTime.now();
         for (ChiTietDoiTra ct : y.getChiTiet()) {
             PhienBanSanPham variant = ct.getChiTietDonHang().getPhienBan();
-            khoService.thayDoiTonDoiTra(variant, ct.getSoLuong(), y, adminId,
+            if (addStock) khoService.thayDoiTonDoiTra(variant, ct.getSoLuong(), y, adminId,
                     "Nhận hàng đổi trả " + y.getMaYeuCau());
             ct.setDaNhapKho(true);
             ct.setNgayNhapKho(now);
         }
         y.setNgayCapNhat(now);
         nhatKyHoatDongService.ghi(HanhDongAudit.CHANGE_RETURN_STATUS, LoaiDoiTuongAudit.RETURN, ma,
-                Map.of(), Map.of("suKien", "RESTOCK"));
+                Map.of(), Map.of("suKien", "RESTOCK", "hangTraBanDuoc", addStock));
         return dto(y);
     }
 
@@ -274,10 +372,21 @@ public class DoiTraService {
         BigDecimal ceiling = tinhTongHoanDuKien(y);
         BigDecimal requested = request.soTien();
         String adjustment = Objects.toString(request.lyDoDieuChinh(), "").trim();
-        if (thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream().findFirst().map(ThanhToan::getPhuongThuc).orElse(null) == PhuongThucTt.COD && !"CHUYEN_KHOAN".equals(method))
+        var payment = nhom10.phonenest.util.OrderPaymentPolicy.effective(
+                thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()));
+        if (payment == null || payment.getPhuongThuc() == null) {
+            throw new AppException(HttpStatus.CONFLICT, "Chưa có dữ liệu thanh toán; cần đối soát trước khi hoàn tiền");
+        }
+        if (payment.getPhuongThuc() == PhuongThucTt.COD) {
+            if (!nhom10.phonenest.util.OrderPaymentPolicy.codPaid(payment, y.getDonHang().getTongThanhToan())) {
+                throw new AppException(HttpStatus.CONFLICT, "Chưa xác nhận thu đủ tiền COD. Vui lòng đối soát tại Quản lý đơn hàng trước khi hoàn tiền");
+            }
+            if (!"CHUYEN_KHOAN".equals(method)) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Đơn COD phải hoàn qua chuyển khoản");
-        if (y.getLyDoChung() != null && y.getLyDoChung().lines().anyMatch(line -> line.equals("Hoàn tiền đề nghị: Chuyển khoản")) && !"CHUYEN_KHOAN".equals(method))
-                throw new AppException(HttpStatus.BAD_REQUEST, "Khách hàng chọn hoàn qua chuyển khoản");
+            }
+        }
+        if (!method.equals(nhom10.phonenest.util.ReturnRefundPolicy.adminMethod(payment.getPhuongThuc(), y.getLyDoChung())))
+            throw new AppException(HttpStatus.BAD_REQUEST, "Phải hoàn tiền theo phương thức được phép của giao dịch gốc");
         if (vnPayDangXuLy) {
             // Gửi lại VNPay: giữ nguyên số tiền từng dòng đã gửi cùng mã yêu cầu hoàn để tránh lệch đối soát.
             if (y.getChiTiet().stream().anyMatch(ct -> ct.getSoTienHoan() == null))
@@ -406,7 +515,8 @@ public class DoiTraService {
                 !items.isEmpty() && items.stream().allMatch(DoiTraDto.ChiTietDto::daNhapKho), y.getNgayTao(),
                 thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc(y.getDonHang().getMaDonHang()).stream()
                         .findFirst().map(ThanhToan::getPhuongThuc).orElse(null),
-                y.getTrangThaiHoanVnPay(), y.getMaYeuCauHoanVnPay(), y.getThongBaoHoanVnPay());
+                y.getTrangThaiHoanVnPay(), y.getMaYeuCauHoanVnPay(), y.getThongBaoHoanVnPay(),
+                y.getMaPhienBanDoi() == null ? null : new DoiTraDto.ExchangeDto(y.getMaPhienBanDoi(), y.getLyDoDoi(), y.getGiaTriDoi(), y.getTienBu(), y.isDaKiemTraDoi(), y.getNgayThuChenhLech(), y.isDaGiaoMayDoi()), y.getHangTraBanDuoc());
     }
 
     private BigDecimal tinhTongHoanDuKien(YeuCauDoiTra y) {

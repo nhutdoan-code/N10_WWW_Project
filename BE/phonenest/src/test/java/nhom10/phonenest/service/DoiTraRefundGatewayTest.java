@@ -50,6 +50,7 @@ class DoiTraRefundGatewayTest {
         don.setMaDonHang("DH1");
         don.setKhachHang(kh);
         don.setTamTinh(new BigDecimal("1000000"));
+        don.setTongThanhToan(new BigDecimal("1000000"));
         don.setGiamGia(BigDecimal.ZERO);
         PhienBanSanPham pb = new PhienBanSanPham();
         pb.setMaPhienBan("PB1");
@@ -78,6 +79,8 @@ class DoiTraRefundGatewayTest {
     private void paidBy(PhuongThucTt method) {
         ThanhToan tt = new ThanhToan();
         tt.setPhuongThuc(method);
+        tt.setTrangThai(TrangThaiThanhToan.DA_THANH_TOAN);
+        tt.setSoTien(new BigDecimal("1000000"));
         when(thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc("DH1")).thenReturn(List.of(tt));
     }
 
@@ -117,6 +120,23 @@ class DoiTraRefundGatewayTest {
         verify(vnPay, times(2)).refundReturn(same(y), eq(new BigDecimal("700000")), eq("AD1"));
         assertEquals("VNP-RF-1", second.maGiaoDichHoanTien());
         assertNotNull(second.ngayHoanTien());
+    }
+
+    @Test
+    void uncollectedCodCannotBeRefundedEvenAfterRestock() {
+        paidBy(PhuongThucTt.COD);
+        var tt = thanhToanRepo.findByDonHangMaDonHangOrderByNgayTaoDesc("DH1").getFirst();
+        tt.setTrangThai(TrangThaiThanhToan.CHO_THANH_TOAN);
+        var ex = assertThrows(AppException.class, () -> service.ghiNhanHoanTien("YC1", req("CHUYEN_KHOAN", "CK-1", null, null), "AD1"));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        assertNull(y.getNgayHoanTien());
+        verifyNoInteractions(momo, vnPay, nhatKy);
+    }
+
+    @Test
+    void missingPaymentCannotBeRefunded() {
+        assertThrows(AppException.class, () -> service.ghiNhanHoanTien("YC1", req("CHUYEN_KHOAN", "CK-1", null, null), "AD1"));
+        assertNull(y.getNgayHoanTien());
     }
 
     @Test

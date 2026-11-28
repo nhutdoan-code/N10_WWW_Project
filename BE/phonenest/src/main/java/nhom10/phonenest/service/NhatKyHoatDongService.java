@@ -168,6 +168,7 @@ public class NhatKyHoatDongService {
 
             case CHANGE_RETURN_STATUS -> "Cập nhật trạng thái yêu cầu đổi trả";
             case REFUND_PAYMENT -> "Hoàn tiền thanh toán";
+            case CONFIRM_COD_PAYMENT -> "Xác nhận đã thu tiền COD";
         };
         if (maDoiTuong != null && !maDoiTuong.isBlank()) {
             moTa = moTa + " " + maDoiTuong.trim();

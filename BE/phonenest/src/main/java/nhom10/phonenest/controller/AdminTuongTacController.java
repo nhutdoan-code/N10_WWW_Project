@@ -98,8 +98,8 @@ public class AdminTuongTacController {
     }
 
     @PostMapping("/returns/{ma}/restock")
-    public DoiTraDto xacNhanNhapKho(@PathVariable String ma) {
-        return workflow.restock(ma, SecurityUtil.currentUserId());
+    public DoiTraDto xacNhanNhapKho(@PathVariable String ma, @RequestParam(defaultValue = "false") boolean sellable) {
+        return workflow.restock(ma, SecurityUtil.currentUserId(), sellable);
     }
 
     @PostMapping("/returns/{ma}/refund")

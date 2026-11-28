@@ -43,7 +43,7 @@ public class AfterSalesAdminWorkflow {
                          LocalDateTime created, LocalDateTime delivered, LocalDateTime confirmed,
                          LocalDateTime deadline, Boolean eligibleAtSubmission, String voucher,
                          java.math.BigDecimal discount, String orderStatus, String payment, java.math.BigDecimal gross, java.math.BigDecimal allocatedDiscount,
-                         Assignment assignment) {}
+                         Assignment assignment, boolean codPaid) {}
     private AppException bad(String message) { return new AppException(HttpStatus.BAD_REQUEST, message); }
     private AppException missing() { return new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu"); }
     private boolean isReturn(String source) {
@@ -155,11 +155,13 @@ public class AfterSalesAdminWorkflow {
         var confirmed = order == null ? null : order.getNgayKhachXacNhan();
         var deadline = complaint ? null : AfterSalesPolicy.end(delivered, confirmed, warranty);
         Boolean eligible = order == null || complaint || created == null ? null : AfterSalesPolicy.eligible(order.getTrangThai(), delivered, confirmed, warranty, created);
+        var payment = order == null ? null : nhom10.phonenest.util.OrderPaymentPolicy.effective(
+                payments.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()));
         return new Detail(timeline, steps(timeline), phone, created, delivered, confirmed, deadline, eligible,
                 order == null || order.getKhuyenMai() == null ? null : order.getKhuyenMai().getMaKm(),
                 order == null ? null : order.getGiamGia(), order == null ? null : order.getTrangThai().name(),
-                order == null ? null : payments.findByDonHangMaDonHangOrderByNgayTaoDesc(order.getMaDonHang()).stream().map(ThanhToan::getPhuongThuc).filter(Objects::nonNull).findFirst().map(Enum::name).orElse(null), gross, allocated,
-                assignment(source, id));
+                payment == null || payment.getPhuongThuc() == null ? null : payment.getPhuongThuc().name(), gross, allocated,
+                assignment(source, id), order != null && nhom10.phonenest.util.OrderPaymentPolicy.codPaid(payment, order.getTongThanhToan()));
     }
     public void execute(String source, String id, Action action) {
         if (action == null || action.action() == null) throw bad("Chọn thao tác");
@@ -200,8 +202,14 @@ public class AfterSalesAdminWorkflow {
             case "TRIAGE" -> { if (!ret || !"CHO_DUYET".equals(status) || note.isBlank()) throw bad("Chỉ tiếp nhận yêu cầu đang chờ duyệt và cần ghi phản hồi"); send = true; }
             case "REQUEST_INFO", "REPLY" -> { if (note.isBlank()) throw bad("Vui lòng nhập phản hồi gửi khách"); send = true; }
             case "TRANSFER" -> { if (!Set.of("Kỹ thuật", "Kho", "Kế toán", "Chăm sóc khách hàng").contains(Objects.toString(action.department(), "")) || note.isBlank()) throw bad("Chọn bộ phận và ghi lý do điều chuyển"); }
-            case "RECEIVE_CHECK" -> { if (!ret || !Set.of("DA_DUYET", "DANG_XU_LY").contains(status) || note.isBlank()) throw bad("Chỉ xác nhận nhận và kiểm tra hàng đã duyệt; cần ghi kết quả"); }
-            case "EXCHANGE_HANDOVER" -> { if (!ret || !"DANG_XU_LY".equals(status) || r.getChiTiet().isEmpty() || r.getChiTiet().stream().anyMatch(c -> !c.isDaNhapKho() || c.getLoaiYeuCau() != LoaiYeuCauDoiTra.DOI_HANG) || note.isBlank()) throw bad("Cần nhập kho máy cũ và ghi thông tin máy đã giao đổi"); }
+            case "RECEIVE_CHECK" -> {
+                if (!ret || note.isBlank()) throw bad("Cần ghi kết quả kiểm tra máy");
+                boolean exchange = r.getChiTiet().stream().anyMatch(c -> c.getLoaiYeuCau() == LoaiYeuCauDoiTra.DOI_HANG);
+                if (exchange && "CHO_DUYET".equals(status)) returnService.inspectExchange(id);
+                else if (exchange || !Set.of("DA_DUYET", "DANG_XU_LY").contains(status)) throw bad("Không thể kiểm tra ở trạng thái này");
+            }
+            case "EXCHANGE_PAYMENT" -> { if (!ret) throw bad("Chỉ áp dụng đổi máy"); returnService.recordExchangePayment(id, note); }
+            case "EXCHANGE_HANDOVER" -> { if (!ret || !"DANG_XU_LY".equals(status) || r.getChiTiet().isEmpty() || r.getChiTiet().stream().anyMatch(c -> !c.isDaNhapKho() || c.getLoaiYeuCau() != LoaiYeuCauDoiTra.DOI_HANG) || note.isBlank()) throw bad("Cần xử lý máy cũ và ghi thông tin máy đã giao đổi"); returnService.handoverExchange(id); }
             case "WARRANTY_RECEIVE" -> { if (!warranty || !"DANG_XU_LY".equals(status) || note.isBlank()) throw bad("Cần tiếp nhận bảo hành và ghi nhận tình trạng máy"); }
             case "WARRANTY_REPAIR" -> { if (!warranty || !"DANG_XU_LY".equals(status) || !done.contains("WARRANTY_RECEIVE") || note.isBlank()) throw bad("Cần nhận máy và ghi thông tin sửa chữa"); }
             case "WARRANTY_HANDOVER" -> { if (!warranty || !"DANG_XU_LY".equals(status) || !done.contains("WARRANTY_REPAIR") || note.isBlank()) throw bad("Cần xử lý máy và ghi nhận trả máy cho khách"); }
@@ -226,10 +234,11 @@ public class AfterSalesAdminWorkflow {
         if ("TRANSFER".equals(event)) data.put("boPhan", action.department());
         record(id, data);
     }
-    public DoiTraDto restock(String id, String admin) {
+    public DoiTraDto restock(String id, String admin) { return restock(id, admin, false); }
+    public DoiTraDto restock(String id, String admin, boolean sellable) {
         var y = returns.findByIdForUpdate(id).orElseThrow(this::missing);
         if (!steps(history(id)).contains("RECEIVE_CHECK")) throw bad("Cần xác nhận đã nhận và kiểm tra máy trước khi nhập kho");
-        return returnService.xacNhanNhapKho(id, admin);
+        return returnService.xacNhanNhapKho(id, admin, sellable);
     }
     public void checkCompletion(String source, String id) {
         if (isReturn(source)) {

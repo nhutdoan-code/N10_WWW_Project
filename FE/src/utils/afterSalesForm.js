@@ -1,5 +1,15 @@
 export const TYPES = { TRA_HANG_HOAN_TIEN: 'Trả hàng / hoàn tiền', DOI_HANG: 'Đổi sản phẩm', BAO_HANH: 'Bảo hành', KHIEU_NAI: 'Khiếu nại' };
 export const REASONS = ['Máy lỗi', 'Giao sai hàng', 'Không đúng mô tả', 'Đổi ý', 'Khác'];
+export const sameExchange = reason => ['Máy lỗi','Giao sai hàng'].includes(reason);
+export const upgradeExchange = reason => ['Đổi ý','Không đúng mô tả'].includes(reason);
+export function exchangeQuote(order, product, qty, reason, target) {
+  const net = refundEstimate(order, product, qty);
+  if (!net || !target || !Number.isSafeInteger(Number(target.stock)) || Number(target.stock) < Number(qty)) return null;
+  if (sameExchange(reason)) return target.id === product.maPhienBan ? {net:net.amount, difference:0} : null;
+  if (!upgradeExchange(reason) || !Number.isSafeInteger(Number(target.price)) || Number(target.price) <= 0) return null;
+  const total = Number(target.price) * Number(qty);
+  return Number.isSafeInteger(total) && total >= net.amount ? {net:net.amount,difference:total-net.amount} : null;
+}
 export const CONDITIONS = ['Còn nguyên seal', 'Đã kích hoạt', 'Có lỗi'];
 export const FAULTS = ['Không lên nguồn', 'Màn hình / cảm ứng', 'Pin / sạc', 'Camera / âm thanh', 'Kết nối', 'Lỗi khác'];
 export const allowedConditions = reason => reason === 'Máy lỗi' ? ['Có lỗi'] : reason === 'Đổi ý' ? ['Còn nguyên seal'] : ['Giao sai hàng','Không đúng mô tả'].includes(reason) ? ['Còn nguyên seal','Đã kích hoạt'] : CONDITIONS;
@@ -11,16 +21,17 @@ export function toggleFault(value, item) {
   if (!FAULTS.includes(item)) return selected.join('; ');
   return FAULTS.filter(x => x === item ? !selected.includes(x) : selected.includes(x)).join('; ');
 }
-export const descriptionMin = (type, reason) => ['DOI_HANG','TRA_HANG_HOAN_TIEN'].includes(type) && reason === 'Đổi ý' ? 10 : 20;
+// No minimum character quota; nonblank descriptions and a technical size cap remain.
+export const descriptionMin = () => 1;
 export const MISMATCHES = ['Sai dung lượng','Sai màu','Sai phiên bản','Thiếu phụ kiện','Khác'];
 export const BANKS = ['Vietcombank', 'VietinBank', 'BIDV', 'Agribank', 'Techcombank', 'MB', 'ACB', 'VPBank', 'TPBank', 'Sacombank', 'HDBank', 'VIB', 'SHB', 'OCB', 'MSB', 'SeABank', 'LPBank', 'Eximbank', 'Nam A Bank', 'BVBank', 'ABBANK', 'PVcomBank', 'Vietbank', 'Bac A Bank', 'KienlongBank', 'NCB', 'Viet A Bank', 'UOB', 'HSBC', 'Standard Chartered', 'Woori Bank', 'Shinhan Bank', 'Public Bank', 'Hong Leong Bank', 'CIMB', 'Co-opBank', 'Bao Viet Bank'];
 export const accountDigits = value => String(value ?? '').replace(/[^0-9]/g,'').slice(0,20);
-export const normalizeHolder = value => String(value ?? '').toLocaleUpperCase('vi-VN');
-export const validHolder = value => /^[\p{L}\p{M}][\p{L}\p{M} .’'\-]{1,99}$/u.test(String(value ?? '').trim());
+export const normalizeHolder = value => String(value ?? '').normalize('NFD').replace(/\p{M}/gu,'').toLocaleUpperCase('vi-VN').replace(/Đ/g,'D');
+export const validHolder = value => /^[A-Z][A-Z .’'\-]{1,99}$/u.test(String(value ?? '').trim());
 // Clear validation on controls whose meaning/visibility changes; validate again on submit.
 export function clearFieldErrors(errors, name) {
   if (name === 'reason' || name === 'loai') return {};
-  const reset = {maDonHang:['maPhienBan','soLuong','targetId','refund','bank','account','holder','serial','sealConfirmed','fault','appearance'], maPhienBan:['soLuong','targetId','serial','sealConfirmed','fault','appearance'], soLuong:['sealConfirmed'], condition:['fault','images'], refund:['bank','account','holder'], serialKind:['serial']};
+  const reset = {maDonHang:['maPhienBan','soLuong','targetId','refund','bank','account','holder','sealConfirmed','fault','appearance'], maPhienBan:['soLuong','targetId','sealConfirmed','fault','appearance'], soLuong:['sealConfirmed'], condition:['fault','images'], refund:['bank','account','holder']};
   const next = {...errors};
   for (const key of [name,'submit',...(reset[name] || [])]) delete next[key];
   return next;
@@ -47,13 +58,13 @@ export function refundEstimate(order, product, quantity) {
 }
 export const maskAccount = value => String(value ?? '').replace(/(^|\n)(Số tài khoản:[ \t]*)([0-9]{4,30})(?=[ \t]*(?:\r?\n|$))/g, (_,start,label,number) => `${start}${label}•••• ${number.slice(-4)}`);
 export const evidenceHint = (type, reason, condition) => {
-  if (type === 'BAO_HANH') return 'Bắt buộc: chụp mặt trước, mặt sau và vị trí lỗi. Có thể thêm ảnh màn hình thông tin thiết bị để đối chiếu IMEI/Serial; tránh để lộ thông tin cá nhân khác.';
+  if (type === 'BAO_HANH') return 'Bắt buộc: chụp mặt trước, mặt sau và vị trí lỗi. Tránh để lộ thông tin cá nhân khác.';
   if (reason === 'Không đúng mô tả' && ['DOI_HANG','TRA_HANG_HOAN_TIEN'].includes(type)) return 'Bắt buộc: chụp máy, hộp/tem hoặc màn hình thông tin thiết bị để đối chiếu.';
   if (reason === 'Giao sai hàng' && ['DOI_HANG','TRA_HANG_HOAN_TIEN'].includes(type)) return 'Bắt buộc: chụp sản phẩm thực nhận, hộp và tem.';
   if (proofRequired(type,reason,condition)) return 'Bắt buộc: chụp mặt trước, mặt sau và vị trí lỗi.';
   return 'Không bắt buộc; có thể thêm ảnh để cửa hàng dễ kiểm tra.';
 };
-export const refundOptions = order => order?.phuongThucTt === 'COD' ? ['Chuyển khoản'] : REFUNDS;
+export const refundOptions = order => order?.phuongThucTt === 'COD' ? ['Chuyển khoản'] : order?.phuongThucTt === 'CHUYEN_KHOAN' ? ['Phương thức thanh toán gốc'] : order?.phuongThucTt === 'VI_DIEN_TU' ? REFUNDS : [];
 export const REFUNDS = ['Phương thức thanh toán gốc', 'Chuyển khoản'];
 export const warrantyAppearanceWarning = appearance => ['Rơi vỡ','Vào nước'].includes(appearance) ? 'Hư hỏng do rơi vỡ/vào nước có thể không thuộc diện bảo hành miễn phí; cửa hàng sẽ báo phí sau khi kiểm tra.' : '';
 export const APPEARANCES = ['Bình thường', 'Trầy xước', 'Rơi vỡ', 'Vào nước', 'Khác'];
@@ -66,22 +77,6 @@ export function imageError(file) {
   if (file.size <= 0 || file.size > MAX_BYTES) return 'Ảnh phải lớn hơn 0 và không quá 5 MB.';
   return '';
 }
-export function validImei(value) {
-  const digits = String(value ?? '').trim();
-  if (!/^[0-9]{15}$/.test(digits)) return false;
-  return [...digits].reduce((sum, digit, i) => { const n = Number(digit) * (i % 2 ? 2 : 1); return sum + (n > 9 ? n - 9 : n); }, 0) % 10 === 0;
-}
-export function deviceIdError(kind, value) {
-  const text = String(value ?? '').trim();
-  if (kind === 'IMEI') return validImei(text) ? '' : 'IMEI phải gồm 15 chữ số và đúng mã kiểm tra.';
-  if (kind === 'SERIAL') return /^[A-Za-z0-9-]{4,60}$/.test(text) ? '' : 'Serial gồm 4–60 chữ cái, chữ số hoặc dấu gạch ngang.';
-  return 'Vui lòng chọn IMEI hoặc Serial.';
-}
-// Hiện DTO chưa cung cấp IMEI; hỗ trợ dữ liệu thiết bị nếu API bổ sung trong tương lai.
-export function deviceIdentifiers(product, kind) {
-  const fields = kind === 'IMEI' ? [product?.imei, product?.imeis] : [product?.serial, product?.serials];
-  return [...new Set(fields.flat().filter(x => typeof x === 'string').map(x => x.trim()).filter(x => !deviceIdError(kind, x)))];
-}
 export function validateForm(type, f, order, product, images) {
   const errors = {};
   if (!TYPES[type]) return { loai: 'Vui lòng chọn loại yêu cầu.' };
@@ -91,18 +86,19 @@ export function validateForm(type, f, order, product, images) {
   if (isReturn && product && (!Number.isInteger(Number(f.soLuong)) || Number(f.soLuong) < 1 || Number(f.soLuong) > product.soLuong)) errors.soLuong = 'Số lượng không hợp lệ.';
   if (isReturn) {
     if (!REASONS.includes(f.reason)) errors.reason = 'Vui lòng chọn lý do.';
-    if (!allowedConditions(f.reason).includes(f.condition)) errors.condition = 'Vui lòng chọn tình trạng máy phù hợp với lý do.';
+    if (f.reason !== 'Máy lỗi' && !allowedConditions(f.reason).includes(f.condition)) errors.condition = 'Vui lòng chọn tình trạng máy phù hợp với lý do.';
     if (f.reason === 'Máy lỗi' && !validFaults(f.fault)) errors.fault = 'Vui lòng chọn ít nhất một loại lỗi hợp lệ.';
     if (f.reason === 'Đổi ý' && f.sealConfirmed !== 'true') errors.sealConfirmed = 'Vui lòng xác nhận máy chưa bóc seal, đầy đủ phụ kiện.';
     if (f.reason === 'Không đúng mô tả' && !MISMATCHES.includes(f.mismatch)) errors.mismatch = 'Vui lòng chọn điểm khác với mô tả.';
   }
   if (type === 'TRA_HANG_HOAN_TIEN') { if (!refundOptions(order).includes(f.refund)) errors.refund = 'Vui lòng chọn hình thức hoàn tiền phù hợp.'; if (f.refund === 'Chuyển khoản') { if (!BANKS.includes(f.bank)) errors.bank = 'Vui lòng chọn ngân hàng từ danh sách.'; if (!/^[0-9]{6,20}$/.test(String(f.account ?? '').trim())) errors.account = 'Số tài khoản gồm 6–20 chữ số.'; if (!validHolder(f.holder)) errors.holder = 'Vui lòng nhập tên chủ tài khoản đúng như tại ngân hàng.'; } }
-  if (type === 'DOI_HANG' && !f.targetId) errors.targetId = 'Vui lòng chọn phiên bản muốn đổi từ danh mục.';
-  if (type === 'BAO_HANH') { if (!validFaults(f.fault)) errors.fault = 'Vui lòng chọn ít nhất một loại lỗi hợp lệ.'; const issue = deviceIdError(f.serialKind, f.serial); if (issue) errors.serial = issue; if (!APPEARANCES.includes(f.appearance)) errors.appearance = 'Vui lòng chọn tình trạng ngoại hình.'; }
+  if (type === 'DOI_HANG' && !sameExchange(f.reason) && !f.targetId) errors.targetId = 'Vui lòng chọn phiên bản muốn đổi từ danh mục.';
+  if (type === 'DOI_HANG' && !sameExchange(f.reason) && !upgradeExchange(f.reason)) errors.reason = 'Vui lòng chọn lý do đổi máy hợp lệ.';
+  if (type === 'BAO_HANH') { if (!validFaults(f.fault)) errors.fault = 'Vui lòng chọn ít nhất một loại lỗi hợp lệ.'; if (!APPEARANCES.includes(f.appearance)) errors.appearance = 'Vui lòng chọn tình trạng ngoại hình.'; }
   if (type === 'KHIEU_NAI' && !TOPICS.includes(f.topic)) errors.topic = 'Vui lòng chọn chủ đề.';
-  const min = descriptionMin(type, f.reason);
   const length = String(f.lyDo ?? '').trim().length;
-  if (length < min || length > 1000) errors.lyDo = `Mô tả chi tiết phải từ ${min} đến 1000 ký tự.`;
+  if (!length) errors.lyDo = 'Vui lòng mô tả vấn đề.';
+  else if (length > 1000) errors.lyDo = 'Mô tả tối đa 1000 ký tự.';
   if (proofRequired(type, f.reason, f.condition) && !images.length) errors.images = 'Vui lòng thêm ít nhất 1 ảnh minh chứng.';
   return errors;
 }

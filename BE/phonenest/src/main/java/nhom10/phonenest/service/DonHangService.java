@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 public class DonHangService {
 
     private static final int DIEM_MOI_VND = 10000;
+    static final long AUTO_COMPLETE_HOURS = 72;
     private static final String LY_DO_KHAC = "Lý do khác";
     private record PaymentConfirmation(
             BigDecimal amount,
@@ -450,7 +451,7 @@ public class DonHangService {
         if (moi == TrangThaiDonHang.DA_GIAO) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    "Chỉ khách hàng mới xác nhận hoàn thành đơn hàng"
+                    "Đơn chỉ hoàn thành khi khách xác nhận hoặc hệ thống tự động hoàn thành"
             );
         }
 
@@ -509,6 +510,40 @@ public class DonHangService {
 
         return mapper.toDto(d);
     }
+    /** Xác nhận thu tiền thực tế; không gọi cổng thanh toán. Cùng khóa đơn với hủy đơn/IPN. */
+    public DonHangDto xacNhanThuTienCod(String ma) {
+        DonHang d = timKhoa(ma);
+        var records = thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(ma);
+        ThanhToan payment = OrderPaymentPolicy.effective(records);
+        if (payment == null || payment.getPhuongThuc() != PhuongThucTt.COD) {
+            throw new AppException(HttpStatus.CONFLICT, "Chỉ đơn COD có bản ghi thanh toán mới được xác nhận thu tiền");
+        }
+        if (records.size() != 1) {
+            throw new AppException(HttpStatus.CONFLICT, "Đơn có nhiều bản ghi thanh toán; cần đối soát trước khi xác nhận COD");
+        }
+        if (!OrderPaymentPolicy.canConfirmCod(d.getTrangThai(), payment, d.getTongThanhToan())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Chỉ xác nhận COD chưa thu tiền, đúng số tiền, khi đơn đang giao hoặc đã giao; không xác nhận lại hay xác nhận đơn đã hủy");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        payment.setTrangThai(TrangThaiThanhToan.DA_THANH_TOAN);
+        payment.setNgayThanhToan(now);
+        if (payment.getMaGiaoDich() == null || payment.getMaGiaoDich().isBlank()) {
+            // Mã đối soát nội bộ, không phải mã giao dịch ngân hàng.
+            payment.setMaGiaoDich("COD-" + payment.getMaThanhToan());
+        }
+        thanhToanRepository.save(payment);
+        nhatKyHoatDongService.ghi(HanhDongAudit.CONFIRM_COD_PAYMENT, LoaiDoiTuongAudit.ORDER, ma,
+                Map.of("trangThaiThanhToan", TrangThaiThanhToan.CHO_THANH_TOAN.name()),
+                Map.of("trangThaiThanhToan", TrangThaiThanhToan.DA_THANH_TOAN.name(),
+                        "soTien", payment.getSoTien(), "maThanhToan", payment.getMaThanhToan(),
+                        "maGiaoDich", payment.getMaGiaoDich(), "ngayThanhToan", now.toString()));
+        thongBaoService.gui(d.getKhachHang().getMaKh(),
+                "PhoneNest đã ghi nhận thu đủ tiền COD cho đơn " + ma + ".",
+                ThongBaoService.linkDonHang(ma));
+        return mapper.toDto(d);
+    }
+
     public DonHangDto danhDauDaGiao(String ma) {
         DonHang d = timKhoa(ma);
 
@@ -541,7 +576,7 @@ public class DonHangService {
         thongBaoService.gui(
                 d.getKhachHang().getMaKh(),
                 "Đơn hàng " + ma
-                        + " đã được giao. Vui lòng xác nhận khi bạn đã nhận được hàng.",
+                        + " đã được giao. Vui lòng xác nhận khi đã nhận hàng; hệ thống tự hoàn thành sau 72 giờ nếu đã thanh toán đủ.",
                 ThongBaoService.linkDonHang(ma)
         );
 
@@ -565,36 +600,52 @@ public class DonHangService {
             );
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        hoanThanhDon(d, LocalDateTime.now(), maKh);
+        return mapper.toDto(d);
+    }
 
+    /** Được gọi từ scheduler (qua Spring proxy), cùng khóa đơn với xác nhận thủ công. */
+    public boolean tuDongHoanThanh(String ma) {
+        DonHang d = donHangRepository.findByIdForUpdate(ma).orElse(null);
+        LocalDateTime now = LocalDateTime.now();
+        if (d == null || d.getTrangThai() != TrangThaiDonHang.CHO_KHACH_XAC_NHAN
+                || d.getNgayGiao() == null || d.getNgayKhachXacNhan() != null
+                || d.getNgayGiao().isAfter(now.minusHours(AUTO_COMPLETE_HOURS))) {
+            return false;
+        }
+        // Kiểm tra lại dưới khóa đơn; không suy ra đã trả tiền từ trạng thái giao hàng.
+        ThanhToan payment = OrderPaymentPolicy.effective(
+                thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc(ma));
+        if (!OrderPaymentPolicy.canAutoComplete(payment, d.getTongThanhToan())) {
+            return false;
+        }
+        hoanThanhDon(d, now, null);
+        return true;
+    }
+
+    private void hoanThanhDon(DonHang d, LocalDateTime now, String maKhXacNhan) {
+        String ma = d.getMaDonHang();
+        boolean tuDong = maKhXacNhan == null;
         d.setTrangThai(TrangThaiDonHang.DA_GIAO);
         d.setNgayKhachXacNhan(now);
-        d.setNguoiXacNhan(maKh);
+        // FK tới TaiKhoan: null cho tác vụ hệ thống, không giả mạo khách hoặc admin.
+        d.setNguoiXacNhan(maKhXacNhan);
         d.setNgayCapNhat(now);
-
         congDiem(d);
-
-        ghiTrangThai(
-                d,
-                TrangThaiDonHang.DA_GIAO,
-                "Khách hàng xác nhận đã nhận hàng",
-                maKh
-        );
-
-        auditTrangThai(
-                ma,
-                TrangThaiDonHang.CHO_KHACH_XAC_NHAN,
-                TrangThaiDonHang.DA_GIAO
-        );
-
-        thongBaoService.gui(
-                maKh,
-                "Đơn hàng " + ma
-                        + " đã hoàn thành. Cảm ơn bạn đã mua sắm tại PhoneNest!",
-                ThongBaoService.linkDonHang(ma)
-        );
-
-        return mapper.toDto(d);
+        if (tuDong) {
+            // Nhật ký trạng thái hỗ trợ actor null; audit quản trị yêu cầu SecurityContext.
+            ghiTrangThai(d, TrangThaiDonHang.DA_GIAO,
+                    "Hệ thống tự động hoàn thành sau 72 giờ kể từ khi giao hàng");
+        } else {
+            ghiTrangThai(d, TrangThaiDonHang.DA_GIAO,
+                    "Khách hàng xác nhận đã nhận hàng", maKhXacNhan);
+            auditTrangThai(ma, TrangThaiDonHang.CHO_KHACH_XAC_NHAN, TrangThaiDonHang.DA_GIAO);
+        }
+        thongBaoService.gui(d.getKhachHang().getMaKh(),
+                "Đơn hàng " + ma + (tuDong
+                        ? " đã được hệ thống tự động hoàn thành sau thời gian chờ xác nhận."
+                        : " đã hoàn thành. Cảm ơn bạn đã mua sắm tại PhoneNest!"),
+                ThongBaoService.linkDonHang(ma));
     }
     private void ghiTrangThai(
             DonHang d,
@@ -652,72 +703,10 @@ public class DonHangService {
         return gioHangService.sync(maKh, ds);
     }
 
+    /** Đơn đã đặt là bất biến về sản phẩm và số lượng, kể cả COD chưa thu tiền. */
     public DonHangDto suaDong(String ma, String id, int sl) {
-        DonHang d = timKhoa(ma);
-        if (d.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ sửa khi chờ xác nhận");
-        }
-        Map<String, Object> duLieuTruoc = snapshotDong(d);
-        ChiTietDonHang c = d.getChiTiet().stream()
-                .filter(x -> x.getPhienBan().getMaPhienBan().equals(id))
-                .findFirst().orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không có trong đơn"));
-        int delta = sl - c.getSoLuong();
-        if (sl <= 0) {
-            if (d.getChiTiet().size() == 1) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Đơn phải còn ít nhất một sản phẩm");
-            }
-            PhienBanSanPham pb = phienBanRepository.findByIdForUpdate(c.getPhienBan().getMaPhienBan())
-                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không tồn tại"));
-            capTon(pb, c.getSoLuong(), d, LoaiBienDongKho.DIEU_CHINH);
-            d.getChiTiet().remove(c);
-        } else {
-            PhienBanSanPham pb = phienBanRepository.findByIdForUpdate(c.getPhienBan().getMaPhienBan())
-                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phiên bản không tồn tại"));
-            if (delta > 0 && !PheDuyetBanHangPolicy.duocPhepBan(pb)) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Không thể tăng số lượng do phiên bản chưa được phê duyệt bán hàng");
-            }
-            if (delta > pb.getSoLuongTon()) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Không đủ tồn kho");
-            }
-            capTon(pb, -delta, d, LoaiBienDongKho.DIEU_CHINH);
-            c.setSoLuong(sl);
-        }
-        recalc(d);
-        nhatKyHoatDongService.ghi(HanhDongAudit.UPDATE_ORDER_ITEM, LoaiDoiTuongAudit.ORDER, ma, duLieuTruoc, snapshotDong(d));
-        return mapper.toDto(d);
-    }
-
-    private Map<String, Object> snapshotDong(DonHang d) {
-        Map<String, Object> duLieu = new LinkedHashMap<>();
-        List<Map<String, Object>> ds = new ArrayList<>();
-        for (ChiTietDonHang c : d.getChiTiet()) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("maChiTiet", c.getMaChiTiet());
-            m.put("maPhienBan", c.getPhienBan().getMaPhienBan());
-            m.put("soLuong", c.getSoLuong());
-            m.put("donGia", c.getDonGia());
-            ds.add(m);
-        }
-        duLieu.put("items", ds);
-        return duLieu;
-    }
-
-    private void recalc(DonHang d) {
-        BigDecimal tam = d.getChiTiet().stream()
-                .map(c -> c.getDonGia().multiply(BigDecimal.valueOf(c.getSoLuong())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        d.setTamTinh(tam);
-        if (d.getKhuyenMai() != null) {
-            d.setGiamGia(khuyenMaiService.tinhGiam(d.getKhuyenMai(), tam));
-        }
-        BigDecimal giamGia = d.getGiamGia() != null ? d.getGiamGia() : BigDecimal.ZERO;
-        BigDecimal giamShip = d.getGiamPhiVanChuyen() != null ? d.getGiamPhiVanChuyen() : BigDecimal.ZERO;
-        BigDecimal tong = tam.subtract(giamGia).add(d.getPhiVanChuyen()).subtract(giamShip);
-        if (tong.compareTo(BigDecimal.ZERO) < 0) {
-            tong = BigDecimal.ZERO;
-        }
-        d.setTongThanhToan(tong);
-        d.setNgayCapNhat(LocalDateTime.now());
+        throw new AppException(HttpStatus.CONFLICT,
+                "Không được thay đổi số lượng sản phẩm sau khi đặt hàng. Khách cần hủy đơn và đặt lại nếu đủ điều kiện.");
     }
 
     private void taoThanhToan(DonHang d, PhuongThucTt pt, PaymentConfirmation paymentConfirmation) {

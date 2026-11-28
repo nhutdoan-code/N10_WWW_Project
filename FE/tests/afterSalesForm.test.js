@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {eligible, remainingLabel} from '../src/utils/warrantyPolicy.js';
 import {proofRequired, validateForm, imageError, MAX_BYTES} from '../src/utils/afterSalesForm.js';
-const delivered = {trangThai:'DA_GIAO',ngayGiao:'2026-11-01T12:00:00',ngayKhachXacNhan:'2026-11-02T12:00:00',hanDoiTra:'2026-11-09T12:00:00',hanBaoHanh:'2027-11-02T12:00:00'};
+const delivered = {phuongThucTt:'VI_DIEN_TU',trangThai:'DA_GIAO',ngayGiao:'2026-11-01T12:00:00',ngayKhachXacNhan:'2026-11-02T12:00:00',hanDoiTra:'2026-11-09T12:00:00',hanBaoHanh:'2027-11-02T12:00:00'};
 const date = value => new Date(value);
 test('return includes exactly day seven but not one second later or day eight', () => {
   assert(eligible(delivered,'DOI_HANG',date('2026-11-09T12:00:00')));
@@ -41,7 +41,7 @@ test('file extension, MIME and exact 5MB limit', () => {
 test('complaint needs no order; description cannot be whitespace or out of range', () => {
   const f = {maDonHang:'',topic:'Khác',lyDo:'a'.repeat(20)};
   assert.deepEqual(validateForm('KHIEU_NAI',f,null,null,[]),{});
-  for(const desc of [' '.repeat(20),'a'.repeat(19),'a'.repeat(1001)]) assert(validateForm('KHIEU_NAI',{...f,lyDo:desc},null,null,[]).lyDo);
+  for(const desc of [' '.repeat(20),'a'.repeat(1001)]) assert(validateForm('KHIEU_NAI',{...f,lyDo:desc},null,null,[]).lyDo);
   assert.deepEqual(validateForm('KHIEU_NAI',{...f,lyDo:'a'.repeat(1000)},null,null,[]),{});
 });
 test('dynamic forms require product, fields, bank account and evidence', () => {
@@ -52,20 +52,10 @@ test('dynamic forms require product, fields, bank account and evidence', () => {
   assert.deepEqual(validateForm('TRA_HANG_HOAN_TIEN',form,delivered,{soLuong:1},[{}]),{});
 });
 
-test('IMEI Luhn, serial, and saved device choices', async () => {
-  const {validImei, deviceIdError, deviceIdentifiers} = await import('../src/utils/afterSalesForm.js');
-  assert(validImei('490154203237518'));
-  assert(!validImei('490154203237519'));
-  assert(!validImei('49015420323751'));
-  assert(!validImei('49015420323751A'));
-  assert.equal(deviceIdError('SERIAL','AB-1234'),'');
-  assert(deviceIdError('SERIAL','a'));
-  assert.deepEqual(deviceIdentifiers({imeis:['490154203237518','490154203237519','490154203237518']},'IMEI'),['490154203237518']);
-});
-test('warranty requires device and appearance, but no customer outcome', () => {
-  const f = {maDonHang:'DH1',maPhienBan:'PB1',lyDo:'a'.repeat(20),serialKind:'IMEI',serial:'490154203237518',appearance:'Bình thường',fault:'Camera / âm thanh'};
+test('warranty requires appearance and fault, not IMEI or serial', () => {
+  const f = {maDonHang:'DH1',maPhienBan:'PB1',lyDo:'a'.repeat(20),appearance:'Bình thường',fault:'Camera / âm thanh'};
   assert.deepEqual(validateForm('BAO_HANH',f,delivered,{},[{}]),{});
-  assert(validateForm('BAO_HANH',{...f,serial:'490154203237519'},delivered,{},[{}]).serial);
+  assert.deepEqual(validateForm('BAO_HANH',{...f,serial:'invalid legacy value'},delivered,{},[{}]),{});
   assert(validateForm('BAO_HANH',{...f,appearance:''},delivered,{},[{}]).appearance);
 });
 test('exact remaining days and expired labels', async () => {
@@ -92,7 +82,7 @@ test('V4 COD requires bank transfer; reason and condition must agree', async () 
   assert.deepEqual(validateForm('TRA_HANG_HOAN_TIEN',f,order,{soLuong:1},[]),{});
   assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,refund:'Phương thức thanh toán gốc'},order,{soLuong:1},[]).refund);
   assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,condition:'Có lỗi'},order,{soLuong:1},[]).condition);
-  assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,reason:'Máy lỗi'},order,{soLuong:1},[]).condition);
+  assert(!validateForm('TRA_HANG_HOAN_TIEN',{...f,reason:'Máy lỗi'},order,{soLuong:1},[]).condition);
   assert(!validateForm('TRA_HANG_HOAN_TIEN',{...f,reason:'Khác',condition:'Có lỗi'},order,{soLuong:1},[]).fault);
   assert(proofRequired('DOI_HANG','Khác','Có lỗi'));
 });
@@ -130,7 +120,7 @@ test('V5 return reasons constrain conditions; only machine fault requires fault 
 });
 test('V5 bank fields are validated and customer account display is masked', async () => {
   const {accountDigits,normalizeHolder,validHolder,maskAccount} = await import('../src/utils/afterSalesForm.js');
-  const f = {maDonHang:'DH1',maPhienBan:'PB1',soLuong:1,lyDo:'a'.repeat(20),reason:'Đổi ý',condition:'Còn nguyên seal',sealConfirmed:'true',refund:'Chuyển khoản',bank:'MB',account:'00123456',holder:'NGUYỄN VĂN A'};
+  const f = {maDonHang:'DH1',maPhienBan:'PB1',soLuong:1,lyDo:'a'.repeat(20),reason:'Đổi ý',condition:'Còn nguyên seal',sealConfirmed:'true',refund:'Chuyển khoản',bank:'MB',account:'00123456',holder:'NGUYEN VAN A'};
   const order = {...delivered,phuongThucTt:'COD'};
   assert.deepEqual(validateForm('TRA_HANG_HOAN_TIEN',f,order,{soLuong:1},[]),{});
   assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,bank:'FAKE'},order,{soLuong:1},[]).bank);
@@ -138,7 +128,7 @@ test('V5 bank fields are validated and customer account display is masked', asyn
   assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,holder:'A\n123'},order,{soLuong:1},[]).holder);
   assert.equal(accountDigits('00a123-456'),'00123456');
   assert.equal(accountDigits('1'.repeat(22)).length,20);
-  assert.equal(normalizeHolder('Nguyễn Văn A'),'NGUYỄN VĂN A');
+  assert.equal(normalizeHolder('Nguyễn Văn A'),'NGUYEN VAN A');
   assert(validHolder('NGUYEN VAN A'));
   assert.equal(maskAccount('Ngân hàng: MB\nSố tài khoản: 00123456\nChủ tài khoản: A'),'Ngân hàng: MB\nSố tài khoản: •••• 3456\nChủ tài khoản: A');
 });
@@ -182,25 +172,25 @@ test('V6 multiple fault chips toggle; invalid or repeated labels rejected', asyn
     assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,fault},delivered,{soLuong:1},[{}]).fault);
   }
 });
-test('V6 change of mind requires an explicit seal commitment and 10 characters for both return types', async () => {
+test('V6 change of mind requires an explicit seal commitment and a nonblank description for both return types', async () => {
   const {descriptionMin} = await import('../src/utils/afterSalesForm.js');
   const f = {maDonHang:'DH1',maPhienBan:'PB1',soLuong:1,lyDo:'a'.repeat(10),reason:'Đổi ý',condition:'Còn nguyên seal',refund:'Phương thức thanh toán gốc',targetId:'PB2'};
   for (const type of ['TRA_HANG_HOAN_TIEN','DOI_HANG']) {
-    assert.equal(descriptionMin(type,'Đổi ý'),10);
+    assert.equal(descriptionMin(type,'Đổi ý'),1);
     assert(validateForm(type,f,delivered,{soLuong:1},[]).sealConfirmed);
     assert(validateForm(type,{...f,sealConfirmed:'false'},delivered,{soLuong:1},[]).sealConfirmed);
     assert.deepEqual(validateForm(type,{...f,sealConfirmed:'true'},delivered,{soLuong:1},[]),{});
-    for(const lyDo of ['a'.repeat(9),' '.repeat(10),'a'.repeat(1001)]) assert(validateForm(type,{...f,sealConfirmed:'true',lyDo},delivered,{soLuong:1},[]).lyDo);
+    for(const lyDo of [' '.repeat(10),'a'.repeat(1001)]) assert(validateForm(type,{...f,sealConfirmed:'true',lyDo},delivered,{soLuong:1},[]).lyDo);
   }
-  assert.equal(descriptionMin('BAO_HANH','Đổi ý'),20);
-  assert.equal(descriptionMin('DOI_HANG','Máy lỗi'),20);
+  assert.equal(descriptionMin('BAO_HANH','Đổi ý'),1);
+  assert.equal(descriptionMin('DOI_HANG','Máy lỗi'),1);
 });
 
 
 test('V7 warranty shares fault choices, accepts physical damage for assessment, requires proof', async () => {
   const {toggleFault, warrantyAppearanceWarning, evidenceHint, descriptionHint} = await import('../src/utils/afterSalesForm.js');
   const fault = toggleFault(toggleFault('', 'Camera / âm thanh'), 'Pin / sạc');
-  const f = {maDonHang:'DH1',maPhienBan:'PB1',lyDo:'Camera bị đen sau khi mở ứng dụng.',serialKind:'IMEI',serial:'490154203237518',appearance:'Rơi vỡ',fault};
+  const f = {maDonHang:'DH1',maPhienBan:'PB1',lyDo:'Camera bị đen sau khi mở ứng dụng.',appearance:'Rơi vỡ',fault};
   assert.deepEqual(validateForm('BAO_HANH',f,delivered,{},[{}]),{});
   assert.deepEqual(validateForm('BAO_HANH',{...f,appearance:'Vào nước'},delivered,{},[{}]),{});
   for (const bad of ['', 'Sai', 'Pin / sạc; Pin / sạc']) assert(validateForm('BAO_HANH',{...f,fault:bad},delivered,{},[{}]).fault);
@@ -209,12 +199,32 @@ test('V7 warranty shares fault choices, accepts physical damage for assessment, 
   assert.match(warrantyAppearanceWarning('Vào nước'), /báo phí/);
   assert.equal(warrantyAppearanceWarning('Bình thường'),'');
   assert.match(descriptionHint('BAO_HANH',''), /Thường xuyên hay thỉnh thoảng/);
-  assert.match(evidenceHint('BAO_HANH','',''), /IMEI/);
+  assert.match(evidenceHint('BAO_HANH','',''), /mặt trước/);
+  assert.doesNotMatch(evidenceHint('BAO_HANH','',''), /IMEI|Serial/);
 });
 test('V7 warranty dependent validation is clean when switching device', async () => {
   const {validationAfterChange, visibleValidationErrors} = await import('../src/utils/afterSalesForm.js');
   for (const field of ['maDonHang','maPhienBan']) {
-    const state = validationAfterChange({fault:'submitted',appearance:'touched',serial:'submitted'},field);
-    assert.deepEqual(visibleValidationErrors({fault:'missing',appearance:'missing',serial:'missing'},state),{});
+    const state = validationAfterChange({fault:'submitted',appearance:'touched'},field);
+    assert.deepEqual(visibleValidationErrors({fault:'missing',appearance:'missing'},state),{});
   }
+});
+
+
+test('V14 VNPay original only; COD bank only; unknown channel is rejected', async () => {
+  const {refundOptions,normalizeHolder,validHolder} = await import('../src/utils/afterSalesForm.js');
+  const {adminRefundMethod} = await import('../src/utils/afterSalesAdmin.js');
+  const vn = {...delivered,phuongThucTt:'CHUYEN_KHOAN'};
+  const f = {maDonHang:'DH1',maPhienBan:'PB1',soLuong:1,lyDo:'Lỗi',reason:'Máy lỗi',fault:'Pin / sạc',refund:'Phương thức thanh toán gốc'};
+  assert.deepEqual(refundOptions(vn),['Phương thức thanh toán gốc']);
+  assert.deepEqual(validateForm('TRA_HANG_HOAN_TIEN',f,vn,{soLuong:1},[{}]),{});
+  assert(validateForm('TRA_HANG_HOAN_TIEN',{...f,refund:'Chuyển khoản'},vn,{soLuong:1},[{}]).refund);
+  assert(validateForm('TRA_HANG_HOAN_TIEN',f,{...vn,phuongThucTt:null},{soLuong:1},[{}]).refund);
+  assert.equal(adminRefundMethod('CHUYEN_KHOAN',{'Hoàn tiền đề nghị':'Chuyển khoản'}),'VNPAY');
+  assert.equal(adminRefundMethod('COD',{}),'CHUYEN_KHOAN');
+  assert.equal(adminRefundMethod('VI_DIEN_TU',{}),'MOMO');
+  assert.equal(adminRefundMethod('VI_DIEN_TU',{'Hoàn tiền đề nghị':'Chuyển khoản'}),'CHUYEN_KHOAN');
+  assert.equal(adminRefundMethod(null,{}),null);
+  assert.equal(normalizeHolder('Đỗ Thị Ánh'),'DO THI ANH');
+  assert(!validHolder('ĐỖ THỊ ÁNH'));
 });

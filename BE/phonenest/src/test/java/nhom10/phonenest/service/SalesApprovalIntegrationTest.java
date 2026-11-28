@@ -545,7 +545,7 @@ public class SalesApprovalIntegrationTest {
 
     @Test
     @Order(19)
-    @DisplayName("Kịch bản 19: Chỉnh sửa dòng đơn hàng (suaDong) không cho phép tăng số lượng nếu biến thể bị khóa bán")
+    @DisplayName("Kịch bản 19: Đơn đã đặt không cho phép chỉnh số lượng kể cả khi biến thể bị khóa bán")
     void test19_suaDong_cannotIncreaseLockedVariant() {
         // Tạo đơn hàng mẫu với A56 APPROVED
         DonHangDto.Checkout req = new DonHangDto.Checkout(
@@ -558,10 +558,10 @@ public class SalesApprovalIntegrationTest {
         phienBanRepository.saveAndFlush(pb);
 
         try {
-            // Khách/Admin cố sửa dòng đơn tăng số lượng từ 1 lên 2 -> Bị chặn 400 Bad Request
+            // Admin cố sửa dòng đơn tăng số lượng từ 1 lên 2 -> Bị chặn 409 Conflict
             assertThatThrownBy(() -> donHangService.suaDong(don.maDonHang(), PB_GALAXY_A56_APPROVED, 2))
                     .isInstanceOf(AppException.class)
-                    .hasMessageContaining("chưa được phê duyệt");
+                    .hasMessageContaining("Không được thay đổi số lượng");
         } finally {
             // Khôi phục lại trạng thái APPROVED
             pb.setTrangThaiPheDuyet(TrangThaiPheDuyet.APPROVED);

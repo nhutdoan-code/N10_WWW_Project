@@ -35,26 +35,23 @@ public record AfterSalesInput(String maDonHang, String maPhienBan, Integer soLuo
     }
     public String description(String type) {
         String text = clean(lyDo);
-        boolean returnType = "TRA_HANG_HOAN_TIEN".equals(type) || "DOI_HANG".equals(type);
-        int min = returnType && chiTiet != null && "Đổi ý".equals(clean(chiTiet.get("reason"))) ? 10 : 20;
-        if (text.length() < min || text.length() > 1000) throw bad("Mô tả chi tiết phải từ " + min + " đến 1000 ký tự");
+        if (text.isBlank()) throw bad("Vui lòng mô tả vấn đề");
+        if (text.length() > 1000) throw bad("Mô tả tối đa 1000 ký tự");
         if (chiTiet == null) {
-            if ("BAO_HANH".equals(type)) throw bad("Vui lòng gửi IMEI hoặc Serial và tình trạng ngoại hình");
+            if ("BAO_HANH".equals(type)) throw bad("Vui lòng gửi tình trạng ngoại hình và loại lỗi");
             return text; // legacy payload: conservatively require proof for returns
         }
         List<String> lines = new ArrayList<>();
         if ("KHIEU_NAI".equals(type)) {
             lines.add("Chủ đề: " + required("topic", "chủ đề", 50, Set.of("Giao hàng", "Thái độ nhân viên", "Giá/khuyến mãi", "Sản phẩm", "Khác")));
         } else if ("BAO_HANH".equals(type)) {
-            lines.add(nhom10.phonenest.util.WarrantyDevicePolicy.requireDevice(clean(chiTiet.get("serialKind")), required("serial", "IMEI/Serial", 60, null)));
             lines.add("Ngoại hình: " + required("appearance", "tình trạng ngoại hình", 50, Set.of("Bình thường", "Trầy xước", "Rơi vỡ", "Vào nước", "Khác")));
             lines.add("Loại lỗi: " + validatedFaults());
             // Legacy customer outcome is deliberately ignored; only the store decides.
         } else {
             String reason = required("reason", "lý do", 50, REASONS);
             lines.add("Lý do: " + reason);
-            String condition = required("condition", "tình trạng máy", 50, Set.of("Còn nguyên seal", "Đã kích hoạt", "Có lỗi"));
-            if ("Máy lỗi".equals(reason) && !"Có lỗi".equals(condition)) throw bad("Máy lỗi phải chọn tình trạng Có lỗi");
+            String condition = "Máy lỗi".equals(reason) ? "Có lỗi" : required("condition", "tình trạng máy", 50, Set.of("Còn nguyên seal", "Đã kích hoạt", "Có lỗi"));
             if ("Đổi ý".equals(reason) && !"Còn nguyên seal".equals(condition)) throw bad("Đổi ý yêu cầu máy còn nguyên seal");
             if (Set.of("Giao sai hàng", "Không đúng mô tả").contains(reason) && "Có lỗi".equals(condition))
                 throw bad("Vui lòng chọn Còn nguyên seal hoặc Đã kích hoạt; nếu máy bị hỏng, chọn lý do Máy lỗi");
@@ -76,8 +73,9 @@ public record AfterSalesInput(String maDonHang, String maPhienBan, Integer soLuo
                     String account = required("account", "số tài khoản", 20, null);
                     if (!account.matches("[0-9]{6,20}")) throw bad("Số tài khoản phải gồm 6–20 chữ số");
                     lines.add("Số tài khoản: " + account);
-                    String holder = required("holder", "chủ tài khoản", 100, null).toUpperCase(Locale.ROOT);
-                    if (!holder.matches("[\\p{L}\\p{M}][\\p{L}\\p{M} .’'\\-]{1,99}")) throw bad("Vui lòng nhập tên chủ tài khoản hợp lệ");
+                    String holder = java.text.Normalizer.normalize(required("holder", "chủ tài khoản", 100, null), java.text.Normalizer.Form.NFD)
+                            .replaceAll("\\p{M}", "").toUpperCase(Locale.ROOT).replace('Đ', 'D');
+                    if (!holder.matches("[A-Z][A-Z .’'\\-]{1,99}")) throw bad("Vui lòng nhập tên chủ tài khoản hợp lệ");
                     lines.add("Chủ tài khoản: " + holder);
                 }
             }

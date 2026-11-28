@@ -20,6 +20,7 @@ export const ACTION_LABELS = {
   STOCK_ADJUSTMENT: 'Điều chỉnh tồn kho',
 
   CHANGE_ORDER_STATUS: 'Đổi trạng thái đơn hàng',
+  CONFIRM_COD_PAYMENT: 'Xác nhận thu tiền COD',
   UPDATE_ORDER_ITEM: 'Cập nhật sản phẩm trong đơn',
 
   LOCK_ACCOUNT: 'Khóa tài khoản',
@@ -66,6 +67,11 @@ export const FIELD_LABELS = {
   soLuongTon: 'Số lượng tồn',
   trangThai: 'Trạng thái kinh doanh',
   trangThaiDonHang: 'Trạng thái đơn hàng',
+  trangThaiThanhToan: 'Trạng thái thanh toán',
+  ngayThanhToan: 'Thời điểm thanh toán',
+  maThanhToan: 'Mã thanh toán',
+  maGiaoDich: 'Mã đối soát',
+  soTien: 'Số tiền',
   anhChinh: 'Ảnh sản phẩm',
   maThuongHieu: 'Mã thương hiệu',
   tenThuongHieu: 'Thương hiệu',

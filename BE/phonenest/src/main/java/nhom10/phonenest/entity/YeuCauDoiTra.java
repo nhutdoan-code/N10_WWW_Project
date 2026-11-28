@@ -50,6 +50,17 @@ public class YeuCauDoiTra {
     @Column(length = 500)
     private String thongBaoHoanVnPay;
 
+    private String lyDoDoi;
+    private String maPhienBanDoi;
+    private java.math.BigDecimal giaTriDoi;
+    private java.math.BigDecimal tienBu;
+    private boolean daKiemTraDoi;
+    @Column(length = 150, unique = true)
+    private String maThuChenhLech;
+    private LocalDateTime ngayThuChenhLech;
+    private boolean daGiaoMayDoi;
+    private Boolean hangTraBanDuoc;
+
     @OneToMany(mappedBy = "yeuCau", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChiTietDoiTra> chiTiet = new ArrayList<>();
 }

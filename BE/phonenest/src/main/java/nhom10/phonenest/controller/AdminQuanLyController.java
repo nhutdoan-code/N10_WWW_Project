@@ -57,6 +57,11 @@ public class AdminQuanLyController {
     public DonHangDto huyDonQuanTri(@PathVariable String ma, @Valid @RequestBody DonHangDto.HuyRequest request) {
         return donHangService.huyQuanTri(ma, request);
     }
+    @PutMapping("/orders/{ma}/confirm-cod-payment")
+    public DonHangDto xacNhanThuTienCod(@PathVariable String ma) {
+        return donHangService.xacNhanThuTienCod(ma);
+    }
+
     @PutMapping("/orders/{ma}/mark-delivered")
     public DonHangDto danhDauDaGiao(@PathVariable String ma) {
         return donHangService.danhDauDaGiao(ma);

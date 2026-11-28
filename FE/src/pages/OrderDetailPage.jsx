@@ -177,12 +177,23 @@ export default function OrderDetailPage() {
                 )}
                 <p className="muted">Cập nhật lần cuối: {formatDate(o.ngayCapNhat || o.ngayMua)}</p>
                 {o.trangThai === 'CHO_KHACH_XAC_NHAN' && (
-                    <p>Đơn hàng đã được giao{o.ngayGiao && ` lúc ${formatDate(o.ngayGiao)}`}. Vui lòng xác nhận nếu bạn đã nhận được hàng.</p>
+                    <p>Đơn hàng đã được giao{o.ngayGiao && ` lúc ${formatDate(o.ngayGiao)}`}. Vui lòng xác nhận nếu bạn đã nhận được hàng. Nếu chưa xác nhận, đơn sẽ tự hoàn thành sau 72 giờ kể từ lúc giao hàng, với điều kiện đã thanh toán đủ.</p>
                 )}
                 {o.ngayKhachXacNhan && <p className="muted">Hoàn thành lúc {formatDate(o.ngayKhachXacNhan)}</p>}
               </>
             )}
           </div>
+
+          {o.phuongThucTt === 'COD' && <div className="section">
+            <h3>Thanh toán khi nhận hàng (COD)</h3>
+            {o.thanhToan?.trangThai === 'DA_THANH_TOAN' ? <p style={{ color: 'var(--ok)', fontWeight: 500 }}>✓ Đã thanh toán{o.thanhToan.ngayThanhToan && ` · ${formatDate(o.thanhToan.ngayThanhToan)}`}</p>
+              : o.thanhToan?.trangThai === 'CAN_HOAN_TIEN' ? <p>Đã thu tiền, đang chờ hoàn tiền.</p>
+              : o.thanhToan?.trangThai === 'DA_HOAN_TIEN' ? <p>Đã hoàn tiền.</p>
+              : o.thanhToan?.trangThai === 'DANG_HOAN_TIEN' ? <p>Đang hoàn tiền.</p>
+              : o.trangThai === 'DA_HUY' ? <p>Đơn đã hủy.</p>
+              : o.thanhToan?.trangThai === 'CHO_THANH_TOAN' ? <p>Chưa ghi nhận thu tiền COD.</p>
+              : <p>Chưa có thông tin thanh toán.</p>}
+          </div>}
 
           {['VI_DIEN_TU', 'CHUYEN_KHOAN'].includes(o.phuongThucTt) && o.trangThai !== 'DA_HUY' && (
             <div className="section">

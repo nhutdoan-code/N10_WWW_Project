@@ -28,6 +28,7 @@ export const adminService = {
   restoreBrand: (ma) => api.put(`/admin/brands/${ma}/restore`),
 
   orders: () => api.get('/admin/orders'),
+  order: (ma) => api.get(`/admin/orders/${encodeURIComponent(ma)}`),
 
   filterOrders: (params) =>
       api.get('/admin/orders/filter', { params }),
@@ -35,11 +36,11 @@ export const adminService = {
   updateOrderStatus: (ma, trangThai) => api.put(`/admin/orders/${ma}/status`, null, { params: { trangThai } }),
   cancelOrder: (ma, data) => api.put(`/admin/orders/${ma}/cancel`, data),
   markDelivered: (ma) => api.put(`/admin/orders/${ma}/mark-delivered`),
+  confirmCodPayment: (ma) => api.put(`/admin/orders/${encodeURIComponent(ma)}/confirm-cod-payment`),
   momoRefundStatus: (ma) => api.get(`/admin/orders/${ma}/momo/refund-status`),
   refundMomoPayment: (ma) => api.post(`/admin/orders/${ma}/momo/refund`),
   vnPayRefundStatus: (ma) => api.get(`/admin/orders/${ma}/vnpay/refund-status`),
   refundVnPayPayment: (ma) => api.post(`/admin/orders/${ma}/vnpay/refund`),
-  updateOrderLine: (ma, maSanPham, soLuong) => api.put(`/admin/orders/${ma}/items/${maSanPham}`, { soLuong }),
 
   accounts: () => api.get('/admin/accounts'),
   accountsPage: (params) => api.get('/admin/accounts/page', { params }),
@@ -84,7 +85,7 @@ export const adminService = {
   assignAfterSales: (source, ma, data) => api.post(`/admin/after-sales-workflow/${source}/${encodeURIComponent(ma)}/assignment`, data),
   returns: () => api.get('/admin/returns'),
   updateReturn: (ma, trangThai, ghiChuXuLy) => api.put(`/admin/returns/${ma}/status`, null, { params: { trangThai, ghiChuXuLy } }),
-  restockReturn: (ma) => api.post(`/admin/returns/${ma}/restock`),
+  restockReturn: (ma, sellable = false) => api.post(`/admin/returns/${ma}/restock`, null, {params:{sellable}}),
   recordReturnRefund: (ma, data) => api.post(`/admin/returns/${ma}/refund`, data),
   afterSales: () => api.get('/admin/after-sales'),
   updateAfterSale: (ma, payload) => api.put(`/admin/after-sales/${ma}/status`, payload),

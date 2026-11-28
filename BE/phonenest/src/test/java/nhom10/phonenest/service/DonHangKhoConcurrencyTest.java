@@ -624,15 +624,7 @@ public class DonHangKhoConcurrencyTest {
         ct.setDonGia(new BigDecimal("25000000"));
         dh.setChiTiet(List.of(ct));
 
-        when(donHangRepository.findByIdForUpdate("DH001")).thenReturn(Optional.of(dh));
-
-        // 1. Thử sửa dòng tăng vượt tồn kho: ném BAD_REQUEST ("Không đủ tồn kho")
-        assertThatThrownBy(() -> donHangService.suaDong("DH001", "PB001", 7))
-                .isInstanceOf(AppException.class)
-                .matches(e -> ((AppException) e).getStatus() == HttpStatus.BAD_REQUEST)
-                .hasMessageContaining("Không đủ tồn kho");
-
-        // 2. Thử trừ kho trực tiếp quá số lượng tồn: ném CONFLICT ("Tồn kho không đủ"), KHÔNG ép âm về 0
+        // Trừ kho trực tiếp quá số lượng tồn: ném CONFLICT, KHÔNG ép âm về 0.
         assertThatThrownBy(() -> {
             try {
                 java.lang.reflect.Method m = DonHangService.class.getDeclaredMethod(
@@ -653,41 +645,56 @@ public class DonHangKhoConcurrencyTest {
     }
 
     @Test
-    @DisplayName("Test 10: Sửa số lượng dòng đơn (suaDong): Khóa và cập nhật tồn kho an toàn")
-    void test10_suaDong_adjustQuantityWithLockingAndValidation() {
+    @DisplayName("Test 10: Không thay đổi số lượng đơn đã đặt, kể cả COD chưa thu tiền")
+    void test10_suaDong_cannotChangeAnyPlacedOrder() {
         pb1.setSoLuongTon(5);
-        configurePessimisticRowLocking();
-
         DonHang dh = new DonHang();
         dh.setMaDonHang("DH001");
-        dh.setKhachHang(khachHang);
         dh.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
         dh.setTamTinh(new BigDecimal("25000000"));
         dh.setTongThanhToan(new BigDecimal("25000000"));
-        dh.setPhiVanChuyen(BigDecimal.ZERO);
-
         ChiTietDonHang ct = new ChiTietDonHang();
-        ct.setMaChiTiet("CT001");
-        ct.setDonHang(dh);
         ct.setPhienBan(pb1);
         ct.setSoLuong(1);
-        ct.setDonGia(new BigDecimal("25000000"));
         dh.setChiTiet(new ArrayList<>(List.of(ct)));
-
+        ThanhToan cod = new ThanhToan();
+        cod.setPhuongThuc(PhuongThucTt.COD);
+        cod.setTrangThai(TrangThaiThanhToan.CHO_THANH_TOAN);
+        cod.setSoTien(dh.getTongThanhToan());
         when(donHangRepository.findByIdForUpdate("DH001")).thenReturn(Optional.of(dh));
+        when(thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc("DH001")).thenReturn(List.of(cod));
 
-        try {
-            // Tăng từ 1 lên 3 chiếc: cần thêm 2 chiếc, tồn kho 5 -> 3
-            DonHangDto result = donHangService.suaDong("DH001", "PB001", 3);
-            assertThat(result).isNotNull();
-        } finally {
-            releaseAllRowLocks();
+        for (int quantity : new int[]{0, 1, 2, -1}) {
+            assertThatThrownBy(() -> donHangService.suaDong("DH001", "PB001", quantity))
+                    .isInstanceOf(AppException.class)
+                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.CONFLICT)
+                    .hasMessageContaining("Không được thay đổi số lượng");
         }
-
-        assertThat(pb1.getSoLuongTon()).isEqualTo(3);
-        assertThat(savedBienDong).hasSize(1);
-        assertThat(savedBienDong.get(0).getLoaiBienDong()).isEqualTo(LoaiBienDongKho.DIEU_CHINH);
-        assertThat(savedBienDong.get(0).getTonTruoc()).isEqualTo(5);
-        assertThat(savedBienDong.get(0).getTonSau()).isEqualTo(3);
+        assertThat(ct.getSoLuong()).isEqualTo(1);
+        assertThat(dh.getChiTiet()).hasSize(1);
+        assertThat(dh.getTongThanhToan()).isEqualByComparingTo("25000000");
+        assertThat(cod.getSoTien()).isEqualByComparingTo("25000000");
+        assertThat(pb1.getSoLuongTon()).isEqualTo(5);
+        assertThat(savedBienDong).isEmpty();
+        verifyNoInteractions(donHangRepository, thanhToanRepository, phienBanRepository, bienDongRepository);
     }
+
+    @Test
+    void paidOnlineOrderCannotChangeQuantityEvenBeforeConfirmation() {
+        for (PhuongThucTt method : List.of(PhuongThucTt.CHUYEN_KHOAN, PhuongThucTt.VI_DIEN_TU)) {
+            DonHang dh = new DonHang();
+            dh.setMaDonHang("DH001");
+            dh.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
+            ThanhToan paid = new ThanhToan();
+            paid.setPhuongThuc(method);
+            paid.setTrangThai(TrangThaiThanhToan.DA_THANH_TOAN);
+            when(donHangRepository.findByIdForUpdate("DH001")).thenReturn(Optional.of(dh));
+            when(thanhToanRepository.findByDonHangMaDonHangOrderByNgayTaoDesc("DH001")).thenReturn(List.of(paid));
+            assertThatThrownBy(() -> donHangService.suaDong("DH001", "PB001", 2))
+                    .isInstanceOf(AppException.class)
+                    .matches(e -> ((AppException) e).getStatus() == HttpStatus.CONFLICT);
+        }
+        verifyNoInteractions(donHangRepository, thanhToanRepository, phienBanRepository, bienDongRepository);
+    }
+
 }

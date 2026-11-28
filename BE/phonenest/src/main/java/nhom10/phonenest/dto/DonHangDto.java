@@ -41,12 +41,42 @@ public record DonHangDto(
         BigDecimal phiKhaiGia,
         BigDecimal phuPhiCod,
         LocalDate ngayGiaoDuKienTu,
-        LocalDate ngayGiaoDuKienDen) {
+        LocalDate ngayGiaoDuKienDen,
+        ThanhToanInfo thanhToan,
+        Boolean khoaSuaSoLuong) {
+
+    // Giữ hợp đồng JSON cũ, kể cả khi đọc cache checkout trước V11.
+    public DonHangDto {
+        khoaSuaSoLuong = true;
+    }
 
     @com.fasterxml.jackson.annotation.JsonProperty("hanDoiTra")
     public LocalDateTime hanDoiTra() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, false); }
     @com.fasterxml.jackson.annotation.JsonProperty("hanBaoHanh")
     public LocalDateTime hanBaoHanh() { return nhom10.phonenest.util.AfterSalesPolicy.end(ngayGiao, ngayKhachXacNhan, true); }
+
+    /** Giữ tương thích với caller M22 và cache checkout cũ. */
+    public DonHangDto(
+            String maDonHang, String maKh, String maKm, String maKmVanChuyen,
+            LocalDateTime ngayMua, PhuongThucTt phuongThucTt, TrangThaiDonHang trangThai,
+            BigDecimal tamTinh, BigDecimal giamGia, BigDecimal phiVanChuyen,
+            BigDecimal giamPhiVanChuyen, BigDecimal tongTien, String diaChiGiaoHang,
+            LocalDateTime ngayCapNhat, LocalDateTime ngayGiao, String tenKhach,
+            String tenNguoiNhan, String soDienThoaiNhan, String trangThaiDoiTra,
+            String lyDoHuy, LocalDateTime ngayKhachXacNhan, String nguoiXacNhan,
+            List<Dong> chiTiet, BigDecimal phiKhaiGia, BigDecimal phuPhiCod,
+            LocalDate ngayGiaoDuKienTu, LocalDate ngayGiaoDuKienDen) {
+        this(maDonHang, maKh, maKm, maKmVanChuyen, ngayMua, phuongThucTt, trangThai,
+                tamTinh, giamGia, phiVanChuyen, giamPhiVanChuyen, tongTien,
+                diaChiGiaoHang, ngayCapNhat, ngayGiao, tenKhach, tenNguoiNhan, soDienThoaiNhan,
+                trangThaiDoiTra, lyDoHuy, ngayKhachXacNhan, nguoiXacNhan, chiTiet,
+                phiKhaiGia, phuPhiCod, ngayGiaoDuKienTu, ngayGiaoDuKienDen, null, null);
+    }
+
+    public record ThanhToanInfo(PhuongThucTt phuongThuc,
+            nhom10.phonenest.enums.TrangThaiThanhToan trangThai, BigDecimal soTien,
+            String maGiaoDich, String maGiaoDichNganHang, String maGiaoDichMoMo,
+            LocalDateTime ngayThanhToan) {}
 
     /** Constructor trước M22 (không có chi tiết phí / ngày giao dự kiến), giữ cho test và caller cũ. */
     public DonHangDto(

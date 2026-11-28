@@ -4,6 +4,7 @@ import Modal from '../../components/Modal';
 import MoneyInput from '../../components/MoneyInput';
 import StatusBadge from '../../components/StatusBadge';
 import { CANCEL_REASONS, ORDER_STATUS } from '../../config/constants';
+import { PAYMENT_LABELS, PAYMENT_METHOD_LABELS, paymentView, canConfirmCodPayment } from '../../utils/adminOrderPayment';
 import useFetch from '../../hooks/useFetch';
 import useToast from '../../hooks/useToast';
 import { adminService } from '../../service/adminService';
@@ -28,6 +29,8 @@ const NEXT = {
 const empty = {
   q: '',
   trangThai: '',
+  phuongThucTt: '',
+  trangThaiThanhToan: '',
   from: '',
   to: '',
   minTotal: '',
@@ -41,6 +44,8 @@ const readOrderFilters = (searchParams) => {
   const initial = { ...empty };
   const status = searchParams.get('trangThai') || '';
   if (Object.prototype.hasOwnProperty.call(ORDER_STATUS, status)) initial.trangThai = status;
+  if (Object.hasOwn(PAYMENT_METHOD_LABELS, searchParams.get('phuongThucTt'))) initial.phuongThucTt = searchParams.get('phuongThucTt');
+  if (Object.hasOwn(PAYMENT_LABELS, searchParams.get('trangThaiThanhToan'))) initial.trangThaiThanhToan = searchParams.get('trangThaiThanhToan');
   initial.q = searchParams.get('q') || '';
   initial.from = searchParams.get('from') || '';
   initial.to = searchParams.get('to') || '';
@@ -59,7 +64,7 @@ const readOrderFilters = (searchParams) => {
 
 const orderFiltersToSearchParams = (filters) => {
   const params = new URLSearchParams();
-  ['q', 'trangThai', 'from', 'to', 'minTotal', 'maxTotal'].forEach((key) => {
+  ['q', 'trangThai', 'phuongThucTt', 'trangThaiThanhToan', 'from', 'to', 'minTotal', 'maxTotal'].forEach((key) => {
     if (filters[key]) params.set(key, String(filters[key]));
   });
   if (filters.ngayTheo !== 'ngayMua') params.set('ngayTheo', filters.ngayTheo);
@@ -75,6 +80,7 @@ export default function AdminOrdersPage() {
   const [page, setPage] = useState(0);
 
   const [selected, setSelected] = useState(null);
+  const [confirmingCod, setConfirmingCod] = useState(false);
   const [xacNhanGiao, setXacNhanGiao] = useState(null);
   const [dangGui, setDangGui] = useState(false);
   const [cancelOrder, setCancelOrder] = useState(null);
@@ -118,6 +124,7 @@ export default function AdminOrdersPage() {
       setMomoRefundStatus(nextStatus);
       toast('MoMo đã xác nhận hoàn tiền');
       reload();
+      await refreshSelectedPayment(selected.maDonHang);
     } catch (error) {
       toast(errorMessage(error), 'error');
     } finally {
@@ -144,6 +151,7 @@ export default function AdminOrdersPage() {
         toast(status.message || 'VNPay chưa xác nhận hoàn tiền', 'error');
       }
       reload();
+      await refreshSelectedPayment(selected.maDonHang);
     } catch (error) {
       toast(errorMessage(error), 'error');
     } finally {
@@ -161,6 +169,8 @@ export default function AdminOrdersPage() {
     () =>
       adminService.filterOrders({
         q: filter.q || undefined,
+        phuongThucTt: filter.phuongThucTt || undefined,
+        trangThaiThanhToan: filter.trangThaiThanhToan || undefined,
         trangThai: filter.trangThai && filter.trangThai !== 'DANG_XU_LY' ? filter.trangThai : undefined,
         nhomTrangThai: filter.trangThai === 'DANG_XU_LY' ? 'DANG_XU_LY' : undefined,
         ngayTheo: filter.ngayTheo,
@@ -182,6 +192,30 @@ export default function AdminOrdersPage() {
   );
 
   const orders = result?.content || [];
+  const selectedPayment = paymentView(selected);
+
+  const refreshSelectedPayment = async (id) => {
+    const updated = await adminService.order(id);
+    setSelected(current => current?.maDonHang === id ? updated : current);
+  };
+
+  const confirmCod = async () => {
+    if (confirmingCod || !canConfirmCodPayment(selected)) return;
+    const id = selected.maDonHang;
+    if (!window.confirm(`Xác nhận đã thực tế thu đủ ${formatPrice(selected.tongTien)} cho đơn ${id}? Chỉ thực hiện sau khi đối soát tiền COD. Không thể xác nhận lại.`)) return;
+    setConfirmingCod(true);
+    try {
+      const updated = await adminService.confirmCodPayment(id);
+      setSelected(current => current?.maDonHang === id ? updated : current);
+      toast('Đã xác nhận thu tiền COD');
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+      try { await refreshSelectedPayment(id); } catch { /* giữ lỗi nghiệp vụ */ }
+    } finally {
+      setConfirmingCod(false);
+      reload();
+    }
+  };
 
   const update = (name, value) => {
     setDraft((prev) => ({
@@ -310,11 +344,7 @@ export default function AdminOrdersPage() {
       o.trangThai === 'DA_GIAO' &&
       o.ngayKhachXacNhan
     ) {
-      return `${
-        o.nguoiXacNhan || 'Khách hàng'
-      } xác nhận lúc ${formatDate(
-        o.ngayKhachXacNhan
-      )}`;
+      return `${o.nguoiXacNhan ? 'Khách xác nhận' : 'Hoàn thành (không có tài khoản xác nhận)'} lúc ${formatDate(o.ngayKhachXacNhan)}`;
     }
 
     return null;
@@ -392,6 +422,7 @@ export default function AdminOrdersPage() {
   return (
     <>
       <h2>Quản lý đơn hàng</h2>
+      <p className="muted">Trạng thái thanh toán độc lập với trạng thái đơn. Phiên thanh toán online chưa tạo đơn không nằm trong danh sách này.</p>
 
       {/* BỘ LỌC ĐƠN HÀNG */}
       <form
@@ -431,6 +462,14 @@ export default function AdminOrdersPage() {
             ))}
         </select>
 
+        <select aria-label="Phương thức thanh toán" value={draft.phuongThucTt} onChange={e => update('phuongThucTt', e.target.value)}>
+          <option value="">Mọi phương thức thanh toán</option>
+          {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select aria-label="Trạng thái thanh toán" value={draft.trangThaiThanhToan} onChange={e => update('trangThaiThanhToan', e.target.value)}>
+          <option value="">Mọi trạng thái thanh toán</option>
+          {Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
         <label>
           Lọc ngày theo
           <select
@@ -578,7 +617,9 @@ export default function AdminOrdersPage() {
                 <th>{filter.ngayTheo === 'ngayGiao' ? 'Ngày giao' : 'Ngày mua'}</th>
                 <th>Sản phẩm</th>
                 <th>Tổng tiền</th>
-                <th>Trạng thái</th>
+                <th>Phương thức</th>
+                <th>Thanh toán</th>
+                <th>Trạng thái đơn</th>
                 <th></th>
               </tr>
             </thead>
@@ -609,6 +650,8 @@ export default function AdminOrdersPage() {
                     {formatPrice(o.tongTien)}
                   </td>
 
+                  <td>{paymentView(o).method}</td>
+                  <td><span className={`admin-payment-badge admin-payment-${paymentView(o).tone}`}>{paymentView(o).label}</span></td>
                   <td>
                     {trangThaiCell(o)}
                   </td>
@@ -630,7 +673,7 @@ export default function AdminOrdersPage() {
                 orders.length === 0 && (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="9"
                       className="muted"
                     >
                       Không có đơn hàng phù hợp.
@@ -737,6 +780,23 @@ export default function AdminOrdersPage() {
             </p>
           </div>
 
+          <section className="admin-order-payment-info" aria-label="Thông tin thanh toán">
+            <div className="row between">
+              <h3>Thông tin thanh toán</h3>
+              <span className={`admin-payment-badge admin-payment-${selectedPayment.tone}`}>{selectedPayment.label}</span>
+            </div>
+            <dl>
+              <dt>Phương thức</dt><dd>{selectedPayment.method}</dd>
+              <dt>{selected.phuongThucTt === 'COD' && selected.thanhToan?.trangThai === 'CHO_THANH_TOAN' ? 'Số tiền cần thu' : 'Số tiền giao dịch'}</dt><dd>{selectedPayment.amount == null ? 'Chưa có dữ liệu' : formatPrice(selectedPayment.amount)}</dd>
+              <dt>Mã tham chiếu</dt><dd>{selectedPayment.reference || '—'}</dd>
+              {selected.phuongThucTt !== 'COD' && <><dt>Mã giao dịch cổng thanh toán</dt><dd>{selectedPayment.providerId || '—'}</dd></>}
+              <dt>Thời điểm thanh toán</dt><dd>{selectedPayment.paidAt ? formatDate(selectedPayment.paidAt) : 'Chưa ghi nhận'}</dd>
+            </dl>
+            {selectedPayment.mismatch && <p className="error" role="alert">Số tiền giao dịch khác tổng đơn hàng. Cần đối soát trước khi xử lý.</p>}
+            {canConfirmCodPayment(selected) && <button type="button" className="btn btn-primary" disabled={confirmingCod} onClick={confirmCod}>{confirmingCod ? 'Đang xác nhận...' : 'Xác nhận đã thu tiền COD'}</button>}
+            {selected.phuongThucTt === 'COD' && selected.thanhToan?.trangThai === 'CHO_THANH_TOAN' && ['DANG_GIAO','CHO_KHACH_XAC_NHAN','DA_GIAO'].includes(selected.trangThai) && !canConfirmCodPayment(selected) && <p className="error" role="alert">Dữ liệu thu tiền COD không khớp. Cần đối soát trước khi xác nhận.</p>}
+          </section>
+
           <p>
             Giao đến:{' '}
             {selected.diaChiGiaoHang ||
@@ -799,14 +859,9 @@ export default function AdminOrdersPage() {
 
           {selected.ngayKhachXacNhan && (
             <p>
-              Khách xác nhận:{' '}
-              {formatDate(
-                selected.ngayKhachXacNhan
-              )}{' '}
-              (
-              {selected.nguoiXacNhan ||
-                'Khách hàng'}
-              )
+              {selected.nguoiXacNhan ? 'Khách xác nhận' : 'Thời điểm hoàn thành'}:{' '}
+              {formatDate(selected.ngayKhachXacNhan)}
+              {selected.nguoiXacNhan ? ` (${selected.nguoiXacNhan})` : ' (không có tài khoản xác nhận)'}
             </p>
           )}
 
@@ -821,45 +876,10 @@ export default function AdminOrdersPage() {
                   {formatPrice(d.donGia)}
                 </span>
 
-                {selected.trangThai ===
-                'CHO_XAC_NHAN' ? (
-                  <input
-                    className="qty"
-                    type="number"
-                    min="0"
-                    defaultValue={
-                      d.soLuong
-                    }
-                    onBlur={(e) =>
-                      Number(
-                        e.target.value
-                      ) !== d.soLuong &&
-                      run(
-                        () =>
-                          adminService.updateOrderLine(
-                            selected.maDonHang,
-                            d.maPhienBan,
-                            Number(
-                              e.target.value
-                            )
-                          ),
-                        'Đã cập nhật số lượng'
-                      )
-                    }
-                  />
-                ) : (
-                  <span>
-                    × {d.soLuong}
-                  </span>
-                )}
+                <span>× {d.soLuong}</span>
               </div>
             )
           )}
-
-          <p className="muted">
-            Chỉ chỉnh số lượng được khi đơn
-            đang chờ xác nhận.
-          </p>
 
           <div className="summary">
             <div className="row between">

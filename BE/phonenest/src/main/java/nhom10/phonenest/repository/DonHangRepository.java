@@ -22,6 +22,16 @@ public interface DonHangRepository extends JpaRepository<DonHang, String>, JpaSp
 
     List<DonHang> findAllByOrderByNgayMuaDesc();
 
+    // Chỉ lấy ID; scheduler xử lý mỗi đơn trong một transaction riêng.
+    @Query("SELECT d.maDonHang FROM DonHang d WHERE d.trangThai = :status " +
+           "AND d.ngayGiao <= :cutoff AND d.ngayKhachXacNhan IS NULL " +
+           "AND EXISTS (SELECT t FROM ThanhToan t WHERE t.donHang = d " +
+           "AND t.trangThai = nhom10.phonenest.enums.TrangThaiThanhToan.DA_THANH_TOAN " +
+           "AND t.soTien = d.tongThanhToan) ORDER BY d.ngayGiao, d.maDonHang")
+    List<String> findAutoCompletionCandidates(@Param("status") TrangThaiDonHang status,
+                                             @Param("cutoff") LocalDateTime cutoff);
+
+
     @Query("SELECT DISTINCT d FROM DonHang d WHERE EXISTS (" +
            "SELECT t FROM ThanhToan t WHERE t.donHang = d AND (" +
            "t.phuongThuc = nhom10.phonenest.enums.PhuongThucTt.COD OR " +

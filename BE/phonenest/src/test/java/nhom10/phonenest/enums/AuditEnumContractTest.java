@@ -12,8 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditEnumContractTest {
 
     @Test
-    @DisplayName("shouldContainExact33HanhDongAuditEnums")
-    void shouldContainExact33HanhDongAuditEnums() {
+    @DisplayName("shouldContainExact34HanhDongAuditEnums")
+    void shouldContainExact34HanhDongAuditEnums() {
         Set<String> actualNames = Arrays.stream(HanhDongAudit.values())
                 .map(Enum::name)
                 .collect(Collectors.toSet());
@@ -64,13 +64,14 @@ class AuditEnumContractTest {
                 "DELETE_REVIEW",
 
                 "CHANGE_RETURN_STATUS",
-                "REFUND_PAYMENT"
+                "REFUND_PAYMENT",
+                "CONFIRM_COD_PAYMENT"
         );
 
         assertThat(actualNames)
-                .as("HanhDongAudit must match exactly the 33 planned actions")
+                .as("HanhDongAudit must match exactly the 34 planned actions")
                 .containsExactlyInAnyOrderElementsOf(expectedNames);
-        assertThat(HanhDongAudit.values()).hasSize(33);
+        assertThat(HanhDongAudit.values()).hasSize(34);
     }
 
     @Test
